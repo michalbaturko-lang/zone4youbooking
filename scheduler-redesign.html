@@ -1,0 +1,1623 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zone4You - Rezervační systém (Redesign)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #E67E22;
+            --primary-dark: #D35400;
+            --primary-light: #FDEBD0;
+            --success: #27AE60;
+            --success-light: #D5F5E3;
+            --danger: #E74C3C;
+            --danger-light: #FADBD8;
+            --gray-50: #F8FAFC;
+            --gray-100: #F1F5F9;
+            --gray-200: #E2E8F0;
+            --gray-300: #CBD5E1;
+            --gray-400: #94A3B8;
+            --gray-500: #64748B;
+            --gray-600: #475569;
+            --gray-700: #334155;
+            --gray-800: #1E293B;
+            --gray-900: #0F172A;
+            --radius: 12px;
+            --radius-sm: 8px;
+            --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-800);
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: white;
+            border-bottom: 1px solid var(--gray-200);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+            font-size: 18px;
+            color: var(--gray-800);
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 10px 16px;
+            border-radius: var(--radius-sm);
+            font-weight: 500;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--gray-600);
+        }
+
+        .btn-ghost:hover {
+            background: var(--gray-100);
+        }
+
+        /* Navigation Tabs */
+        .nav-tabs {
+            background: white;
+            border-bottom: 1px solid var(--gray-200);
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .nav-tabs::-webkit-scrollbar {
+            display: none;
+        }
+
+        .nav-tabs-inner {
+            display: flex;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 16px;
+        }
+
+        .nav-tab {
+            padding: 14px 20px;
+            font-weight: 500;
+            font-size: 14px;
+            color: var(--gray-500);
+            border-bottom: 2px solid transparent;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .nav-tab:hover {
+            color: var(--gray-700);
+        }
+
+        .nav-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        /* Main Content */
+        .main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 16px;
+        }
+
+        /* Quick Actions Bar */
+        .quick-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .quick-action-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            background: white;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--gray-700);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-action-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .quick-action-btn.highlight {
+            background: var(--success-light);
+            border-color: var(--success);
+            color: var(--success);
+        }
+
+        /* Date Navigation */
+        .date-nav {
+            background: white;
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .date-nav-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .date-nav-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .date-nav-arrows {
+            display: flex;
+            gap: 8px;
+        }
+
+        .date-arrow {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--gray-100);
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .date-arrow:hover {
+            background: var(--gray-200);
+        }
+
+        .date-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+        }
+
+        .date-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px 8px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .date-item:hover {
+            background: var(--gray-100);
+        }
+
+        .date-item.selected {
+            background: var(--primary);
+            color: white;
+        }
+
+        .date-item.today {
+            border: 2px solid var(--primary);
+        }
+
+        .date-day {
+            font-size: 12px;
+            font-weight: 500;
+            opacity: 0.7;
+            margin-bottom: 4px;
+        }
+
+        .date-num {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .date-availability {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            margin-top: 6px;
+        }
+
+        .date-availability.high {
+            background: var(--success);
+        }
+
+        .date-availability.medium {
+            background: var(--primary);
+        }
+
+        .date-availability.low {
+            background: var(--danger);
+        }
+
+        /* Court Filter */
+        .court-filter {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+        }
+
+        .court-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: white;
+            border: 2px solid var(--gray-200);
+            border-radius: 50px;
+            font-size: 14px;
+            font-weight: 500;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .court-chip:hover {
+            border-color: var(--gray-300);
+        }
+
+        .court-chip.active {
+            background: var(--primary-light);
+            border-color: var(--primary);
+            color: var(--primary-dark);
+        }
+
+        .court-chip-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .court-chip-dot.court1 { background: #3498DB; }
+        .court-chip-dot.court2 { background: #E67E22; }
+        .court-chip-dot.court3 { background: #27AE60; }
+        .court-chip-dot.table-tennis { background: #9B59B6; }
+
+        /* Time Slots */
+        .slots-container {
+            background: white;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .slots-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .slots-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .slots-legend {
+            display: flex;
+            gap: 16px;
+            font-size: 12px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 4px;
+        }
+
+        .legend-dot.available { background: var(--success-light); border: 2px solid var(--success); }
+        .legend-dot.reserved { background: var(--gray-200); }
+        .legend-dot.blocked { background: var(--danger-light); }
+
+        .slots-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .time-group {
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        .time-group:last-child {
+            border-bottom: none;
+        }
+
+        .time-label {
+            padding: 12px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--gray-500);
+            background: var(--gray-50);
+            position: sticky;
+            top: 0;
+        }
+
+        .slot-row {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--gray-100);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .slot-row:last-child {
+            border-bottom: none;
+        }
+
+        .slot-row:hover {
+            background: var(--gray-50);
+        }
+
+        .slot-row.available:hover {
+            background: var(--success-light);
+        }
+
+        .slot-time {
+            width: 70px;
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .slot-courts {
+            flex: 1;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .slot-court {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .slot-court.available {
+            background: var(--success-light);
+            color: var(--success);
+        }
+
+        .slot-court.reserved {
+            background: var(--gray-100);
+            color: var(--gray-500);
+        }
+
+        .slot-court.blocked {
+            background: var(--danger-light);
+            color: var(--danger);
+            text-decoration: line-through;
+        }
+
+        .slot-court-icon {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .slot-action {
+            margin-left: auto;
+        }
+
+        .slot-btn {
+            padding: 8px 16px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            opacity: 0;
+            transition: all 0.2s;
+        }
+
+        .slot-row:hover .slot-btn {
+            opacity: 1;
+        }
+
+        /* First Available Banner */
+        .first-available {
+            background: linear-gradient(135deg, var(--success), #1ABC9C);
+            color: white;
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .first-available:hover {
+            transform: translateY(-2px);
+        }
+
+        .first-available-content {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .first-available-icon {
+            width: 48px;
+            height: 48px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .first-available-text h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .first-available-text p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .first-available-btn {
+            padding: 12px 24px;
+            background: white;
+            color: var(--success);
+            border: none;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* Bottom Sheet (Mobile) */
+        .bottom-sheet {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-radius: 24px 24px 0 0;
+            box-shadow: 0 -10px 40px rgba(0,0,0,0.15);
+            z-index: 200;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .bottom-sheet.open {
+            transform: translateY(0);
+        }
+
+        .bottom-sheet-handle {
+            width: 40px;
+            height: 4px;
+            background: var(--gray-300);
+            border-radius: 2px;
+            margin: 12px auto;
+        }
+
+        .bottom-sheet-content {
+            padding: 0 20px 20px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        /* Reservation Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 300;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-overlay.open {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: var(--radius);
+            width: 100%;
+            max-width: 440px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--gray-100);
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-info {
+            background: var(--gray-50);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+
+        .modal-info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+        }
+
+        .modal-info-row:not(:last-child) {
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .modal-info-label {
+            color: var(--gray-500);
+            font-size: 14px;
+        }
+
+        .modal-info-value {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .modal-footer {
+            padding: 20px;
+            border-top: 1px solid var(--gray-200);
+            display: flex;
+            gap: 12px;
+        }
+
+        .modal-footer .btn {
+            flex: 1;
+        }
+
+        /* Mobile Navigation */
+        .mobile-nav {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid var(--gray-200);
+            padding: 8px 16px;
+            padding-bottom: max(8px, env(safe-area-inset-bottom));
+            z-index: 100;
+        }
+
+        .mobile-nav-items {
+            display: flex;
+            justify-content: space-around;
+        }
+
+        .mobile-nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 16px;
+            color: var(--gray-500);
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .mobile-nav-item.active {
+            color: var(--primary);
+        }
+
+        .mobile-nav-icon {
+            font-size: 20px;
+        }
+
+        /* View Toggle */
+        .view-toggle {
+            display: flex;
+            background: var(--gray-100);
+            border-radius: var(--radius-sm);
+            padding: 4px;
+        }
+
+        .view-toggle-btn {
+            padding: 8px 16px;
+            border: none;
+            background: transparent;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--gray-500);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .view-toggle-btn.active {
+            background: white;
+            color: var(--gray-800);
+            box-shadow: var(--shadow);
+        }
+
+        /* Calendar View (Week) */
+        .week-view {
+            display: none;
+        }
+
+        .week-view.active {
+            display: block;
+        }
+
+        .week-grid {
+            display: grid;
+            grid-template-columns: 60px repeat(7, 1fr);
+            background: white;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+
+        .week-header {
+            display: contents;
+        }
+
+        .week-header-cell {
+            padding: 12px 8px;
+            text-align: center;
+            background: var(--gray-50);
+            border-bottom: 1px solid var(--gray-200);
+            font-size: 12px;
+        }
+
+        .week-header-cell.corner {
+            border-right: 1px solid var(--gray-200);
+        }
+
+        .week-time-col {
+            background: var(--gray-50);
+            border-right: 1px solid var(--gray-200);
+        }
+
+        .week-time-cell {
+            padding: 8px;
+            font-size: 11px;
+            color: var(--gray-500);
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .week-day-col {
+            border-right: 1px solid var(--gray-100);
+        }
+
+        .week-day-col:last-child {
+            border-right: none;
+        }
+
+        .week-slot {
+            height: 48px;
+            border-bottom: 1px solid var(--gray-100);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            padding: 2px;
+        }
+
+        .week-slot:hover {
+            background: var(--gray-100);
+        }
+
+        .week-slot.available {
+            background: var(--success-light);
+        }
+
+        .week-slot.reserved {
+            background: var(--gray-200);
+        }
+
+        .week-slot.blocked {
+            background: var(--danger-light);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header-actions .btn span {
+                display: none;
+            }
+
+            .quick-actions {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                padding-bottom: 8px;
+            }
+
+            .quick-action-btn {
+                flex-shrink: 0;
+            }
+
+            .date-grid {
+                gap: 4px;
+            }
+
+            .date-item {
+                padding: 10px 4px;
+            }
+
+            .date-num {
+                font-size: 16px;
+            }
+
+            .court-filter {
+                margin: 0 -16px 20px;
+                padding: 0 16px 8px;
+            }
+
+            .slots-legend {
+                display: none;
+            }
+
+            .slot-courts {
+                flex-direction: column;
+                gap: 4px;
+            }
+
+            .slot-btn {
+                opacity: 1;
+                padding: 6px 12px;
+            }
+
+            .mobile-nav {
+                display: block;
+            }
+
+            .main {
+                padding-bottom: 80px;
+            }
+
+            .first-available {
+                flex-direction: column;
+                text-align: center;
+                gap: 16px;
+            }
+
+            .first-available-content {
+                flex-direction: column;
+            }
+
+            .week-view {
+                overflow-x: auto;
+            }
+
+            .week-grid {
+                min-width: 600px;
+            }
+        }
+
+        @media (min-width: 769px) {
+            .bottom-sheet {
+                display: none !important;
+            }
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .slot-row {
+            animation: fadeIn 0.3s ease forwards;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .empty-state-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .empty-state-text {
+            color: var(--gray-500);
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">Z4</div>
+                <span>Zone4You</span>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-ghost">
+                    <span>🔔</span>
+                </button>
+                <button class="btn btn-primary">
+                    <span>👤</span>
+                    <span>Přihlásit se</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+        <div class="nav-tabs-inner">
+            <div class="nav-tab">Výpis lekcí</div>
+            <div class="nav-tab">Sál 1</div>
+            <div class="nav-tab">Sál 2</div>
+            <div class="nav-tab">Sál 3</div>
+            <div class="nav-tab">Reformer</div>
+            <div class="nav-tab active">Squash</div>
+            <div class="nav-tab">Masáže</div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Quick Actions -->
+        <div class="quick-actions">
+            <button class="quick-action-btn highlight" onclick="scrollToFirstAvailable()">
+                <span>⚡</span>
+                <span>Nejbližší volný termín</span>
+            </button>
+            <button class="quick-action-btn" onclick="toggleView()">
+                <span>📅</span>
+                <span>Týdenní pohled</span>
+            </button>
+            <button class="quick-action-btn">
+                <span>🔄</span>
+                <span>Pravidelná rezervace</span>
+            </button>
+            <button class="quick-action-btn">
+                <span>📋</span>
+                <span>Moje rezervace</span>
+            </button>
+        </div>
+
+        <!-- First Available Banner -->
+        <div class="first-available" onclick="openModal()">
+            <div class="first-available-content">
+                <div class="first-available-icon">🎯</div>
+                <div class="first-available-text">
+                    <h3>Nejbližší volný termín</h3>
+                    <p>Dnes 14:00 - Kurt 1 (za 2 hodiny)</p>
+                </div>
+            </div>
+            <button class="first-available-btn">Rezervovat</button>
+        </div>
+
+        <!-- Date Navigation -->
+        <div class="date-nav">
+            <div class="date-nav-header">
+                <h2 class="date-nav-title">Leden 2026</h2>
+                <div class="date-nav-arrows">
+                    <button class="date-arrow">←</button>
+                    <button class="date-arrow">→</button>
+                </div>
+            </div>
+            <div class="date-grid">
+                <div class="date-item">
+                    <span class="date-day">Po</span>
+                    <span class="date-num">20</span>
+                    <span class="date-availability high"></span>
+                </div>
+                <div class="date-item">
+                    <span class="date-day">Út</span>
+                    <span class="date-num">21</span>
+                    <span class="date-availability medium"></span>
+                </div>
+                <div class="date-item">
+                    <span class="date-day">St</span>
+                    <span class="date-num">22</span>
+                    <span class="date-availability high"></span>
+                </div>
+                <div class="date-item today selected">
+                    <span class="date-day">Čt</span>
+                    <span class="date-num">23</span>
+                    <span class="date-availability medium"></span>
+                </div>
+                <div class="date-item">
+                    <span class="date-day">Pá</span>
+                    <span class="date-num">24</span>
+                    <span class="date-availability low"></span>
+                </div>
+                <div class="date-item">
+                    <span class="date-day">So</span>
+                    <span class="date-num">25</span>
+                    <span class="date-availability low"></span>
+                </div>
+                <div class="date-item">
+                    <span class="date-day">Ne</span>
+                    <span class="date-num">26</span>
+                    <span class="date-availability high"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Court Filter -->
+        <div class="court-filter">
+            <div class="court-chip active">
+                <span class="court-chip-dot court1"></span>
+                Kurt 1
+            </div>
+            <div class="court-chip active">
+                <span class="court-chip-dot court2"></span>
+                Kurt 2
+            </div>
+            <div class="court-chip active">
+                <span class="court-chip-dot court3"></span>
+                Kurt 3
+            </div>
+            <div class="court-chip">
+                <span class="court-chip-dot table-tennis"></span>
+                Stolní tenis
+            </div>
+        </div>
+
+        <!-- Day View (Default) -->
+        <div class="day-view active" id="dayView">
+            <div class="slots-container">
+                <div class="slots-header">
+                    <h3 class="slots-title">Čtvrtek, 23. ledna 2026</h3>
+                    <div class="slots-legend">
+                        <div class="legend-item">
+                            <span class="legend-dot available"></span>
+                            <span>Volné</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot reserved"></span>
+                            <span>Obsazeno</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot blocked"></span>
+                            <span>Blokováno</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="slots-list">
+                    <!-- Morning -->
+                    <div class="time-group">
+                        <div class="time-label">🌅 Ráno (6:00 - 12:00)</div>
+
+                        <div class="slot-row">
+                            <span class="slot-time">6:00</span>
+                            <div class="slot-courts">
+                                <span class="slot-court available"><span class="slot-court-icon" style="background: #3498DB"></span> Kurt 1</span>
+                                <span class="slot-court available"><span class="slot-court-icon" style="background: #E67E22"></span> Kurt 2</span>
+                                <span class="slot-court reserved"><span class="slot-court-icon" style="background: #27AE60"></span> Kurt 3</span>
+                            </div>
+                            <div class="slot-action">
+                                <button class="slot-btn" onclick="openModal()">Rezervovat</button>
+                            </div>
+                        </div>
+
+                        <div class="slot-row">
+                            <span class="slot-time">7:00</span>
+                            <div class="slot-courts">
+                                <span class="slot-court available"><span class="slot-court-icon" style="background: #3498DB"></span> Kurt 1</span>
+                                <span class="slot-court reserved"><span class="slot-court-icon" style="background: #E67E22"></span> Kurt 2</span>
+                                <span class="slot-court available"><span class="slot-court-icon" style="background: #27AE60"></span> Kurt 3</span>
+                            </div>
+                            <div class="slot-action">
+                                <button class="slot-btn" onclick="openModal()">Rezervovat</button>
+                            </div>
+                        </div>
+
+                        <div class="slot-row">
+                            <span class="slot-time">8:00</span>
+                            <div class="slot-courts">
+                                <span class="slot-court reserved"><span class="slot-court-icon" style="background: #3498DB"></span> Kurt 1</span>
+                                <span class="slot-court reserved"><span class="slot-court-icon" style="background: #E67E22"></span> Kurt 2</span>
+                                <span class="slot-court reserved"><span class="slot-court-icon" style="background: #27AE60"></span> Kurt 3</span>
+                            </div>
+                        </div>
+
+                        <div class="slot-row">
+                            <span class="slot-time">9:00</span>
+                            <div class="slot-courts">
+                                <span class="slot-court available"><span class="slot-court-icon" style="background: #3498DB"></span> Kurt 1</span>
+                                <span class="slot-court available"><span class="slot-court-icon" style="background: #E67E22"></span> Kurt 2</span>
+                                <span class="slot-court available"><span class="slot-court-icon" style="background: #27AE60"></span> Kurt 3</span>
+                            </div>
+                            <div class="slot-action">
+                                <button class="slot-btn" onclick="openModal()">Rezervovat</button>
+                            </div>
+                        </div>
+
+                        <div class="slot-row">
+                            <span class="slot-time">10:00</span>
+                            <div class="slot-courts">
+                                <span class="slot-court reserved"><span class="slot-court-icon" style="background: #3498DB"></span> Kurt 1</span>
+                                <span class="slot-court available"><span class="slot-court-icon" style="background: #E67E22"></span> Kurt 2</span>
+                                <span class="slot-court reserved"><span class="slot-court-icon" style="background: #27AE60"></span> Kurt 3</span>
+                            </div>
+                            <div class="slot-action">
+                                <button class="slot-btn" onclick="openModal()">Rezervovat</button>
+                            </div>
+                        </div>
+
+                        <div class="slot-row">
+                            <span class="slot-time">11:00</span>
+                            <div class="slot-courts">
+                                <span class="slot-court available"><span class="slot-court-icon" style="background: #3498DB"></span> Kurt 1</span>
+                                <span class="slot-court reserved"><span class="slot-court-icon" style="background: #E67E22"></span> Kurt 2</span>
+                                <span class="slot-court available"><span class="slot-court-icon" style="background: #27AE60"></span> Kurt 3</span>
+                            </div>
+                            <div class="slot-action">
+                                <button class="slot-btn" onclick="openModal()">Rezervovat</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Afternoon -->
+                    <div class="time-group">
+                        <div class="time-label">☀️ Odpoledne (12:00 - 18:00)</div>
+
+                        <div class="slot-row">
+                            <span class="slot-time">12:00</span>
+                            <div class="slot-courts">
+                                <span class="slot-court available"><span class="slot-court-icon" style="background: #3498DB"></span> Kurt 1</span>
+                                <span class="slot-court available"><span class="slot-court-icon" style="background: #E67E22"></span> Kurt 2</span>
+                                <span class="slot-court available"><span class="slot-court-icon" style="background: #27AE60"></span> Kurt 3</span>
+                            </div>
+                            <div class="slot-action">
+                                <button class="slot-btn" onclick="openModal()">Rezervovat</button>
+                            </div>
+                        </div>
+
+                        <div class="slot-row">
+                            <span class="slot-time">13:00</span>
+                            <div class="slot-courts">
+                                <span class="slot-court reserved"><span class="slot-court-icon" style="background: #3498DB"></span> Kurt 1</span>
+                                <span class="slot-court available"><span class="slot-court-icon" style="background: #E67E22"></span> Kurt 2</span>
+                                <span class="slot-court reserved"><span class="slot-court-icon" style="background: #27AE60"></span> Kurt 3</span>
+                            </div>
+                            <div class="slot-action">
+                                <button class="slot-btn" onclick="openModal()">Rezervovat</button>
+                            </div>
+                        </div>
+
+                        <div class="slot-row" id="firstAvailable">
+                            <span class="slot-time">14:00</span>
+                            <div class="slot-courts">
+                                <span class="slot-court available"><span class="slot-court-icon" style="background: #3498DB"></span> Kurt 1</span>
+                                <span class="slot-court available"><span class="slot-court-icon" style="background: #E67E22"></span> Kurt 2</span>
+                                <span class="slot-court available"><span class="slot-court-icon" style="background: #27AE60"></span> Kurt 3</span>
+                            </div>
+                            <div class="slot-action">
+                                <button class="slot-btn" onclick="openModal()">Rezervovat</button>
+                            </div>
+                        </div>
+
+                        <div class="slot-row">
+                            <span class="slot-time">15:00</span>
+                            <div class="slot-courts">
+                                <span class="slot-court reserved"><span class="slot-court-icon" style="background: #3498DB"></span> Kurt 1</span>
+                                <span class="slot-court reserved"><span class="slot-court-icon" style="background: #E67E22"></span> Kurt 2</span>
+                                <span class="slot-court available"><span class="slot-court-icon" style="background: #27AE60"></span> Kurt 3</span>
+                            </div>
+                            <div class="slot-action">
+                                <button class="slot-btn" onclick="openModal()">Rezervovat</button>
+                            </div>
+                        </div>
+
+                        <div class="slot-row">
+                            <span class="slot-time">16:00</span>
+                            <div class="slot-courts">
+                                <span class="slot-court reserved"><span class="slot-court-icon" style="background: #3498DB"></span> Kurt 1</span>
+                                <span class="slot-court reserved"><span class="slot-court-icon" style="background: #E67E22"></span> Kurt 2</span>
+                                <span class="slot-court reserved"><span class="slot-court-icon" style="background: #27AE60"></span> Kurt 3</span>
+                            </div>
+                        </div>
+
+                        <div class="slot-row">
+                            <span class="slot-time">17:00</span>
+                            <div class="slot-courts">
+                                <span class="slot-court blocked"><span class="slot-court-icon" style="background: #3498DB"></span> Kurt 1</span>
+                                <span class="slot-court reserved"><span class="slot-court-icon" style="background: #E67E22"></span> Kurt 2</span>
+                                <span class="slot-court reserved"><span class="slot-court-icon" style="background: #27AE60"></span> Kurt 3</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Evening -->
+                    <div class="time-group">
+                        <div class="time-label">🌙 Večer (18:00 - 22:00)</div>
+
+                        <div class="slot-row">
+                            <span class="slot-time">18:00</span>
+                            <div class="slot-courts">
+                                <span class="slot-court reserved"><span class="slot-court-icon" style="background: #3498DB"></span> Kurt 1</span>
+                                <span class="slot-court reserved"><span class="slot-court-icon" style="background: #E67E22"></span> Kurt 2</span>
+                                <span class="slot-court reserved"><span class="slot-court-icon" style="background: #27AE60"></span> Kurt 3</span>
+                            </div>
+                        </div>
+
+                        <div class="slot-row">
+                            <span class="slot-time">19:00</span>
+                            <div class="slot-courts">
+                                <span class="slot-court reserved"><span class="slot-court-icon" style="background: #3498DB"></span> Kurt 1</span>
+                                <span class="slot-court available"><span class="slot-court-icon" style="background: #E67E22"></span> Kurt 2</span>
+                                <span class="slot-court reserved"><span class="slot-court-icon" style="background: #27AE60"></span> Kurt 3</span>
+                            </div>
+                            <div class="slot-action">
+                                <button class="slot-btn" onclick="openModal()">Rezervovat</button>
+                            </div>
+                        </div>
+
+                        <div class="slot-row">
+                            <span class="slot-time">20:00</span>
+                            <div class="slot-courts">
+                                <span class="slot-court available"><span class="slot-court-icon" style="background: #3498DB"></span> Kurt 1</span>
+                                <span class="slot-court available"><span class="slot-court-icon" style="background: #E67E22"></span> Kurt 2</span>
+                                <span class="slot-court available"><span class="slot-court-icon" style="background: #27AE60"></span> Kurt 3</span>
+                            </div>
+                            <div class="slot-action">
+                                <button class="slot-btn" onclick="openModal()">Rezervovat</button>
+                            </div>
+                        </div>
+
+                        <div class="slot-row">
+                            <span class="slot-time">21:00</span>
+                            <div class="slot-courts">
+                                <span class="slot-court available"><span class="slot-court-icon" style="background: #3498DB"></span> Kurt 1</span>
+                                <span class="slot-court reserved"><span class="slot-court-icon" style="background: #E67E22"></span> Kurt 2</span>
+                                <span class="slot-court available"><span class="slot-court-icon" style="background: #27AE60"></span> Kurt 3</span>
+                            </div>
+                            <div class="slot-action">
+                                <button class="slot-btn" onclick="openModal()">Rezervovat</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Week View -->
+        <div class="week-view" id="weekView">
+            <div class="slots-container">
+                <div class="slots-header">
+                    <h3 class="slots-title">Týden 20. - 26. ledna 2026 • Kurt 1</h3>
+                    <div class="view-toggle">
+                        <button class="view-toggle-btn active">Kurt 1</button>
+                        <button class="view-toggle-btn">Kurt 2</button>
+                        <button class="view-toggle-btn">Kurt 3</button>
+                    </div>
+                </div>
+                <div class="week-grid">
+                    <div class="week-header">
+                        <div class="week-header-cell corner"></div>
+                        <div class="week-header-cell"><strong>Po</strong><br>20.1.</div>
+                        <div class="week-header-cell"><strong>Út</strong><br>21.1.</div>
+                        <div class="week-header-cell"><strong>St</strong><br>22.1.</div>
+                        <div class="week-header-cell" style="background: var(--primary-light)"><strong>Čt</strong><br>23.1.</div>
+                        <div class="week-header-cell"><strong>Pá</strong><br>24.1.</div>
+                        <div class="week-header-cell"><strong>So</strong><br>25.1.</div>
+                        <div class="week-header-cell"><strong>Ne</strong><br>26.1.</div>
+                    </div>
+                    <div class="week-time-col">
+                        <div class="week-time-cell">6:00</div>
+                        <div class="week-time-cell">7:00</div>
+                        <div class="week-time-cell">8:00</div>
+                        <div class="week-time-cell">9:00</div>
+                        <div class="week-time-cell">10:00</div>
+                        <div class="week-time-cell">11:00</div>
+                        <div class="week-time-cell">12:00</div>
+                        <div class="week-time-cell">13:00</div>
+                        <div class="week-time-cell">14:00</div>
+                        <div class="week-time-cell">15:00</div>
+                        <div class="week-time-cell">16:00</div>
+                        <div class="week-time-cell">17:00</div>
+                        <div class="week-time-cell">18:00</div>
+                        <div class="week-time-cell">19:00</div>
+                        <div class="week-time-cell">20:00</div>
+                        <div class="week-time-cell">21:00</div>
+                    </div>
+                    <!-- Monday -->
+                    <div class="week-day-col">
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                    </div>
+                    <!-- Tuesday -->
+                    <div class="week-day-col">
+                        <div class="week-slot available"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot blocked"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                    </div>
+                    <!-- Wednesday -->
+                    <div class="week-day-col">
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                    </div>
+                    <!-- Thursday (Today) -->
+                    <div class="week-day-col" style="background: var(--primary-light)">
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot blocked"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                    </div>
+                    <!-- Friday -->
+                    <div class="week-day-col">
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot available"></div>
+                    </div>
+                    <!-- Saturday -->
+                    <div class="week-day-col">
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                    </div>
+                    <!-- Sunday -->
+                    <div class="week-day-col">
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot reserved"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                        <div class="week-slot available"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Mobile Bottom Navigation -->
+    <nav class="mobile-nav">
+        <div class="mobile-nav-items">
+            <div class="mobile-nav-item active">
+                <span class="mobile-nav-icon">🏸</span>
+                <span>Squash</span>
+            </div>
+            <div class="mobile-nav-item">
+                <span class="mobile-nav-icon">📅</span>
+                <span>Rezervace</span>
+            </div>
+            <div class="mobile-nav-item">
+                <span class="mobile-nav-icon">🔍</span>
+                <span>Hledat</span>
+            </div>
+            <div class="mobile-nav-item">
+                <span class="mobile-nav-icon">👤</span>
+                <span>Profil</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Reservation Modal -->
+    <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3 class="modal-title">Nová rezervace</h3>
+                <button class="modal-close" onclick="closeModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-info">
+                    <div class="modal-info-row">
+                        <span class="modal-info-label">Datum</span>
+                        <span class="modal-info-value">Čtvrtek, 23. ledna 2026</span>
+                    </div>
+                    <div class="modal-info-row">
+                        <span class="modal-info-label">Čas</span>
+                        <span class="modal-info-value">14:00 - 15:00</span>
+                    </div>
+                    <div class="modal-info-row">
+                        <span class="modal-info-label">Kurt</span>
+                        <span class="modal-info-value">Kurt 1</span>
+                    </div>
+                    <div class="modal-info-row">
+                        <span class="modal-info-label">Cena</span>
+                        <span class="modal-info-value">180 Kč</span>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-size: 14px; font-weight: 500; margin-bottom: 8px;">Délka rezervace</label>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-ghost" style="flex: 1; border: 2px solid var(--gray-200);">30 min</button>
+                        <button class="btn btn-primary" style="flex: 1;">60 min</button>
+                        <button class="btn btn-ghost" style="flex: 1; border: 2px solid var(--gray-200);">90 min</button>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-size: 14px; font-weight: 500; margin-bottom: 8px;">Poznámka (volitelné)</label>
+                    <textarea style="width: 100%; padding: 12px; border: 1px solid var(--gray-200); border-radius: var(--radius-sm); font-family: inherit; font-size: 14px; resize: none;" rows="2" placeholder="Např. trénink s Martinem"></textarea>
+                </div>
+
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer;">
+                    <input type="checkbox" style="width: 18px; height: 18px; accent-color: var(--primary);">
+                    Opakovat každý týden
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" style="border: 1px solid var(--gray-200);" onclick="closeModal()">Zrušit</button>
+                <button class="btn btn-primary">Potvrdit rezervaci</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openModal() {
+            document.getElementById('modalOverlay').classList.add('open');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('modalOverlay').classList.remove('open');
+            document.body.style.overflow = '';
+        }
+
+        function scrollToFirstAvailable() {
+            const element = document.getElementById('firstAvailable');
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            element.style.background = 'var(--success-light)';
+            setTimeout(() => {
+                element.style.background = '';
+            }, 2000);
+        }
+
+        function toggleView() {
+            const dayView = document.getElementById('dayView');
+            const weekView = document.getElementById('weekView');
+
+            if (dayView.classList.contains('active')) {
+                dayView.classList.remove('active');
+                dayView.style.display = 'none';
+                weekView.classList.add('active');
+                weekView.style.display = 'block';
+            } else {
+                weekView.classList.remove('active');
+                weekView.style.display = 'none';
+                dayView.classList.add('active');
+                dayView.style.display = 'block';
+            }
+        }
+
+        // Court chip toggle
+        document.querySelectorAll('.court-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                chip.classList.toggle('active');
+            });
+        });
+
+        // Date selection
+        document.querySelectorAll('.date-item').forEach(item => {
+            item.addEventListener('click', () => {
+                document.querySelectorAll('.date-item').forEach(i => i.classList.remove('selected'));
+                item.classList.add('selected');
+            });
+        });
+
+        // Nav tab selection
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+            });
+        });
+
+        // Keyboard support for modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+    </script>
+</body>
+</html>
