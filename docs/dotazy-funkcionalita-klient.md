@@ -87,14 +87,4 @@ Před zahájením vývoje potřebujeme upřesnit, jaké funkce si přejete v nov
 
 ---
 
-## Shrnutí požadavků z předchozí komunikace
-
-Co už víme, že klient chce:
-- [x] Nový design rezervačního systému (schváleno)
-- [x] Napojení na Luxart API (odsouhlaseno)
-- [x] Dobíjení kreditu přes platební bránu (zmíněno)
-- [ ] Ostatní funkce — čekáme na upřesnění dle tohoto dotazníku
-
----
-
 *Prosíme o zodpovězení výše uvedených bodů, abychom mohli připravit detailní specifikaci a harmonogram vývoje.*
