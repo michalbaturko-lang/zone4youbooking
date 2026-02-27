@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dotazy na funkcionalitu — Zone4You</title>
+<style>
+  :root {
+    --primary: #1a1a2e;
+    --accent: #e94560;
+    --bg: #f8f9fa;
+    --card: #ffffff;
+    --text: #2d3436;
+    --text-light: #636e72;
+    --border: #dfe6e9;
+    --blue: #0984e3;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+  .header {
+    background: linear-gradient(135deg, var(--primary) 0%, #16213e 100%);
+    color: white;
+    padding: 3rem 2rem;
+    text-align: center;
+  }
+  .header h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+  .header .sub { opacity: 0.85; font-size: 0.95rem; }
+  .container { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+  .intro {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 1.5rem 2rem;
+    margin-bottom: 2rem;
+    border-left: 4px solid var(--blue);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    color: var(--text-light);
+  }
+
+  .section {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 1.8rem 2rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-left: 4px solid var(--accent);
+  }
+  .section h2 {
+    color: var(--primary);
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .section h2 .num {
+    background: var(--accent);
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .question {
+    background: #f1f3f5;
+    border-radius: 8px;
+    padding: 0.8rem 1.2rem;
+    margin-bottom: 0.8rem;
+    color: var(--text);
+    font-size: 0.95rem;
+  }
+  .question strong { color: var(--primary); }
+  .question .sub-items {
+    margin-top: 0.5rem;
+    margin-left: 1rem;
+    color: var(--text-light);
+    font-size: 0.9rem;
+  }
+  .question .sub-items li { margin-bottom: 0.3rem; }
+
+  .footer {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-light);
+    font-size: 0.9rem;
+    font-style: italic;
+    border-top: 1px solid var(--border);
+    margin-top: 2rem;
+  }
+
+  @media (max-width: 600px) {
+    .header h1 { font-size: 1.4rem; }
+    .container { padding: 1rem; }
+    .section { padding: 1.2rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Dotazy na funkcionalitu</h1>
+  <div class="sub">Zone4You — Nový rezervační systém</div>
+</div>
+
+<div class="container">
+
+  <div class="intro">
+    Před zahájením vývoje potřebujeme upřesnit, jaké funkce si přejete v novém rezervačním systému. Níže jsou oblasti, ke kterým potřebujeme vaše rozhodnutí.
+  </div>
+
+  <!-- 1 -->
+  <div class="section">
+    <h2><span class="num">1</span> Přihlášení a registrace</h2>
+    <div class="question"><strong>Přihlášení:</strong> Aktuálně se klienti přihlašují přes memberzone.cz. V novém systému bude přihlášení přímo v novém rozhraní (login + heslo přes API Luxartu). Souhlasíte?</div>
+    <div class="question"><strong>Registrace nových klientů:</strong> Chcete umožnit registraci nových klientů přímo přes web, nebo se noví klienti stále registrují pouze na recepci / osobně?</div>
+    <div class="question"><strong>Zapomenuté heslo:</strong> Má být v novém rozhraní funkce "Zapomenuté heslo"? Pokud ano, jak se to řeší dnes — posílá se reset emailem?</div>
+    <div class="question"><strong>Přihlášení kartou:</strong> V API existuje možnost přihlášení číslem členské karty. Chcete tuto variantu nabízet i v online rozhraní, nebo je to pouze pro terminály v centru?</div>
+  </div>
+
+  <!-- 2 -->
+  <div class="section">
+    <h2><span class="num">2</span> Kredit a platby</h2>
+    <div class="question"><strong>Zobrazení kreditu:</strong> V novém rozhraní budeme zobrazovat aktuální zůstatek kreditu přihlášeného klienta. Souhlasíte se zobrazením v hlavičce stránky (vedle jména)?</div>
+    <div class="question">
+      <strong>Dobíjení kreditu online:</strong> Chcete umožnit klientům dobíjet kredit přímo přes web platební kartou?
+      <ul class="sub-items">
+        <li>Pokud ano: Jakou platební bránu preferujete? (např. GoPay, Comgate, Stripe, jiná)</li>
+        <li>Chcete nastavit minimální/maximální částku pro dobití? Jaké?</li>
+        <li>Mají být předdefinované částky (např. 500 Kč, 1000 Kč, 2000 Kč), nebo volná částka?</li>
+      </ul>
+    </div>
+    <div class="question"><strong>Historie plateb / transakcí:</strong> Chcete, aby si klient mohl prohlédnout historii svých plateb a dobití kreditu?</div>
+  </div>
+
+  <!-- 3 -->
+  <div class="section">
+    <h2><span class="num">3</span> Rezervace lekcí</h2>
+    <div class="question"><strong>Rezervace s kreditem:</strong> Strhává se kredit v momentě rezervace, nebo až po absolvování lekce?</div>
+    <div class="question"><strong>Cena lekcí:</strong> Jsou ceny lekcí různé (např. Reformer dražší než běžná lekce)? Mají se ceny zobrazovat u každé lekce?</div>
+    <div class="question"><strong>Maximální počet rezervací:</strong> Existuje limit, kolik lekcí si klient může najednou rezervovat (např. max 3 dopředu)?</div>
+    <div class="question"><strong>Časový horizont rezervací:</strong> Jak daleko dopředu se lze rezervovat? (1 týden, 2 týdny, měsíc?)</div>
+    <div class="question">
+      <strong>Zrušení rezervace:</strong>
+      <ul class="sub-items">
+        <li>Jak dlouho před lekcí může klient zrušit rezervaci bez sankce?</li>
+        <li>Existuje storno poplatek / penalizace za pozdní zrušení?</li>
+        <li>Vrací se kredit při včasném zrušení?</li>
+      </ul>
+    </div>
+    <div class="question"><strong>No-show (nedostavení se):</strong> Je nějaký postih za neúčast bez zrušení rezervace?</div>
+  </div>
+
+  <!-- 4 -->
+  <div class="section">
+    <h2><span class="num">4</span> Čekací listina (waiting list)</h2>
+    <div class="question">
+      <strong>Chcete čekací listinu?</strong> Když je lekce plná, má se klient moci zapsat na čekací listinu?
+      <ul class="sub-items">
+        <li>Pokud ano: Automatické zařazení při uvolnění místa, nebo notifikace klientovi, ať se zapíše?</li>
+        <li>Maximální počet lidí na čekací listině?</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 5 -->
+  <div class="section">
+    <h2><span class="num">5</span> Profil klienta</h2>
+    <div class="question"><strong>Osobní údaje:</strong> Má si klient moci prohlédnout/upravit své osobní údaje (jméno, email, telefon)?</div>
+    <div class="question"><strong>Změna hesla:</strong> Má být možná přímo v novém rozhraní?</div>
+    <div class="question"><strong>Historie lekcí:</strong> Chcete, aby si klient mohl prohlédnout historii navštívených lekcí (archiv)?</div>
+  </div>
+
+  <!-- 6 -->
+  <div class="section">
+    <h2><span class="num">6</span> Rozvrh a zobrazení</h2>
+    <div class="question"><strong>Denní vs. týdenní pohled:</strong> V designu jsou oba. Chcete oba ponechat?</div>
+    <div class="question"><strong>Zobrazení instruktora:</strong> U každé lekce zobrazujeme instruktora. Je to v pořádku? Chcete zobrazit i náhradního instruktora / zástup?</div>
+    <div class="question">
+      <strong>Obsazenost lekce:</strong> Jaký formát zobrazení preferujete?
+      <ul class="sub-items">
+        <li>Přesný počet (např. "5 volných míst z 12")</li>
+        <li>Barevný indikátor (zelená = volno, oranžová = málo míst, červená = plno)</li>
+        <li>Obojí</li>
+      </ul>
+    </div>
+    <div class="question"><strong>Filtrování:</strong> V designu jsou filtry podle sálu a typu lekce. Chcete přidat filtr podle instruktora?</div>
+    <div class="question"><strong>Oblíbené lekce:</strong> Chcete funkci "oblíbené", kde si klient označí lekce a dostane přehled?</div>
+  </div>
+
+  <!-- 7 -->
+  <div class="section">
+    <h2><span class="num">7</span> Notifikace</h2>
+    <div class="question">
+      <strong>E-mailové potvrzení:</strong> Má systém posílat email při:
+      <ul class="sub-items">
+        <li>Úspěšné rezervaci?</li>
+        <li>Zrušení rezervace?</li>
+        <li>Uvolnění místa z čekací listiny?</li>
+        <li>Dobití kreditu?</li>
+      </ul>
+    </div>
+    <div class="question"><strong>Připomenutí lekce:</strong> Chcete posílat připomínku před lekcí (např. 2h předem)? Emailem, SMS, nebo push notifikací?</div>
+    <div class="question"><strong>Kdo odesílá emaily?</strong> Má je odesílat naše aplikace (potřebujeme SMTP server / službu), nebo to řeší Luxart přes své API?</div>
+  </div>
+
+  <!-- 8 -->
+  <div class="section">
+    <h2><span class="num">8</span> Speciální lekce</h2>
+    <div class="question"><strong>Reformer:</strong> Reformer lekce mají typicky omezenější kapacitu a jinou cenu. Jsou pro Reformer jiná pravidla rezervací?</div>
+    <div class="question"><strong>Soukromé lekce / PT:</strong> Chcete v systému umožnit i rezervaci soukromých lekcí nebo personal training?</div>
+    <div class="question"><strong>Jednorázový vstup:</strong> Může si někdo bez stálého kreditu / členství zarezervovat jednorázovou lekci a zaplatit online?</div>
+  </div>
+
+  <!-- 9 -->
+  <div class="section">
+    <h2><span class="num">9</span> Technické a provozní otázky</h2>
+    <div class="question"><strong>Doména:</strong> Potvrzujete, že nový systém poběží na booking.zone4you.cz?</div>
+    <div class="question"><strong>HTTPS:</strong> Luxart doporučuje HTTPS na vašem serveru pro API. Je na vašem serveru certifikát, nebo ho potřebujete pomoci zprovoznit?</div>
+    <div class="question"><strong>Mobilní aplikace:</strong> Nový design je responzivní (funguje na mobilech v prohlížeči). Chcete i nativní mobilní aplikaci, nebo stačí webová verze?</div>
+    <div class="question"><strong>Stávající memberzone.cz:</strong> Bude starý systém po spuštění nového zrušen, nebo poběží paralelně?</div>
+    <div class="question"><strong>Jazyky:</strong> Pouze čeština, nebo i angličtina pro zahraniční klienty?</div>
+  </div>
+
+  <!-- 10 -->
+  <div class="section">
+    <h2><span class="num">10</span> Administrace</h2>
+    <div class="question"><strong>Admin rozhraní:</strong> Potřebujete administrační panel na webu, nebo vše spravujete přes Luxart software přímo v centru?</div>
+    <div class="question"><strong>Správa rozvrhu:</strong> Změny rozvrhu děláte vždy v Luxart softwaru a nový web je jen zobrazuje?</div>
+    <div class="question"><strong>Statistiky:</strong> Chcete ve webovém rozhraní vidět statistiky, nebo to řeší Luxart?</div>
+  </div>
+
+  <div class="footer">
+    Prosíme o zodpovězení výše uvedených bodů, abychom mohli připravit detailní specifikaci a harmonogram vývoje.
+  </div>
+
+</div>
+
+</body>
+</html>
