@@ -8,64 +8,66 @@ permissions:
   contents: write
   pages: write
   id-token: write
-  actions: write
-  administration: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: true
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Enable GitHub Pages
+      - name: Deploy to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          publish_branch: gh-pages
+          force_orphan: true
+          exclude_assets: '.github'
+
+      - name: Enable GitHub Pages (legacy mode)
+        continue-on-error: true
         run: |
-          echo "Enabling Pages..."
-          RESPONSE=$(curl -s -o /tmp/pages_response.json -w "%{http_code}" -X POST \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+          echo ">>> Trying to enable GitHub Pages..."
+          # Create Pages site with legacy branch-based deploy
+          RESP=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${{ github.repository }}/pages" \
-            -d '{"build_type":"workflow"}')
-          echo "POST status: $RESPONSE"
-          cat /tmp/pages_response.json
-          echo ""
+            -d '{"source":{"branch":"gh-pages","path":"/"},"build_type":"legacy"}')
+          echo "$RESP"
 
-          if [ "$RESPONSE" = "409" ]; then
-            echo "Pages already exists, updating..."
+          # If already exists (409), update it
+          HTTP_CODE=$(echo "$RESP" | tail -1)
+          if [ "$HTTP_CODE" = "409" ] || [ "$HTTP_CODE" = "422" ]; then
+            echo ">>> Pages exists, updating source..."
             curl -s -X PUT \
-              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
               -H "Accept: application/vnd.github+json" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
               "https://api.github.com/repos/${{ github.repository }}/pages" \
-              -d '{"build_type":"workflow"}'
+              -d '{"source":{"branch":"gh-pages","path":"/"},"build_type":"legacy"}'
           fi
 
-          # Verify
-          sleep 2
-          curl -s \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/pages"
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: '.'
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-
-      - name: Print URL
-        if: always()
+      - name: Verify Pages status
+        continue-on-error: true
         run: |
-          echo "## Site URL" >> $GITHUB_STEP_SUMMARY
-          echo "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/" >> $GITHUB_STEP_SUMMARY
+          sleep 5
+          PAGES=$(curl -s \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/pages")
+          echo "$PAGES"
+          echo ""
+          echo "## Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Site should be available at:" >> $GITHUB_STEP_SUMMARY
+          echo "**https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### All pages:" >> $GITHUB_STEP_SUMMARY
+          echo "- [Hlavní stránka](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Chatbot návrh](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/docs/chatbot-navrh.html)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Scope of Work](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/docs/scope-of-work.html)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Specifikace](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/docs/specifikace-funkcionalita.html)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Scheduler redesign](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/scheduler-redesign.html)" >> $GITHUB_STEP_SUMMARY
