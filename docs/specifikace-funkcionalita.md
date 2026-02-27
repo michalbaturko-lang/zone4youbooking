@@ -1,6 +1,7 @@
 # Zone4You — Specifikace funkcionality (na základě odpovědí klienta)
 
 Datum: 2026-02-27
+Verze: 1.1 (aktualizováno na základě upřesnění)
 
 ---
 
@@ -9,14 +10,14 @@ Datum: 2026-02-27
 | Požadavek | Rozhodnutí |
 |-----------|-----------|
 | Přihlášení přes nové rozhraní (login + heslo přes API Luxart) | **ANO** |
-| Registrace nových klientů přes web | **NE** — registrace pouze z recepce (PC v centru) |
-| Zapomenuté heslo — reset emailem | **ANO** — heslo je neměnné, posílá se mailem; přidat nápovědu |
-| Přihlášení číslem karty v online rozhraní | **NE** — číslo karty slouží jako heslo, nepoužívá se jako samostatný login na webu |
+| Registrace nových klientů přes web | **NE** — registrace probíhá na recepci centra |
+| Zapomenuté heslo — reset emailem | **ANO** — heslo se posílá mailem; přidat nápovědu |
+| Přihlášení číslem karty v online rozhraní | **⚠️ UPŘESNIT** — vztah čísla karty a hesla není ještě zcela jasný |
 
 ### Poznámky k implementaci
-- Login = email/jméno + heslo (číslo karty)
+- Login = email/jméno + heslo
+- Fungování hesla ve vztahu k číslu karty — **nutné upřesnit s klientem**
 - Funkce "Zapomenuté heslo" = odeslání stávajícího hesla na registrovaný email
-- Na přihlašovací stránce zobrazit nápovědu typu "Vaše heslo je číslo vaší členské karty"
 
 ---
 
@@ -26,15 +27,17 @@ Datum: 2026-02-27
 |-----------|-----------|
 | Zobrazení kreditu v hlavičce (vedle jména) | **ANO** |
 | Dobíjení kreditu online kartou | **ANO** |
-| Platební brána | **Stripe** + Apple Pay + Google Pay + krypto |
-| Minimální/maximální částka pro dobití | **⚠️ NEZODPOVĚZENO** |
-| Předdefinované částky | **ANO** — 1 h, 5 h, 10 h (odpovídající hodinové sazby) |
+| Platební brána | **Stripe** + Apple Pay + Google Pay |
+| Kryptoplatby | **Fáze 2** |
+| Minimální zůstatek pro rezervaci | **ANO** — musí mít dostatečný kredit (přesná částka — upřesnit) |
+| Předdefinované částky | **ANO** — 500 Kč, 1 000 Kč, 2 000 Kč, 5 000 Kč, 10 000 Kč |
 | Historie plateb / transakcí | **ANO** |
 
 ### Poznámky k implementaci
-- Předdefinované částky v hodinách (1 h, 5 h, 10 h) — nutné zjistit cenu za hodinu pro přepočet na Kč
+- Předdefinované částky jsou pevně dané v Kč: 500, 1 000, 2 000, 5 000, 10 000 Kč
 - Stripe jako primární brána s podporou Apple Pay a Google Pay (jsou součástí Stripe)
-- Krypto platby — nutné upřesnit, jaká řešení klient preferuje (např. Coinbase Commerce, BTCPay)
+- Krypto platby až ve Fázi 2
+- **Čekáme na Stripe API klíče od klienta**
 
 ---
 
@@ -44,17 +47,18 @@ Datum: 2026-02-27
 |-----------|-----------|
 | Strhávání kreditu | **Při rezervaci** — vrací se pouze při včasném zrušení |
 | Ceny lekcí — zobrazovat u každé lekce | **ANO** — zobrazovat předem u každé lekce |
-| Maximální počet rezervací najednou | **Není pevný limit** — omezeno aktivním členstvím |
-| Časový horizont rezervací | **48 hodin dopředu max** (upřesnit dle typu členství) |
-| Zrušení bez sankce | **⚠️ UPŘESNIT** — klient uvedl 4 h i 24 h |
-| Storno poplatek za pozdní zrušení | **ANO — 100 %** (kredit se nevrací) |
-| Vrácení kreditu při včasném zrušení | **ANO** |
-| No-show (nedostavení se) | **100 % stržení** — kredit se nevrací |
+| Maximální počet rezervací najednou | **Není pevný limit** — omezeno dostatečným zůstatkem kreditu |
+| Časový horizont rezervací | **48 hodin dopředu max** |
+| Zrušení bez sankce | **Minimálně 4 hodiny před lekcí** |
+| Storno poplatek za pozdní zrušení | **100 Kč** |
+| Vrácení kreditu při včasném zrušení | **ANO** — plné vrácení |
+| No-show (nedostavení se) | **⚠️ UPŘESNIT** — 100 Kč nebo 100 % ceny lekce? |
 
 ### Poznámky k implementaci
-- Flow: Rezervace → stržení kreditu → pokud klient zruší včas → kredit zpět
-- Pokud klient zruší pozdě nebo se nedostaví → kredit propadá
-- Nutné vyjasnit: 4 hodiny NEBO 24 hodin pro bezplatné zrušení
+- Flow: Rezervace → stržení kreditu → pokud klient zruší min. 4 h předem → kredit zpět
+- Pokud klient zruší méně než 4 h předem → poplatek 100 Kč
+- No-show — **nutné vyjasnit s klientem**: 100 Kč nebo 100 % ceny lekce?
+- Není limit na počet rezervací, ale klient musí mít dostatečný zůstatek kreditu
 
 ---
 
@@ -63,11 +67,12 @@ Datum: 2026-02-27
 | Požadavek | Rozhodnutí |
 |-----------|-----------|
 | Čekací listina | **ANO** |
-| Chování při uvolnění místa | **Automatické zařazení** + notifikace emailem |
+| Chování při uvolnění místa | **Automatické zařazení** + notifikace emailem **a WhatsApp zprávou** |
 | Max. počet lidí na čekací listině | **10** |
 
 ### Poznámky k implementaci
-- Při uvolnění místa: automaticky přesunout prvního z čekací listiny → strhnout kredit → poslat email
+- Při uvolnění místa: automaticky přesunout prvního z čekací listiny → strhnout kredit → poslat email + WhatsApp
+- WhatsApp zpráva je důležitá — uvolnění místa je časově kritické, email nemusí klient přečíst hned
 - Pokud nemá dostatek kreditu, přeskočit na dalšího v pořadí
 
 ---
@@ -77,12 +82,14 @@ Datum: 2026-02-27
 | Požadavek | Rozhodnutí |
 |-----------|-----------|
 | Osobní údaje | **Prohlížení + doplnění** (ne úprava stávajících) |
-| Změna hesla na webu | **NE** — heslo = číslo karty, nemění se přes web |
+| Změna hesla na webu | **NE** — heslo se nemění přes web |
 | Historie lekcí (archiv) | **ANO** |
+| Gamifikace (odznáčky, motivace) | **ANO — Fáze 2** |
 
 ### Poznámky k implementaci
 - Profil je převážně read-only, klient může doplnit chybějící údaje
 - Změny klíčových údajů (jméno, email) se řeší na recepci
+- Gamifikace (odznáčky za aktivitu, motivační zprávy) bude součástí Fáze 2
 
 ---
 
@@ -104,14 +111,16 @@ Datum: 2026-02-27
 |-----------|-----------|
 | Email — úspěšná rezervace | **ANO** |
 | Email — zrušení rezervace | **ANO** |
-| Email — uvolnění z čekací listiny | **ANO** |
+| Email + WhatsApp — uvolnění z čekací listiny | **ANO** |
 | Email — dobití kreditu | **ANO** |
-| Připomenutí lekce (email/SMS/push) | **⚠️ NEROZHODNUTO** |
-| Kdo odesílá emaily (naše app / Luxart) | **⚠️ NEROZHODNUTO** |
+| Připomenutí lekce | **Fáze 2** |
+| Motivační zprávy (gamifikace) | **Fáze 2** (email + WhatsApp) |
+| Kdo odesílá emaily | **Naše aplikace** (emailová služba typu Resend, SendGrid) |
 
 ### Poznámky k implementaci
-- 4 typy emailových notifikací jsou potvrzeny
-- Odesílání emailů — pokud naše app, potřebujeme SMTP (např. Resend, Mailgun, SendGrid)
+- 4 typy emailových notifikací potvrzeny pro Fázi 1
+- WhatsApp pro čekací listinu (Fáze 1) a motivační zprávy (Fáze 2)
+- Emaily odesílá naše aplikace — potřebujeme emailovou službu (Resend, SendGrid apod.)
 
 ---
 
@@ -131,7 +140,7 @@ Datum: 2026-02-27
 |-----------|-----------|
 | Doména booking.zone4you.cz | **⚠️ NEPOTVRZENO** |
 | HTTPS certifikát | **⚠️ NEPOTVRZENO** |
-| Mobilní aplikace vs. responsivní web | **Responsivní web** (app by byla super, ale stačí web) |
+| Mobilní aplikace vs. responsivní web | **Velmi vyladěný responsivní web** (žádná nativní app) |
 | Starý memberzone.cz | **Ponechat paralelně** (alespoň na přechodné období) |
 | Jazyky | **Čeština + angličtina** |
 
@@ -154,16 +163,16 @@ Datum: 2026-02-27
 ## Otevřené body — nutné vyjasnit s klientem
 
 ### Kritické (blokují vývoj)
-1. **Lhůta pro bezplatné zrušení** — 4 hodiny nebo 24 hodin? (klient uvedl oba údaje)
-2. **Odesílání emailů** — naše aplikace (potřebujeme SMTP) nebo Luxart API?
+1. **No-show penalizace** — je to 100 Kč (jako pozdní zrušení) nebo 100 % ceny lekce?
+2. **Stripe přístupy** — čekáme na API klíče od klienta
 
 ### Důležité (potřebné brzy)
-3. **Doména** — potvrzení booking.zone4you.cz a nastavení DNS
-4. **HTTPS certifikát** — je na serveru, nebo ho musíme řešit?
-5. **Předdefinované částky v Kč** — jaká je hodinová sazba pro přepočet 1 h / 5 h / 10 h?
-6. **Krypto platby** — jaké konkrétní řešení? (Coinbase Commerce, BTCPay, jiné)
+3. **Minimální zůstatek kreditu** pro rezervaci — jaká je minimální částka?
+4. **Heslo a číslo karty** — jak přesně funguje vztah mezi nimi?
+5. **Doména** — potvrzení booking.zone4you.cz a nastavení DNS
+6. **HTTPS certifikát** — je na serveru, nebo ho musíme řešit?
 
 ### Nekritické (lze řešit později)
-7. **Připomenutí lekce** — email / SMS / push? Kolik hodin předem?
-8. **Reformer odlišnosti** — jaké přesně?
-9. **Členství a jeho vliv na rezervace** — jak přesně ovlivňuje max počet / horizont?
+7. **Reformer odlišnosti** — jaké přesně?
+8. **WhatsApp Business API** — přístup a nastavení
+9. **Gamifikace** — přesná pravidla pro odznáčky (kolik lekcí = jaký odznak)
