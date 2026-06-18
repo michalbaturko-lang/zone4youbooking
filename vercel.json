@@ -1,7 +1,6 @@
 {
-  "buildCommand": "",
-  "outputDirectory": ".",
-  "rewrites": [],
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
   "headers": [
     {
       "source": "/(.*)",

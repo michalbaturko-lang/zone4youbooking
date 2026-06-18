@@ -64,7 +64,7 @@ Projekt je rozdělen do dvou fází. **Fáze 1** pokrývá kompletní funkční 
 - Kontrolu dostatečného zůstatku kreditu před rezervací (minimální zůstatek — upřesníme)
 - Zrušení rezervace klientem s automatickým vrácením kreditu (při zrušení min. 4 hodiny předem)
 - Poplatek za pozdní zrušení (méně než 4 hodiny předem) — **100 Kč**
-- Penalizaci za no-show (nedostavení se) — **upřesníme s klientem** (100 Kč nebo 100 % ceny lekce)
+- Penalizaci za no-show (nedostavení se) — **100 Kč**
 - Omezení rezervací na 48 hodin dopředu
 - Zobrazení seznamu aktivních rezervací klienta ("Moje rezervace")
 
@@ -236,7 +236,7 @@ Projekt je rozdělen do dvou fází. **Fáze 1** pokrývá kompletní funkční 
 
 Pro úspěšnou realizaci projektu je potřeba součinnost klienta v těchto oblastech:
 
-1. **Luxart API** — přístupové údaje a dokumentace (zajištěno)
+1. **Luxart API** — čekáme na přístup k API na portu 9759 a aktuální `/Help` dokumentaci
 2. **Stripe účet** — API klíče (testovací i produkční) — **čekáme na klienta**
 3. **Doména** — potvrzení a nastavení DNS pro booking.zone4you.cz
 4. **HTTPS certifikát** — na serveru, kde poběží aplikace

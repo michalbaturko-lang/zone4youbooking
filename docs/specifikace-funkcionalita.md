@@ -52,12 +52,12 @@ Verze: 1.1 (aktualizováno na základě upřesnění)
 | Zrušení bez sankce | **Minimálně 4 hodiny před lekcí** |
 | Storno poplatek za pozdní zrušení | **100 Kč** |
 | Vrácení kreditu při včasném zrušení | **ANO** — plné vrácení |
-| No-show (nedostavení se) | **⚠️ UPŘESNIT** — 100 Kč nebo 100 % ceny lekce? |
+| No-show (nedostavení se) | **100 Kč** |
 
 ### Poznámky k implementaci
 - Flow: Rezervace → stržení kreditu → pokud klient zruší min. 4 h předem → kredit zpět
 - Pokud klient zruší méně než 4 h předem → poplatek 100 Kč
-- No-show — **nutné vyjasnit s klientem**: 100 Kč nebo 100 % ceny lekce?
+- No-show → poplatek 100 Kč
 - Není limit na počet rezervací, ale klient musí mít dostatečný zůstatek kreditu
 
 ---
@@ -163,8 +163,8 @@ Verze: 1.1 (aktualizováno na základě upřesnění)
 ## Otevřené body — nutné vyjasnit s klientem
 
 ### Kritické (blokují vývoj)
-1. **No-show penalizace** — je to 100 Kč (jako pozdní zrušení) nebo 100 % ceny lekce?
-2. **Stripe přístupy** — čekáme na API klíče od klienta
+1. **Stripe přístupy** — čekáme na API klíče od klienta
+2. **Luxart API přístup a dokumentace** — čekáme na aktuální `/Help` pro port 9759
 
 ### Důležité (potřebné brzy)
 3. **Minimální zůstatek kreditu** pro rezervaci — jaká je minimální částka?
