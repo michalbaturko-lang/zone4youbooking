@@ -86,18 +86,61 @@ const instructorMeta: Record<string, { photo: string; specialization: string }> 
 
 const dayMs = 24 * 60 * 60 * 1000;
 const hourMs = 60 * 60 * 1000;
+const appTimeZone = "Europe/Prague";
+
+function pragueDateParts(value: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: appTimeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value);
+
+  return {
+    year: Number(parts.find((part) => part.type === "year")?.value),
+    month: Number(parts.find((part) => part.type === "month")?.value),
+    day: Number(parts.find((part) => part.type === "day")?.value),
+  };
+}
+
+function timeZoneOffsetMs(value: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: appTimeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(value);
+  const get = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+  const hour = get("hour");
+  const asUtc = Date.UTC(
+    get("year"),
+    get("month") - 1,
+    get("day"),
+    hour === 24 ? 0 : hour,
+    get("minute"),
+    get("second"),
+  );
+  return asUtc - value.getTime();
+}
+
+function pragueTimeToUtc(year: number, month: number, day: number, hours: number, minutes: number) {
+  const utcGuess = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0, 0));
+  return new Date(utcGuess.getTime() - timeZoneOffsetMs(utcGuess));
+}
 
 function startOfToday() {
-  const date = new Date();
-  date.setHours(0, 0, 0, 0);
-  return date;
+  const today = pragueDateParts(new Date());
+  return pragueTimeToUtc(today.year, today.month, today.day, 0, 0);
 }
 
 function at(dayOffset: number, time: string) {
   const [hours, minutes] = time.split(":").map(Number);
-  const date = new Date(startOfToday().getTime() + (dayOffset + 1) * dayMs);
-  date.setHours(hours, minutes, 0, 0);
-  return date;
+  const today = pragueDateParts(new Date());
+  return pragueTimeToUtc(today.year, today.month, today.day + dayOffset + 1, hours, minutes);
 }
 
 function lessonSeed(
