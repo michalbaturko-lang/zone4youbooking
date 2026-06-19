@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zone4You — Projektová dokumentace</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primary: #E67E22;
+    --primary-dark: #D35400;
+    --primary-light: #FDEBD0;
+    --dark: #1E293B;
+    --dark-light: #334155;
+    --text: #2d3436;
+    --text-light: #64748B;
+    --bg: #F8FAFC;
+    --card: #ffffff;
+    --border: #E2E8F0;
+    --green: #27AE60;
+    --blue: #0984e3;
+    --purple: #6C5CE7;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  .hero {
+    background: linear-gradient(135deg, var(--dark) 0%, var(--dark-light) 50%, var(--primary-dark) 100%);
+    color: white;
+    padding: 4rem 2rem 3rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle at 70% 30%, rgba(230,126,34,0.15) 0%, transparent 50%);
+  }
+  .hero h1 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 0.8rem;
+    position: relative;
+  }
+  .hero h1 span { color: var(--primary); }
+  .hero p {
+    font-size: 1.1rem;
+    opacity: 0.8;
+    position: relative;
+    max-width: 500px;
+    margin: 0 auto;
+  }
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem;
+  }
+  .section-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-light);
+    margin-bottom: 1rem;
+    margin-top: 2.5rem;
+  }
+  .section-label:first-of-type { margin-top: 0; }
+
+  .doc-card {
+    display: block;
+    background: var(--card);
+    border-radius: 14px;
+    padding: 1.5rem 1.8rem;
+    margin-bottom: 0.8rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    border: 1px solid var(--border);
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .doc-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    border-color: var(--primary);
+  }
+  .doc-card::after {
+    content: '\2192';
+    position: absolute;
+    right: 1.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.3rem;
+    color: var(--text-light);
+    transition: all 0.2s;
+  }
+  .doc-card:hover::after {
+    right: 1.2rem;
+    color: var(--primary);
+  }
+  .doc-card .doc-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    font-size: 1.2rem;
+    margin-bottom: 0.6rem;
+  }
+  .doc-card h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--dark);
+    margin-bottom: 0.3rem;
+    padding-right: 2rem;
+  }
+  .doc-card p {
+    font-size: 0.9rem;
+    color: var(--text-light);
+    padding-right: 2rem;
+    line-height: 1.5;
+  }
+  .doc-card .tag {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 5px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-top: 0.5rem;
+  }
+
+  .highlight-card {
+    border-left: 4px solid var(--primary);
+    background: linear-gradient(135deg, #FFF9F0 0%, var(--card) 100%);
+  }
+  .highlight-card:hover {
+    border-color: var(--primary-dark);
+  }
+
+  .footer {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-light);
+    font-size: 0.85rem;
+    border-top: 1px solid var(--border);
+    margin-top: 2rem;
+  }
+
+  @media (max-width: 640px) {
+    .hero h1 { font-size: 1.8rem; }
+    .hero { padding: 2.5rem 1.2rem 2rem; }
+    .container { padding: 2rem 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1><span>Zone4You</span> Booking</h1>
+  <p>Projektová dokumentace a návrhy nového rezervačního systému</p>
+</div>
+
+<div class="container">
+
+  <!-- HLAVNÍ NÁVRHY -->
+  <div class="section-label">Návrhy</div>
+
+  <a href="docs/chatbot-navrh.html" class="doc-card highlight-card">
+    <div class="doc-icon" style="background: var(--primary-light);">&#x1F916;</div>
+    <h3>Návrh AI Chatbota</h3>
+    <p>Inteligentní asistent pro klienty — rezervace, rozvrh, kredit. Ukázky konverzací, technické řešení, fáze implementace.</p>
+    <span class="tag" style="background: var(--primary-light); color: var(--primary-dark);">NOVÉ</span>
+  </a>
+
+  <a href="docs/scope-of-work.html" class="doc-card highlight-card">
+    <div class="doc-icon" style="background: #E8F8F5;">&#x1F4CB;</div>
+    <h3>Scope of Work</h3>
+    <p>Kompletní rozsah prací — Fáze 1 (MVP, 8 modulů, 8 týdnů) a Fáze 2 (rozšíření, 4 moduly, 6 týdnů). Předpoklady a termíny.</p>
+    <span class="tag" style="background: #E8F8F5; color: var(--green);">v1.1</span>
+  </a>
+
+  <!-- SPECIFIKACE -->
+  <div class="section-label">Specifikace</div>
+
+  <a href="docs/specifikace-funkcionalita.html" class="doc-card">
+    <div class="doc-icon" style="background: #E8E5FF;">&#x2699;</div>
+    <h3>Specifikace funkcionality</h3>
+    <p>Detailní funkční specifikace na základě odpovědí klienta. 10 kategorií s rozhodnutími (ANO/NE/UPŘESNIT) a poznámkami.</p>
+  </a>
+
+  <a href="docs/implementation-status-luxart-plan.md" class="doc-card highlight-card">
+    <div class="doc-icon" style="background: #FFF5EB;">&#x1F50C;</div>
+    <h3>Stav implementace + Luxart plán</h3>
+    <p>Technický audit aktuálního prototypu, fakta z komunikace s Luxartem, blokery, endpoint checklist a texty pro IT/Luxart.</p>
+    <span class="tag" style="background: #FFF5EB; color: var(--primary-dark);">2026-06-18</span>
+  </a>
+
+  <!-- DOTAZY PRO KLIENTA -->
+  <div class="section-label">Dotazy pro klienta</div>
+
+  <a href="docs/dotazy-funkcionalita-klient.html" class="doc-card">
+    <div class="doc-icon" style="background: #dfe6fd;">&#x2753;</div>
+    <h3>Dotazy na funkcionalitu</h3>
+    <p>Původní dotazník — 10 sekcí s otázkami na přihlášení, kredit, rezervace, notifikace, technické řešení a další.</p>
+  </a>
+
+  <a href="docs/dotazy-klient-doplneni.html" class="doc-card">
+    <div class="doc-icon" style="background: #FFF0F0;">&#x1F4DD;</div>
+    <h3>Doplňující dotazy</h3>
+    <p>7 doplňujících bodů — no-show penalizace, Stripe přístupy, minimální kredit, Reformer, heslo/karta, WhatsApp, gamifikace.</p>
+  </a>
+
+  <!-- DESIGN -->
+  <div class="section-label">Design & prototypy</div>
+
+  <a href="scheduler-redesign.html" class="doc-card">
+    <div class="doc-icon" style="background: var(--primary-light);">&#x1F3A8;</div>
+    <h3>Redesign rozvrhu</h3>
+    <p>Interaktivní prototyp redesignovaného rozvrhového systému s denním a týdenním pohledem.</p>
+  </a>
+
+  <a href="index-app.html" class="doc-card">
+    <div class="doc-icon" style="background: #E8F8F5;">&#x1F4C5;</div>
+    <h3>Booking scheduler (původní)</h3>
+    <p>Původní návrh scheduleru s instruktory, sály a lekcemi.</p>
+  </a>
+
+</div>
+
+<div class="footer">
+  Zone4You Online Booking System &copy; 2026 | Michal Baturko
+</div>
+
+</body>
+</html>

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Specifikace funkcionality — Zone4You</title>
+<style>
+  :root {
+    --primary: #1a1a2e;
+    --accent: #e94560;
+    --accent-light: #ff6b81;
+    --bg: #f8f9fa;
+    --card: #ffffff;
+    --text: #2d3436;
+    --text-light: #636e72;
+    --border: #dfe6e9;
+    --green: #00b894;
+    --orange: #fdcb6e;
+    --blue: #0984e3;
+    --yellow-bg: #fff3cd;
+    --yellow-text: #856404;
+    --red-bg: #f8d7da;
+    --red-text: #721c24;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+  .header {
+    background: linear-gradient(135deg, var(--primary) 0%, #16213e 100%);
+    color: white;
+    padding: 3rem 2rem;
+    text-align: center;
+  }
+  .header h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+  .header .sub { opacity: 0.85; font-size: 0.95rem; }
+  .container { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+  .section {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 1.8rem 2rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .section h2 {
+    color: var(--primary);
+    font-size: 1.3rem;
+    margin-bottom: 1.2rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--border);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1rem;
+  }
+  table th {
+    background: var(--primary);
+    color: white;
+    padding: 0.6rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+  table td {
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.95rem;
+  }
+  table tr:last-child td { border-bottom: none; }
+  table tr:hover td { background: #f1f3f5; }
+
+  .status-yes {
+    color: var(--green);
+    font-weight: 700;
+  }
+  .status-no {
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .status-warn {
+    color: var(--yellow-text);
+    font-weight: 700;
+  }
+  .status-phase2 {
+    color: var(--blue);
+    font-weight: 700;
+  }
+
+  .notes {
+    background: #edf2f7;
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--text-light);
+  }
+  .notes strong { color: var(--text); }
+  .notes ul { margin: 0.5rem 0 0 1.2rem; }
+  .notes li { margin-bottom: 0.3rem; }
+
+  .open-points {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 1.8rem 2rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-left: 4px solid var(--accent);
+  }
+  .open-points h2 {
+    color: var(--accent);
+    font-size: 1.3rem;
+    margin-bottom: 1rem;
+  }
+  .open-points h3 {
+    font-size: 1rem;
+    margin: 1rem 0 0.5rem;
+  }
+  .open-points h3.critical { color: var(--accent); }
+  .open-points h3.important { color: var(--orange); }
+  .open-points h3.minor { color: var(--text-light); }
+  .open-points ol {
+    margin-left: 1.2rem;
+    color: var(--text-light);
+  }
+  .open-points li {
+    margin-bottom: 0.4rem;
+  }
+
+  @media (max-width: 600px) {
+    .header h1 { font-size: 1.4rem; }
+    .container { padding: 1rem; }
+    .section, .open-points { padding: 1.2rem; }
+    table { font-size: 0.85rem; }
+    table td, table th { padding: 0.4rem 0.6rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Specifikace funkcionality</h1>
+  <div class="sub">Zone4You — na základě odpovědí klienta | Verze 1.1 | 27. 2. 2026</div>
+</div>
+
+<div class="container">
+
+  <!-- 1. Přihlášení -->
+  <div class="section">
+    <h2>1. Přihlášení a registrace</h2>
+    <table>
+      <thead><tr><th>Požadavek</th><th>Rozhodnutí</th></tr></thead>
+      <tbody>
+        <tr><td>Přihlášení přes nové rozhraní (login + heslo přes API Luxart)</td><td class="status-yes">ANO</td></tr>
+        <tr><td>Registrace nových klientů přes web</td><td class="status-no">NE — registrace na recepci</td></tr>
+        <tr><td>Zapomenuté heslo — reset emailem</td><td class="status-yes">ANO — heslo se posílá mailem; přidat nápovědu</td></tr>
+        <tr><td>Přihlášení číslem karty v online rozhraní</td><td class="status-warn">UPŘESNIT — vztah čísla karty a hesla není jasný</td></tr>
+      </tbody>
+    </table>
+    <div class="notes">
+      <strong>Poznámky k implementaci:</strong>
+      <ul>
+        <li>Login = email/jméno + heslo</li>
+        <li>Fungování hesla ve vztahu k číslu karty — <strong>nutné upřesnit s klientem</strong></li>
+        <li>Funkce "Zapomenuté heslo" = odeslání stávajícího hesla na registrovaný email</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 2. Kredit -->
+  <div class="section">
+    <h2>2. Kredit a platby</h2>
+    <table>
+      <thead><tr><th>Požadavek</th><th>Rozhodnutí</th></tr></thead>
+      <tbody>
+        <tr><td>Zobrazení kreditu v hlavičce (vedle jména)</td><td class="status-yes">ANO</td></tr>
+        <tr><td>Dobíjení kreditu online kartou</td><td class="status-yes">ANO</td></tr>
+        <tr><td>Platební brána</td><td class="status-yes">Stripe + Apple Pay + Google Pay</td></tr>
+        <tr><td>Kryptoplatby</td><td class="status-phase2">Fáze 2</td></tr>
+        <tr><td>Minimální zůstatek pro rezervaci</td><td class="status-warn">ANO — přesná částka: upřesnit</td></tr>
+        <tr><td>Předdefinované částky</td><td class="status-yes">500 / 1 000 / 2 000 / 5 000 / 10 000 Kč</td></tr>
+        <tr><td>Historie plateb / transakcí</td><td class="status-yes">ANO</td></tr>
+      </tbody>
+    </table>
+    <div class="notes">
+      <strong>Poznámky k implementaci:</strong>
+      <ul>
+        <li>Předdefinované částky jsou pevně dané v Kč: 500, 1 000, 2 000, 5 000, 10 000 Kč</li>
+        <li>Stripe jako primární brána s podporou Apple Pay a Google Pay</li>
+        <li>Krypto platby až ve Fázi 2</li>
+        <li><strong>Čekáme na Stripe API klíče od klienta</strong></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 3. Rezervace -->
+  <div class="section">
+    <h2>3. Rezervace lekcí</h2>
+    <table>
+      <thead><tr><th>Požadavek</th><th>Rozhodnutí</th></tr></thead>
+      <tbody>
+        <tr><td>Strhávání kreditu</td><td class="status-yes">Při rezervaci — vrací se při včasném zrušení</td></tr>
+        <tr><td>Ceny lekcí — zobrazovat u každé lekce</td><td class="status-yes">ANO</td></tr>
+        <tr><td>Maximální počet rezervací najednou</td><td>Není pevný limit — omezeno zůstatkem kreditu</td></tr>
+        <tr><td>Časový horizont rezervací</td><td class="status-yes">48 hodin dopředu max</td></tr>
+        <tr><td>Zrušení bez sankce</td><td class="status-yes">Min. 4 hodiny před lekcí</td></tr>
+        <tr><td>Storno poplatek za pozdní zrušení</td><td class="status-yes">100 Kč</td></tr>
+        <tr><td>Vrácení kreditu při včasném zrušení</td><td class="status-yes">ANO — plné vrácení</td></tr>
+        <tr><td>No-show (nedostavení se)</td><td class="status-yes">100 Kč</td></tr>
+      </tbody>
+    </table>
+    <div class="notes">
+      <strong>Poznámky k implementaci:</strong>
+      <ul>
+        <li>Flow: Rezervace → stržení kreditu → pokud klient zruší min. 4 h předem → kredit zpět</li>
+        <li>Pokud klient zruší méně než 4 h předem → poplatek 100 Kč</li>
+        <li>No-show → poplatek 100 Kč</li>
+        <li>Není limit na počet rezervací, ale klient musí mít dostatečný zůstatek kreditu</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 4. Čekací listina -->
+  <div class="section">
+    <h2>4. Čekací listina (waiting list)</h2>
+    <table>
+      <thead><tr><th>Požadavek</th><th>Rozhodnutí</th></tr></thead>
+      <tbody>
+        <tr><td>Čekací listina</td><td class="status-yes">ANO</td></tr>
+        <tr><td>Chování při uvolnění místa</td><td class="status-yes">Automatické zařazení + email + WhatsApp</td></tr>
+        <tr><td>Max. počet lidí na čekací listině</td><td class="status-yes">10</td></tr>
+      </tbody>
+    </table>
+    <div class="notes">
+      <strong>Poznámky k implementaci:</strong>
+      <ul>
+        <li>Při uvolnění místa: automaticky přesunout prvního → strhnout kredit → poslat email + WhatsApp</li>
+        <li>WhatsApp zpráva je důležitá — uvolnění místa je časově kritické</li>
+        <li>Pokud nemá dostatek kreditu, přeskočit na dalšího v pořadí</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 5. Profil -->
+  <div class="section">
+    <h2>5. Profil klienta</h2>
+    <table>
+      <thead><tr><th>Požadavek</th><th>Rozhodnutí</th></tr></thead>
+      <tbody>
+        <tr><td>Osobní údaje</td><td class="status-yes">Prohlížení + doplnění (ne úprava stávajících)</td></tr>
+        <tr><td>Změna hesla na webu</td><td class="status-no">NE</td></tr>
+        <tr><td>Historie lekcí (archiv)</td><td class="status-yes">ANO</td></tr>
+        <tr><td>Gamifikace (odznáčky, motivace)</td><td class="status-phase2">ANO — Fáze 2</td></tr>
+      </tbody>
+    </table>
+    <div class="notes">
+      <strong>Poznámky k implementaci:</strong>
+      <ul>
+        <li>Profil je převážně read-only, klient může doplnit chybějící údaje</li>
+        <li>Změny klíčových údajů (jméno, email) se řeší na recepci</li>
+        <li>Gamifikace bude součástí Fáze 2</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 6. Rozvrh -->
+  <div class="section">
+    <h2>6. Rozvrh a zobrazení</h2>
+    <table>
+      <thead><tr><th>Požadavek</th><th>Rozhodnutí</th></tr></thead>
+      <tbody>
+        <tr><td>Denní + týdenní pohled</td><td class="status-yes">ANO — oba pohledy</td></tr>
+        <tr><td>Zobrazení instruktora + zástup</td><td class="status-yes">ANO</td></tr>
+        <tr><td>Obsazenost lekce</td><td class="status-yes">Obojí — přesný počet + barevný indikátor</td></tr>
+        <tr><td>Filtr podle instruktora</td><td class="status-yes">ANO</td></tr>
+        <tr><td>Oblíbené lekce</td><td class="status-yes">ANO</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 7. Notifikace -->
+  <div class="section">
+    <h2>7. Notifikace</h2>
+    <table>
+      <thead><tr><th>Požadavek</th><th>Rozhodnutí</th></tr></thead>
+      <tbody>
+        <tr><td>Email — úspěšná rezervace</td><td class="status-yes">ANO</td></tr>
+        <tr><td>Email — zrušení rezervace</td><td class="status-yes">ANO</td></tr>
+        <tr><td>Email + WhatsApp — uvolnění z čekací listiny</td><td class="status-yes">ANO</td></tr>
+        <tr><td>Email — dobití kreditu</td><td class="status-yes">ANO</td></tr>
+        <tr><td>Připomenutí lekce</td><td class="status-phase2">Fáze 2</td></tr>
+        <tr><td>Motivační zprávy (gamifikace)</td><td class="status-phase2">Fáze 2 (email + WhatsApp)</td></tr>
+        <tr><td>Kdo odesílá emaily</td><td>Naše aplikace (Resend / SendGrid)</td></tr>
+      </tbody>
+    </table>
+    <div class="notes">
+      <strong>Poznámky k implementaci:</strong>
+      <ul>
+        <li>4 typy emailových notifikací potvrzeny pro Fázi 1</li>
+        <li>WhatsApp pro čekací listinu (Fáze 1) a motivační zprávy (Fáze 2)</li>
+        <li>Emaily odesílá naše aplikace — potřebujeme emailovou službu</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 8. Speciální lekce -->
+  <div class="section">
+    <h2>8. Speciální lekce</h2>
+    <table>
+      <thead><tr><th>Požadavek</th><th>Rozhodnutí</th></tr></thead>
+      <tbody>
+        <tr><td>Reformer — jiná pravidla</td><td class="status-warn">Stejná pravidla (drobné odlišnosti — upřesnit)</td></tr>
+        <tr><td>Soukromé lekce / PT</td><td class="status-no">Zatím NE</td></tr>
+        <tr><td>Jednorázový vstup online</td><td class="status-no">NE</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 9. Technické -->
+  <div class="section">
+    <h2>9. Technické a provozní otázky</h2>
+    <table>
+      <thead><tr><th>Požadavek</th><th>Rozhodnutí</th></tr></thead>
+      <tbody>
+        <tr><td>Doména booking.zone4you.cz</td><td class="status-warn">NEPOTVRZENO</td></tr>
+        <tr><td>HTTPS certifikát</td><td class="status-warn">NEPOTVRZENO</td></tr>
+        <tr><td>Mobilní aplikace vs. responsivní web</td><td class="status-yes">Velmi vyladěný responsivní web</td></tr>
+        <tr><td>Starý memberzone.cz</td><td>Ponechat paralelně (přechodné období)</td></tr>
+        <tr><td>Jazyky</td><td class="status-yes">Čeština + angličtina</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 10. Administrace -->
+  <div class="section">
+    <h2>10. Administrace</h2>
+    <table>
+      <thead><tr><th>Požadavek</th><th>Rozhodnutí</th></tr></thead>
+      <tbody>
+        <tr><td>Admin rozhraní přes Luxart</td><td class="status-yes">ANO — žádný vlastní admin panel</td></tr>
+        <tr><td>Správa rozvrhu přes Luxart</td><td class="status-yes">ANO — web pouze zobrazuje</td></tr>
+        <tr><td>Statistiky přes Luxart</td><td class="status-yes">ANO</td></tr>
+      </tbody>
+    </table>
+    <div class="notes">
+      <strong>Poznámky k implementaci:</strong>
+      <ul>
+        <li>Nestavíme admin panel — veškerá správa probíhá v Luxart softwaru</li>
+        <li>Naše aplikace je čistě klientské rozhraní (read + reserve + pay)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Otevřené body -->
+  <div class="open-points">
+    <h2>Otevřené body — nutné vyjasnit s klientem</h2>
+
+    <h3 class="critical">Kritické (blokují vývoj)</h3>
+    <ol>
+      <li><strong>Stripe přístupy</strong> — čekáme na API klíče od klienta</li>
+      <li><strong>Luxart API přístup a dokumentace</strong> — čekáme na aktuální /Help pro port 9759</li>
+    </ol>
+
+    <h3 class="important">Důležité (potřebné brzy)</h3>
+    <ol start="3">
+      <li><strong>Minimální zůstatek kreditu</strong> pro rezervaci — jaká je minimální částka?</li>
+      <li><strong>Heslo a číslo karty</strong> — jak přesně funguje vztah mezi nimi?</li>
+      <li><strong>Doména</strong> — potvrzení booking.zone4you.cz a nastavení DNS</li>
+      <li><strong>HTTPS certifikát</strong> — je na serveru, nebo ho musíme řešit?</li>
+    </ol>
+
+    <h3 class="minor">Nekritické (lze řešit později)</h3>
+    <ol start="7">
+      <li><strong>Reformer odlišnosti</strong> — jaké přesně?</li>
+      <li><strong>WhatsApp Business API</strong> — přístup a nastavení</li>
+      <li><strong>Gamifikace</strong> — přesná pravidla pro odznáčky</li>
+    </ol>
+  </div>
+
+</div>
+
+</body>
+</html>

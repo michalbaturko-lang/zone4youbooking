@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scope of Work — Zone4You Online Booking System</title>
+<style>
+  :root {
+    --primary: #1a1a2e;
+    --accent: #e94560;
+    --accent-light: #ff6b81;
+    --bg: #f8f9fa;
+    --card: #ffffff;
+    --text: #2d3436;
+    --text-light: #636e72;
+    --border: #dfe6e9;
+    --green: #00b894;
+    --orange: #fdcb6e;
+    --blue: #0984e3;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 0;
+  }
+  .header {
+    background: linear-gradient(135deg, var(--primary) 0%, #16213e 100%);
+    color: white;
+    padding: 3rem 2rem;
+    text-align: center;
+  }
+  .header h1 {
+    font-size: 2.2rem;
+    margin-bottom: 1rem;
+    font-weight: 700;
+  }
+  .header .meta {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+    font-size: 0.95rem;
+    opacity: 0.9;
+  }
+  .header .meta span {
+    background: rgba(255,255,255,0.1);
+    padding: 0.3rem 1rem;
+    border-radius: 20px;
+  }
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+  }
+  .intro {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    border-left: 4px solid var(--accent);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .intro p {
+    margin-bottom: 0.8rem;
+    color: var(--text-light);
+  }
+  .intro p:last-child { margin-bottom: 0; }
+  .phase-header {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
+    color: white;
+    padding: 1.5rem 2rem;
+    border-radius: 12px;
+    margin: 2.5rem 0 1.5rem;
+    font-size: 1.4rem;
+    font-weight: 700;
+  }
+  .phase-header.phase2 {
+    background: linear-gradient(135deg, var(--blue) 0%, #74b9ff 100%);
+  }
+  .module {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 1.8rem 2rem;
+    margin-bottom: 1.2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-left: 4px solid var(--accent);
+    transition: transform 0.2s;
+  }
+  .module:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  }
+  .module.phase2 {
+    border-left-color: var(--blue);
+  }
+  .module h3 {
+    font-size: 1.15rem;
+    margin-bottom: 0.8rem;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .module h3 .badge {
+    background: var(--accent);
+    color: white;
+    font-size: 0.75rem;
+    padding: 0.15rem 0.6rem;
+    border-radius: 10px;
+    font-weight: 600;
+  }
+  .module.phase2 h3 .badge {
+    background: var(--blue);
+  }
+  .module ul {
+    list-style: none;
+    padding: 0;
+  }
+  .module ul li {
+    padding: 0.35rem 0 0.35rem 1.5rem;
+    position: relative;
+    color: var(--text-light);
+  }
+  .module ul li::before {
+    content: '✓';
+    position: absolute;
+    left: 0;
+    color: var(--green);
+    font-weight: bold;
+  }
+  .module .open-point {
+    background: #fff3cd;
+    border-radius: 8px;
+    padding: 0.6rem 1rem;
+    margin-top: 0.8rem;
+    font-size: 0.9rem;
+    color: #856404;
+  }
+  .module .termin {
+    display: inline-block;
+    margin-top: 0.8rem;
+    background: #edf2f7;
+    padding: 0.3rem 0.8rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: var(--text-light);
+    font-weight: 600;
+  }
+  .summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5rem 0;
+    background: var(--card);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .summary-table th {
+    background: var(--primary);
+    color: white;
+    padding: 0.8rem 1rem;
+    text-align: left;
+    font-weight: 600;
+  }
+  .summary-table td {
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .summary-table tr:last-child td { border-bottom: none; }
+  .summary-table tr:hover td { background: #f1f3f5; }
+  .total {
+    text-align: center;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin: 1rem 0 2rem;
+  }
+  .section {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 1.8rem 2rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .section h2 {
+    color: var(--primary);
+    font-size: 1.3rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--border);
+  }
+  .section ul {
+    list-style: none;
+    padding: 0;
+  }
+  .section ul li {
+    padding: 0.4rem 0 0.4rem 1.5rem;
+    position: relative;
+    color: var(--text-light);
+  }
+  .section ul.excluded li::before {
+    content: '✗';
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    font-weight: bold;
+  }
+  .section ul.required li::before {
+    content: '→';
+    position: absolute;
+    left: 0;
+    color: var(--blue);
+    font-weight: bold;
+  }
+  .section ul.delivery li::before {
+    content: '•';
+    position: absolute;
+    left: 0.3rem;
+    color: var(--green);
+    font-weight: bold;
+  }
+  .waiting {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .footer {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-light);
+    font-size: 0.9rem;
+    font-style: italic;
+    border-top: 1px solid var(--border);
+    margin-top: 2rem;
+  }
+  @media (max-width: 600px) {
+    .header h1 { font-size: 1.5rem; }
+    .header .meta { flex-direction: column; gap: 0.5rem; }
+    .container { padding: 1rem; }
+    .module, .section { padding: 1.2rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Scope of Work</h1>
+  <h2 style="font-weight:400; font-size:1.1rem; opacity:0.85; margin-bottom:1.5rem;">Zone4You Online Booking System</h2>
+  <div class="meta">
+    <span>Klient: Zone4You s.r.o.</span>
+    <span>Dodavatel: Michal Baturko</span>
+    <span>Verze 1.1</span>
+    <span>27. 2. 2026</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="intro">
+    <p><strong>Cíl projektu:</strong> Vytvoření moderního online rezervačního systému pro fitness centrum Zone4You, který nahradí stávající řešení memberzone.cz.</p>
+    <p>Nový systém bude napojen na stávající software Luxart a umožní klientům centra pohodlně si prohlížet rozvrh, rezervovat lekce, spravovat kredit a sledovat svou historii — vše v přehledném, velmi vyladěném responsivním webovém rozhraní dostupném z počítače i mobilního telefonu.</p>
+    <p>Důraz je kladen na kvalitní webový zážitek — systém nebude nativní mobilní aplikace, ale pečlivě navržený a optimalizovaný web, který bude fungovat bezchybně na všech zařízeních.</p>
+    <p>Systém bude dostupný v <strong>češtině a angličtině</strong>.</p>
+  </div>
+
+  <!-- ========== FÁZE 1 ========== -->
+  <div class="phase-header">FÁZE 1 — Rezervační systém (MVP)</div>
+
+  <div class="module">
+    <h3><span class="badge">Modul 1</span> Přihlášení a autentizace</h3>
+    <ul>
+      <li>Přihlašovací stránka s loginem (email) a heslem napojenou na Luxart API</li>
+      <li>Funkce "Zapomenuté heslo" — odeslání stávajícího hesla na registrovaný email</li>
+      <li>Nápověda na přihlašovací stránce (upřesníme po vyjasnění fungování hesla a čísla karty)</li>
+      <li>Zabezpečená session s automatickým odhlášením po nečinnosti</li>
+      <li>Přepínání jazyka (CZ / EN)</li>
+    </ul>
+    <div class="open-point">Otevřený bod: Přesné fungování hesla ve vztahu k číslu karty — upřesníme s klientem.</div>
+    <div class="termin">Týden 1–2</div>
+  </div>
+
+  <div class="module">
+    <h3><span class="badge">Modul 2</span> Rozvrh a zobrazení lekcí</h3>
+    <ul>
+      <li>Denní pohled na rozvrh (výchozí zobrazení)</li>
+      <li>Týdenní pohled na rozvrh</li>
+      <li>Zobrazení detailu lekce: název, instruktor, čas, sál, cena, obsazenost</li>
+      <li>Zobrazení náhradního instruktora / zástupu</li>
+      <li>Indikátor obsazenosti — barevný (zelená/oranžová/červená) + přesný počet míst</li>
+      <li>Filtrování podle sálu, typu lekce a instruktora</li>
+      <li>Funkce "Oblíbené lekce" — klient si označí lekce a má k nim rychlý přístup</li>
+    </ul>
+    <div class="termin">Týden 2–4</div>
+  </div>
+
+  <div class="module">
+    <h3><span class="badge">Modul 3</span> Rezervace lekcí</h3>
+    <ul>
+      <li>Rezervace lekce jedním klikem z rozvrhu</li>
+      <li>Stržení kreditu v momentě rezervace</li>
+      <li>Kontrola dostatečného zůstatku kreditu před rezervací</li>
+      <li>Zrušení rezervace klientem s automatickým vrácením kreditu (min. 4 hodiny předem)</li>
+      <li>Poplatek za pozdní zrušení (méně než 4 hodiny předem) — <strong>100 Kč</strong></li>
+      <li>Penalizace za no-show — <strong>100 Kč</strong></li>
+      <li>Omezení rezervací na 48 hodin dopředu</li>
+      <li>Zobrazení seznamu aktivních rezervací klienta ("Moje rezervace")</li>
+    </ul>
+    <div class="termin">Týden 3–5</div>
+  </div>
+
+  <div class="module">
+    <h3><span class="badge">Modul 4</span> Čekací listina (Waiting List)</h3>
+    <ul>
+      <li>Zápis na čekací listinu, když je lekce plně obsazena</li>
+      <li>Automatické zařazení prvního čekajícího při uvolnění místa</li>
+      <li>Automatické stržení kreditu při zařazení z čekací listiny</li>
+      <li>Notifikace o zařazení na lekci — emailem i WhatsApp zprávou</li>
+      <li>Maximální kapacita čekací listiny (10 osob)</li>
+      <li>Zobrazení pozice klienta na čekací listině</li>
+    </ul>
+    <div class="termin">Týden 5–6</div>
+  </div>
+
+  <div class="module">
+    <h3><span class="badge">Modul 5</span> Kredit a platby (Stripe)</h3>
+    <ul>
+      <li>Zobrazení aktuálního zůstatku kreditu v hlavičce stránky</li>
+      <li>Předdefinované částky pro dobití: 500 Kč, 1 000 Kč, 2 000 Kč, 5 000 Kč, 10 000 Kč</li>
+      <li>Platební brána Stripe s podporou platebních karet</li>
+      <li>Platba přes Apple Pay a Google Pay (součást Stripe)</li>
+      <li>Historie transakcí a plateb (dobití, stržení za lekce, vrácení, storno poplatky)</li>
+      <li>Zabezpečené platební flow (Stripe Checkout / Payment Intents)</li>
+    </ul>
+    <div class="termin">Týden 5–7</div>
+  </div>
+
+  <div class="module">
+    <h3><span class="badge">Modul 6</span> Profil klienta</h3>
+    <ul>
+      <li>Zobrazení osobních údajů klienta (jméno, email, telefon, členství)</li>
+      <li>Možnost doplnit chybějící údaje</li>
+      <li>Historie navštívených lekcí (archiv)</li>
+      <li>Přehled aktivního členství a jeho parametrů</li>
+    </ul>
+    <div class="termin">Týden 6–7</div>
+  </div>
+
+  <div class="module">
+    <h3><span class="badge">Modul 7</span> Notifikace (email + WhatsApp)</h3>
+    <ul>
+      <li>Email při úspěšné rezervaci lekce</li>
+      <li>Email při zrušení rezervace</li>
+      <li>Email + WhatsApp při zařazení z čekací listiny na lekci</li>
+      <li>Email při úspěšném dobití kreditu</li>
+      <li>Profesionální emailové šablony v designu Zone4You (CZ + EN)</li>
+      <li>WhatsApp zprávy pro časově kritické notifikace (čekací listina)</li>
+    </ul>
+    <p style="margin-top:0.8rem; color:var(--text-light); font-size:0.9rem;"><strong>Tech:</strong> Emaily odesílá naše aplikace (Resend / SendGrid). WhatsApp přes WhatsApp Business API / Twilio.</p>
+    <div class="termin">Týden 7–8</div>
+  </div>
+
+  <div class="module">
+    <h3><span class="badge">Modul 8</span> Lokalizace (CZ + EN)</h3>
+    <ul>
+      <li>Kompletní rozhraní v češtině (výchozí jazyk)</li>
+      <li>Kompletní rozhraní v angličtině</li>
+      <li>Přepínání jazyka v hlavičce stránky</li>
+      <li>Lokalizované emaily a WhatsApp zprávy v obou jazycích</li>
+    </ul>
+    <div class="termin">Průběžně (paralelně s ostatními moduly)</div>
+  </div>
+
+  <table class="summary-table">
+    <thead>
+      <tr><th>Modul</th><th>Obsah</th><th>Termín</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Modul 1</td><td>Přihlášení a autentizace</td><td>Týden 1–2</td></tr>
+      <tr><td>Modul 2</td><td>Rozvrh a zobrazení lekcí</td><td>Týden 2–4</td></tr>
+      <tr><td>Modul 3</td><td>Rezervace lekcí</td><td>Týden 3–5</td></tr>
+      <tr><td>Modul 4</td><td>Čekací listina</td><td>Týden 5–6</td></tr>
+      <tr><td>Modul 5</td><td>Kredit a platby (Stripe)</td><td>Týden 5–7</td></tr>
+      <tr><td>Modul 6</td><td>Profil klienta</td><td>Týden 6–7</td></tr>
+      <tr><td>Modul 7</td><td>Notifikace (email + WhatsApp)</td><td>Týden 7–8</td></tr>
+      <tr><td>Modul 8</td><td>Lokalizace (CZ + EN)</td><td>Průběžně</td></tr>
+    </tbody>
+  </table>
+  <div class="total">Odhadovaná délka Fáze 1: 8 týdnů</div>
+
+  <!-- ========== FÁZE 2 ========== -->
+  <div class="phase-header phase2">FÁZE 2 — Rozšíření a doplňkové funkce</div>
+
+  <div class="module phase2">
+    <h3><span class="badge">Modul 9</span> Kryptoplatby</h3>
+    <ul>
+      <li>Integrace platební brány pro kryptoměny (Bitcoin, Ethereum a další)</li>
+      <li>Napojení na službu typu Coinbase Commerce nebo BTCPay Server</li>
+      <li>Automatické přepočítání na Kč a připsání kreditu</li>
+    </ul>
+    <div class="termin">Týden 9–10</div>
+  </div>
+
+  <div class="module phase2">
+    <h3><span class="badge">Modul 10</span> Gamifikace a motivační systém</h3>
+    <ul>
+      <li>Systém odznáčků v profilu klienta (bronz / stříbro / zlato podle aktivity)</li>
+      <li>Pravidla: např. 3 lekce za týden = bronzový odznak, 5 lekcí = stříbrný atd.</li>
+      <li>Zobrazení aktuálního progressu v profilu</li>
+      <li>Proaktivní motivační zprávy (email, WhatsApp)</li>
+      <li>Historie získaných odznáčků</li>
+      <li>Nastavení preferencí (možnost vypnout motivační zprávy)</li>
+    </ul>
+    <div class="termin">Týden 10–12</div>
+  </div>
+
+  <div class="module phase2">
+    <h3><span class="badge">Modul 11</span> Připomenutí lekcí</h3>
+    <ul>
+      <li>Automatické připomenutí lekce emailem (např. 2 h nebo 24 h předem)</li>
+      <li>WhatsApp připomenutí</li>
+      <li>Nastavení preferencí připomenutí v profilu klienta</li>
+    </ul>
+    <div class="termin">Týden 12–13</div>
+  </div>
+
+  <div class="module phase2">
+    <h3><span class="badge">Modul 12</span> Optimalizace a vyladění webu</h3>
+    <ul>
+      <li>PWA (Progressive Web App) — možnost "přidat na plochu" telefonu</li>
+      <li>Offline zobrazení rozvrhu (cache)</li>
+      <li>Pokročilé statistiky pro klienta</li>
+      <li>Optimalizace výkonu na základě reálného provozu</li>
+    </ul>
+    <div class="termin">Týden 13–14</div>
+  </div>
+
+  <table class="summary-table">
+    <thead>
+      <tr><th>Modul</th><th>Obsah</th><th>Termín</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Modul 9</td><td>Kryptoplatby</td><td>Týden 9–10</td></tr>
+      <tr><td>Modul 10</td><td>Gamifikace a motivační systém</td><td>Týden 10–12</td></tr>
+      <tr><td>Modul 11</td><td>Připomenutí lekcí</td><td>Týden 12–13</td></tr>
+      <tr><td>Modul 12</td><td>Optimalizace a vyladění webu</td><td>Týden 13–14</td></tr>
+    </tbody>
+  </table>
+  <div class="total" style="color:var(--blue);">Odhadovaná délka Fáze 2: 6 týdnů</div>
+
+  <!-- ========== CO NENÍ SOUČÁSTÍ ========== -->
+  <div class="section">
+    <h2>Co NENÍ součástí projektu</h2>
+    <ul class="excluded">
+      <li>Administrační panel — veškerá správa probíhá v softwaru Luxart</li>
+      <li>Registrace nových klientů přes web — registrace probíhá na recepci centra</li>
+      <li>Nativní mobilní aplikace (iOS / Android) — místo toho stavíme velmi vyladěný responsivní web</li>
+      <li>Soukromé lekce / Personal Training — případně v budoucí fázi</li>
+      <li>Jednorázové vstupy bez členství</li>
+    </ul>
+  </div>
+
+  <!-- ========== PŘEDPOKLADY ========== -->
+  <div class="section">
+    <h2>Předpoklady a součinnost klienta</h2>
+    <ul class="required">
+      <li><strong>Luxart API</strong> — čekáme na přístup k API na portu 9759 a aktuální /Help dokumentaci</li>
+      <li><strong>Stripe účet</strong> — API klíče (testovací i produkční) — <span class="waiting">čekáme na klienta</span></li>
+      <li><strong>Doména</strong> — potvrzení a nastavení DNS pro booking.zone4you.cz</li>
+      <li><strong>HTTPS certifikát</strong> — na serveru, kde poběží aplikace</li>
+      <li><strong>Grafické podklady</strong> — logo, barvy, fonty (zajištěno z designu)</li>
+      <li><strong>Testování</strong> — klient provede akceptační testování před spuštěním každé fáze</li>
+      <li><strong>Odpovědi na doplňující dotazy</strong> — viz dokument s otevřenými body</li>
+      <li><strong>WhatsApp Business API</strong> — přístup pro odesílání WhatsApp zpráv</li>
+    </ul>
+  </div>
+
+  <!-- ========== ZPŮSOB DODÁNÍ ========== -->
+  <div class="section">
+    <h2>Způsob dodání</h2>
+    <ul class="delivery">
+      <li>Zdrojový kód v Git repozitáři</li>
+      <li>Nasazení na dohodnutý server / hosting</li>
+      <li>Předání dokumentace k nasazení a provozu</li>
+      <li>Zaškolení obsluhy (pokud bude potřeba)</li>
+    </ul>
+  </div>
+
+  <!-- ========== STÁVAJÍCÍ SYSTÉM ========== -->
+  <div class="section">
+    <h2>Stávající systém (memberzone.cz)</h2>
+    <p style="color:var(--text-light);">Stávající systém memberzone.cz bude po dobu vývoje a přechodného období fungovat paralelně s novým systémem. Po úspěšném otestování a stabilizaci nového systému je možné starý systém odstavit — po dohodě s klientem.</p>
+  </div>
+
+  <div class="footer">
+    Tento dokument definuje rozsah prací na projektu Zone4You Online Booking System.<br>
+    Případné změny nebo rozšíření budou řešeny dodatkem k tomuto dokumentu.
+  </div>
+
+</div>
+
+</body>
+</html>
