@@ -184,6 +184,7 @@ export default function Home() {
 
   const activeReservations = reservations.filter((reservation) => reservation.status === "active");
   const waitingEntries = waitlist.filter((entry) => entry.status === "waiting");
+  const hasActiveFilters = room !== "Všechny" || category !== "Všechny" || query.trim().length > 0;
 
   async function withBusy<T>(key: string, action: () => Promise<T>, success?: string) {
     setBusy(key);
@@ -301,29 +302,41 @@ export default function Home() {
           </button>
 
           <div className="user-section">
-            <button className={`btn btn-outline ${section === "schedule" ? "active" : ""}`} onClick={() => setSection("schedule")}>
+            <button
+              className={`btn btn-outline header-nav-button ${section === "schedule" ? "active" : ""}`}
+              onClick={() => setSection("schedule")}
+            >
               Rozvrh
             </button>
-            <button className={`btn btn-outline ${section === "reservations" ? "active" : ""}`} onClick={() => setSection("reservations")}>
+            <button
+              className={`btn btn-outline header-nav-button ${section === "reservations" ? "active" : ""}`}
+              onClick={() => setSection("reservations")}
+            >
               Moje rezervace
             </button>
-            <button className={`btn btn-outline ${section === "credit" ? "active" : ""}`} onClick={() => setSection("credit")}>
+            <button
+              className={`btn btn-outline header-nav-button ${section === "credit" ? "active" : ""}`}
+              onClick={() => setSection("credit")}
+            >
               Kredit
             </button>
             {snapshot?.user && (
-              <button className={`btn btn-outline ${section === "profile" ? "active" : ""}`} onClick={() => setSection("profile")}>
+              <button
+                className={`btn btn-outline header-nav-button ${section === "profile" ? "active" : ""}`}
+                onClick={() => setSection("profile")}
+              >
                 Profil
               </button>
             )}
             {snapshot?.user ? (
               <>
                 <div className="credit-display">{money(snapshot.user.creditBalanceKc)}</div>
-                <button className="btn btn-primary" onClick={handleLogout}>
+                <button className="btn btn-primary auth-button" onClick={handleLogout}>
                   Odhlásit
                 </button>
               </>
             ) : (
-              <button className="btn btn-primary" onClick={() => setModal("login")}>
+              <button className="btn btn-primary auth-button" onClick={() => setModal("login")}>
                 Přihlásit se
               </button>
             )}
@@ -393,9 +406,11 @@ export default function Home() {
                 <Search size={16} />
                 <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Lekce, instruktor, sál" />
               </label>
-              <button className="filter-reset" onClick={clearFilters}>
-                Zrušit filtry
-              </button>
+              {hasActiveFilters && (
+                <button className="filter-reset" onClick={clearFilters}>
+                  Zrušit filtry
+                </button>
+              )}
             </div>
 
             {view === "day" && (
@@ -432,46 +447,70 @@ export default function Home() {
                 {filteredLessons.length === 0 ? (
                   <EmptyState icon={<CalendarDays />} title="Žádné lekce neodpovídají filtrům" actionLabel="Zrušit filtry" onAction={clearFilters} />
                 ) : (
-                  <table className="week-table">
-                    <thead>
-                      <tr>
-                        <th>Čas</th>
-                        {days.map((day) => (
-                          <th key={day} className={todayKey === day ? "today-col" : ""}>
-                            {formatDay(`${day}T12:00:00`, "short")}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {weekTimes.map((time) => (
-                        <tr key={time}>
-                          <td>{time}</td>
-                          {days.map((day) => {
-                            const cellLessons = filteredLessons.filter(
-                              (lesson) => dateKey(lesson.startsAt) === day && formatTime(lesson.startsAt) === time,
-                            );
-                            return (
-                              <td key={`${day}-${time}`}>
-                                {cellLessons.map((lesson) => (
-                                  <button
-                                    key={lesson.id}
-                                    className={`week-lesson ${roomClass(lesson.roomName)}`}
-                                    onClick={() => openLesson(lesson)}
-                                  >
-                                    <span className="week-lesson-name">{lesson.name}</span>
-                                    <span className="week-lesson-time">
-                                      {formatTime(lesson.startsAt)} - {formatTime(lesson.endsAt)}
-                                    </span>
-                                  </button>
-                                ))}
-                              </td>
-                            );
-                          })}
+                  <>
+                    <table className="week-table">
+                      <thead>
+                        <tr>
+                          <th>Čas</th>
+                          {days.map((day) => (
+                            <th key={day} className={todayKey === day ? "today-col" : ""}>
+                              {formatDay(`${day}T12:00:00`, "short")}
+                            </th>
+                          ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {weekTimes.map((time) => (
+                          <tr key={time}>
+                            <td>{time}</td>
+                            {days.map((day) => {
+                              const cellLessons = filteredLessons.filter(
+                                (lesson) => dateKey(lesson.startsAt) === day && formatTime(lesson.startsAt) === time,
+                              );
+                              return (
+                                <td key={`${day}-${time}`}>
+                                  {cellLessons.map((lesson) => (
+                                    <button
+                                      key={lesson.id}
+                                      className={`week-lesson ${roomClass(lesson.roomName)}`}
+                                      onClick={() => openLesson(lesson)}
+                                    >
+                                      <span className="week-lesson-name">{lesson.name}</span>
+                                      <span className="week-lesson-time">
+                                        {formatTime(lesson.startsAt)} - {formatTime(lesson.endsAt)}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+
+                    <div className="week-mobile-list">
+                      {visibleLessonsByDay
+                        .filter(({ lessons: dayLessons }) => dayLessons.length > 0)
+                        .map(({ day, lessons: dayLessons }) => (
+                          <section className="week-mobile-day" key={day}>
+                            <h2 className="section-title">{formatDay(`${day}T12:00:00`, "long")}</h2>
+                            <div className="time-group">
+                              {dayLessons.map((lesson) => (
+                                <LessonRow
+                                  key={lesson.id}
+                                  lesson={lesson}
+                                  rules={rules}
+                                  reservation={reservationFor(lesson, reservations)}
+                                  waitlistEntry={waitlistFor(lesson, waitlist)}
+                                  onOpen={() => openLesson(lesson)}
+                                />
+                              ))}
+                            </div>
+                          </section>
+                        ))}
+                    </div>
+                  </>
                 )}
               </div>
             )}
@@ -613,6 +652,27 @@ export default function Home() {
           </section>
         )}
       </main>
+
+      <nav className="mobile-tabbar" aria-label="Navigace">
+        <button className={section === "schedule" ? "active" : ""} onClick={() => setSection("schedule")}>
+          <CalendarDays size={18} />
+          <span>Rozvrh</span>
+        </button>
+        <button className={section === "reservations" ? "active" : ""} onClick={() => setSection("reservations")}>
+          <Check size={18} />
+          <span>Rezervace</span>
+        </button>
+        <button className={section === "credit" ? "active" : ""} onClick={() => setSection("credit")}>
+          <WalletCards size={18} />
+          <span>Kredit</span>
+        </button>
+        {snapshot?.user && (
+          <button className={section === "profile" ? "active" : ""} onClick={() => setSection("profile")}>
+            <UserRound size={18} />
+            <span>Profil</span>
+          </button>
+        )}
+      </nav>
 
       {modal === "login" && <LoginModal busy={busy} onClose={() => setModal(null)} onLogin={handleLogin} />}
 
