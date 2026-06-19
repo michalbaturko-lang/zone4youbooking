@@ -36,7 +36,7 @@ async function main() {
   const login = await request("/api/auth/login", {
     method: "POST",
     body: bodyWithDemoState({
-      login: "demo@zone4you.cz",
+      login: "tereza.novakova@email.cz",
       password: "1234",
       memberCardNumber: "Z4Y-2048",
     }),

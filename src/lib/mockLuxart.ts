@@ -21,9 +21,9 @@ const RESERVATION_WINDOW_HOURS = bookingRules.reservationWindowHours;
 
 const demoUser: User = {
   id: "usr_demo_001",
-  login: "demo@zone4you.cz",
+  login: "tereza.novakova@email.cz",
   fullName: "Tereza Nováková",
-  email: "demo@zone4you.cz",
+  email: "tereza.novakova@email.cz",
   phone: "+420 777 123 456",
   memberCardNumber: "Z4Y-2048",
   membership: "Zone4You Active",
@@ -508,7 +508,7 @@ export const mockLuxartAdapter: LuxartAdapter = {
       type: "topup",
       amountKc: input.amountKc,
       relatedTopupId: topup.id,
-      note: `Mock Stripe top-up ${input.amountKc.toLocaleString("cs-CZ")} Kč`,
+      note: `Dobití kreditu kartou ${input.amountKc.toLocaleString("cs-CZ")} Kč`,
     });
     return topup;
   },
