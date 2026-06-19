@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Doplňující dotazy — Zone4You</title>
+<style>
+  :root {
+    --primary: #1a1a2e;
+    --accent: #e94560;
+    --bg: #f8f9fa;
+    --card: #ffffff;
+    --text: #2d3436;
+    --text-light: #636e72;
+    --border: #dfe6e9;
+    --blue: #0984e3;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+  .header {
+    background: linear-gradient(135deg, var(--primary) 0%, #16213e 100%);
+    color: white;
+    padding: 3rem 2rem;
+    text-align: center;
+  }
+  .header h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+  .header .sub { opacity: 0.85; font-size: 0.95rem; }
+  .container { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+  .greeting {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 1.5rem 2rem;
+    margin-bottom: 2rem;
+    border-left: 4px solid var(--blue);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    color: var(--text-light);
+  }
+
+  .question-card {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 1.8rem 2rem;
+    margin-bottom: 1.2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-left: 4px solid var(--accent);
+    transition: transform 0.2s;
+  }
+  .question-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  }
+  .question-card h3 {
+    color: var(--primary);
+    font-size: 1.1rem;
+    margin-bottom: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .question-card h3 .num {
+    background: var(--accent);
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .question-card p {
+    color: var(--text-light);
+    margin-bottom: 0.5rem;
+  }
+  .question-card .options {
+    background: #f1f3f5;
+    border-radius: 8px;
+    padding: 0.8rem 1.2rem;
+    margin-top: 0.8rem;
+  }
+  .question-card .options li {
+    margin-bottom: 0.3rem;
+    margin-left: 1rem;
+    color: var(--text);
+  }
+
+  .closing {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 1.5rem 2rem;
+    margin-top: 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    color: var(--text-light);
+    text-align: center;
+  }
+  .closing .signature {
+    margin-top: 1rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  @media (max-width: 600px) {
+    .header h1 { font-size: 1.4rem; }
+    .container { padding: 1rem; }
+    .question-card { padding: 1.2rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Doplňující dotazy</h1>
+  <div class="sub">Zone4You Booking — pro klienta</div>
+</div>
+
+<div class="container">
+
+  <div class="greeting">
+    <p><strong>Zdeňku,</strong></p>
+    <p>díky za odpovědi, většinu věcí máme jasných a můžeme se pustit do práce. Potřebuju ale ještě pár doplnění, abychom některé části mohli dotáhnout:</p>
+  </div>
+
+  <div class="question-card">
+    <h3><span class="num">1</span> No-show — 100 Kč nebo 100 %?</h3>
+    <p>Máme jasné, že zrušení je možné nejpozději 4 hodiny předem a poplatek za pozdní zrušení je 100 Kč. Ale jak je to s <strong>no-show (nedostavení se na lekci)?</strong></p>
+    <div class="options">
+      <ol type="a">
+        <li><strong>100 Kč</strong> — stejně jako pozdní zrušení?</li>
+        <li><strong>100 % ceny lekce</strong> — propadne celý kredit za danou lekci?</li>
+        <li>Jinak?</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="question-card">
+    <h3><span class="num">2</span> Stripe — přístupy</h3>
+    <p>Našel jsi už ty přístupy na Stripe? Potřebuju API klíče (test i live), abych mohl napojit platební bránu. Pokud Stripe účet ještě nemáte, dej vědět, pomůžu s nastavením.</p>
+  </div>
+
+  <div class="question-card">
+    <h3><span class="num">3</span> Minimální zůstatek kreditu pro rezervaci</h3>
+    <p>Psal jsi, že není pevný limit na počet rezervací, ale musí být dostatečný zůstatek kreditu. <strong>Jaký je minimální zůstatek</strong>, aby si klient mohl zarezervovat lekci? Odpovídá to ceně dané lekce, nebo je to nějaká fixní částka?</p>
+  </div>
+
+  <div class="question-card">
+    <h3><span class="num">4</span> Reformer — drobné odlišnosti</h3>
+    <p>Psal jsi, že Reformer má stejná pravidla, ale s drobnými odlišnostmi. <strong>Jaké přesně?</strong> (Jiná cena? Jiná kapacita? Jiná storno lhůta?)</p>
+  </div>
+
+  <div class="question-card">
+    <h3><span class="num">5</span> Heslo a číslo karty</h3>
+    <p>Ještě mi není úplně jasné, jak to funguje s heslem a číslem karty. Číslo karty = heslo? Nebo klient dostane zvlášť heslo při registraci? Tohle si potřebuju ještě upřesnit, abych to správně nastavil v přihlašovacím flow.</p>
+  </div>
+
+  <div class="question-card">
+    <h3><span class="num">6</span> WhatsApp notifikace — co ty na to?</h3>
+    <p>Napadlo nás, že by bylo super kromě emailu posílat i <strong>WhatsApp zprávy</strong> — hlavně při uvolnění místa z čekací listiny (to je časově kritické, email si lidi nemusí přečíst hned). Co na to říkáš? Mohli bychom to zapojit i do dalších notifikací.</p>
+  </div>
+
+  <div class="question-card">
+    <h3><span class="num">7</span> Gamifikace — motivace klientů</h3>
+    <p>Máme nápad přidat do profilu klienta <strong>odznáčky a motivační systém</strong> — např. za 3 lekce týdně bronzový odznak, 5 lekcí stříbrný atd. Systém by pak mohl klientům proaktivně posílat zprávy (mail, WhatsApp) typu "Máš tento týden 2 lekce, stačí ještě jedna na odznak! Volná místa jsou na..." a motivovat je k návštěvě lekcí, kde je ještě prostor. Co ty na to?</p>
+  </div>
+
+  <div class="closing">
+    <p>To je všechno. Zbytek máme jasný a začínáme makat. Scope of Work ti posílám v příloze.</p>
+    <p class="signature">Díky, Michal</p>
+  </div>
+
+</div>
+
+</body>
+</html>

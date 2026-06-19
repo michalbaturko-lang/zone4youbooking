@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Návrh AI Chatbota — Zone4You</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primary: #E67E22;
+    --primary-dark: #D35400;
+    --primary-light: #FDEBD0;
+    --dark: #1E293B;
+    --dark-light: #334155;
+    --text: #2d3436;
+    --text-light: #64748B;
+    --bg: #F8FAFC;
+    --card: #ffffff;
+    --border: #E2E8F0;
+    --green: #27AE60;
+    --green-light: #D5F5E3;
+    --blue: #0984e3;
+    --blue-light: #dfe6fd;
+    --purple: #6C5CE7;
+    --purple-light: #E8E5FF;
+    --red: #E74C3C;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+
+  /* Hero */
+  .hero {
+    background: linear-gradient(135deg, var(--dark) 0%, var(--dark-light) 50%, var(--primary-dark) 100%);
+    color: white;
+    padding: 4rem 2rem 3rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle at 70% 30%, rgba(230,126,34,0.15) 0%, transparent 50%);
+  }
+  .hero .badge {
+    display: inline-block;
+    background: rgba(230,126,34,0.2);
+    border: 1px solid rgba(230,126,34,0.4);
+    color: var(--primary);
+    padding: 0.4rem 1.2rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    position: relative;
+  }
+  .hero h1 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 1rem;
+    position: relative;
+  }
+  .hero h1 span { color: var(--primary); }
+  .hero p {
+    font-size: 1.1rem;
+    opacity: 0.85;
+    max-width: 650px;
+    margin: 0 auto;
+    position: relative;
+  }
+  .hero .meta-row {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-top: 2rem;
+    flex-wrap: wrap;
+    position: relative;
+  }
+  .hero .meta-item {
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(10px);
+    padding: 0.5rem 1.2rem;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+
+  .container { max-width: 960px; margin: 0 auto; padding: 2.5rem 1.5rem; }
+
+  /* Section headers */
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin-bottom: 1.5rem;
+    margin-top: 1rem;
+  }
+  .section-header .icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    flex-shrink: 0;
+  }
+  .section-header h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--dark);
+  }
+
+  /* Cards */
+  .card {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    border: 1px solid var(--border);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+  }
+  .card h3 {
+    font-size: 1.15rem;
+    color: var(--dark);
+    margin-bottom: 0.6rem;
+  }
+  .card p {
+    color: var(--text-light);
+    margin-bottom: 0.8rem;
+  }
+
+  /* Intro */
+  .intro-card {
+    background: linear-gradient(135deg, var(--primary-light) 0%, #FFF5EB 100%);
+    border: 1px solid rgba(230,126,34,0.2);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 2.5rem;
+  }
+  .intro-card p { color: var(--dark-light); margin-bottom: 0.5rem; }
+  .intro-card p:last-child { margin-bottom: 0; }
+
+  /* Feature grid */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.2rem;
+    margin-bottom: 2rem;
+  }
+  .feature-card {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 1.5rem;
+    border: 1px solid var(--border);
+    transition: all 0.2s;
+  }
+  .feature-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+    border-color: var(--primary);
+  }
+  .feature-card .feature-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+  }
+  .feature-card h4 {
+    font-size: 1rem;
+    color: var(--dark);
+    margin-bottom: 0.4rem;
+  }
+  .feature-card p {
+    font-size: 0.9rem;
+    color: var(--text-light);
+    line-height: 1.5;
+  }
+
+  /* Conversation demo */
+  .chat-demo {
+    background: var(--dark);
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    max-width: 500px;
+  }
+  .chat-demo .chat-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    margin-bottom: 1rem;
+  }
+  .chat-demo .chat-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 0.85rem;
+  }
+  .chat-demo .chat-name {
+    color: white;
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+  .chat-demo .chat-status {
+    color: var(--green);
+    font-size: 0.8rem;
+  }
+  .msg {
+    margin-bottom: 0.8rem;
+    display: flex;
+    flex-direction: column;
+  }
+  .msg.user { align-items: flex-end; }
+  .msg.bot { align-items: flex-start; }
+  .msg .bubble {
+    max-width: 85%;
+    padding: 0.7rem 1rem;
+    border-radius: 14px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+  .msg.user .bubble {
+    background: var(--primary);
+    color: white;
+    border-bottom-right-radius: 4px;
+  }
+  .msg.bot .bubble {
+    background: rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.9);
+    border-bottom-left-radius: 4px;
+  }
+
+  /* Use cases */
+  .usecase {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .usecase:last-child { border-bottom: none; }
+  .usecase .num {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .usecase .content h4 {
+    font-size: 1rem;
+    color: var(--dark);
+    margin-bottom: 0.2rem;
+  }
+  .usecase .content p {
+    font-size: 0.9rem;
+    color: var(--text-light);
+  }
+
+  /* Tech stack */
+  .tech-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+  }
+  .tech-item {
+    background: var(--bg);
+    border-radius: 12px;
+    padding: 1.2rem;
+    text-align: center;
+    border: 1px solid var(--border);
+  }
+  .tech-item .tech-label {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.3rem;
+  }
+  .tech-item .tech-value {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--dark);
+  }
+
+  /* Pricing */
+  .pricing-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+  }
+  .pricing-table th {
+    background: var(--dark);
+    color: white;
+    padding: 0.8rem 1.2rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+  .pricing-table th:first-child { border-radius: 10px 0 0 0; }
+  .pricing-table th:last-child { border-radius: 0 10px 0 0; }
+  .pricing-table td {
+    padding: 0.7rem 1.2rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.95rem;
+  }
+  .pricing-table tr:last-child td { border-bottom: none; }
+  .pricing-table tr:hover td { background: #f8f9fa; }
+  .pricing-table .highlight td {
+    background: var(--primary-light);
+    font-weight: 600;
+  }
+
+  /* Tags */
+  .tag {
+    display: inline-block;
+    padding: 0.2rem 0.7rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .tag-green { background: var(--green-light); color: var(--green); }
+  .tag-blue { background: var(--blue-light); color: var(--blue); }
+  .tag-purple { background: var(--purple-light); color: var(--purple); }
+  .tag-orange { background: var(--primary-light); color: var(--primary-dark); }
+
+  /* Divider */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 2.5rem 0;
+  }
+
+  /* CTA */
+  .cta-section {
+    background: linear-gradient(135deg, var(--dark) 0%, var(--dark-light) 100%);
+    border-radius: 16px;
+    padding: 2.5rem;
+    text-align: center;
+    color: white;
+    margin-top: 2rem;
+  }
+  .cta-section h2 {
+    font-size: 1.6rem;
+    margin-bottom: 0.8rem;
+  }
+  .cta-section p {
+    opacity: 0.8;
+    margin-bottom: 1.5rem;
+  }
+  .cta-btn {
+    display: inline-block;
+    background: var(--primary);
+    color: white;
+    padding: 0.8rem 2rem;
+    border-radius: 10px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: all 0.2s;
+  }
+  .cta-btn:hover {
+    background: var(--primary-dark);
+    transform: translateY(-2px);
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-light);
+    font-size: 0.85rem;
+  }
+
+  @media (max-width: 640px) {
+    .hero h1 { font-size: 1.7rem; }
+    .hero { padding: 2.5rem 1.2rem 2rem; }
+    .container { padding: 1.5rem 1rem; }
+    .feature-grid { grid-template-columns: 1fr; }
+    .tech-grid { grid-template-columns: 1fr 1fr; }
+    .card { padding: 1.3rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="badge">AI Asistent pro Zone4You</div>
+  <h1>Návrh <span>AI Chatbota</span></h1>
+  <p>Inteligentní asistent pro klienty fitness centra Zone4You — pomůže s rezervacemi, rozvrhem, kreditem a vším, co klienti potřebují. 24/7, okamžitě, česky i anglicky.</p>
+  <div class="meta-row">
+    <div class="meta-item">Klient: Zone4You s.r.o.</div>
+    <div class="meta-item">Dodavatel: Michal Baturko</div>
+    <div class="meta-item">Verze 1.0</div>
+    <div class="meta-item">Únor 2026</div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- INTRO -->
+  <div class="intro-card">
+    <p><strong>Proč AI chatbot pro Zone4You?</strong></p>
+    <p>Klienti fitness centra mají opakující se dotazy — "Kdy je příští Spinning?", "Kolik mám kreditu?", "Můžu se ještě zapsat na Reformer?". AI chatbot tyto dotazy vyřeší okamžitě, bez čekání na recepci, a navíc může proaktivně pomáhat s rezervacemi a motivací.</p>
+    <p>Chatbot bude integrován přímo do bookingového systému Zone4You a bude mít přístup k reálným datům z Luxart API.</p>
+  </div>
+
+  <!-- CO CHATBOT UMÍ -->
+  <div class="section-header">
+    <div class="icon" style="background: var(--primary-light); color: var(--primary);">&#x1F4AC;</div>
+    <h2>Co chatbot umí</h2>
+  </div>
+
+  <div class="feature-grid">
+    <div class="feature-card">
+      <div class="feature-icon" style="background: var(--primary-light);">&#x1F4C5;</div>
+      <h4>Rozvrh a lekce</h4>
+      <p>Odpovídá na dotazy o rozvrhu, dostupnosti lekcí, instruktorech a sálech. "Jaké lekce jsou zítra ráno?" — okamžitá odpověď.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="background: var(--green-light);">&#x2705;</div>
+      <h4>Rezervace jedním dotazem</h4>
+      <p>"Zarezervuj mi Spinning zítra v 18:00" — chatbot ověří dostupnost, zkontroluje kredit a provede rezervaci.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="background: var(--blue-light);">&#x1F4B3;</div>
+      <h4>Kredit a platby</h4>
+      <p>"Kolik mám kreditu?" / "Chci dobít 2000 Kč" — zobrazí zůstatek, nabídne dobití, ukáže historii transakcí.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="background: var(--purple-light);">&#x1F514;</div>
+      <h4>Čekací listina</h4>
+      <p>"Je na Reformer v pátek volno? Pokud ne, dej mě na čekací listinu." — automaticky zapíše a informuje o pozici.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="background: #FFF0F0;">&#x274C;</div>
+      <h4>Zrušení rezervace</h4>
+      <p>"Zruš mi zítřejší lekci" — chatbot upozorní na případný storno poplatek a provede zrušení s potvrzením.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="background: #F0F8FF;">&#x1F30D;</div>
+      <h4>Dvojjazyčný</h4>
+      <p>Automaticky detekuje jazyk klienta. Plynule přepíná mezi češtinou a angličtinou — bez nutnosti manuálního přepnutí.</p>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- UKÁZKA KONVERZACE -->
+  <div class="section-header">
+    <div class="icon" style="background: var(--green-light); color: var(--green);">&#x1F4F1;</div>
+    <h2>Ukázka konverzace</h2>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+    <!-- Demo 1: Rozvrh -->
+    <div class="chat-demo">
+      <div class="chat-header">
+        <div class="chat-avatar">Z4</div>
+        <div>
+          <div class="chat-name">Zone4You Asistent</div>
+          <div class="chat-status">Online</div>
+        </div>
+      </div>
+      <div class="msg user"><div class="bubble">Ahoj, jaké lekce jsou zítra ráno?</div></div>
+      <div class="msg bot"><div class="bubble">Zítra ráno (pá 28.2.) jsou tyto lekce:<br><br><strong>7:00</strong> — Yoga Flow (Sál 1) — 8/12 míst<br><strong>8:00</strong> — Spinning (Sál 2) — 3/20 míst<br><strong>9:30</strong> — Pilates (Sál 1) — volno<br><br>Chceš se na něco zapsat?</div></div>
+      <div class="msg user"><div class="bubble">Dej mě na ten Spinning!</div></div>
+      <div class="msg bot"><div class="bubble">Hotovo! Zarezervoval jsem ti <strong>Spinning</strong> zítra v 8:00 (Sál 2, instruktor Petr N.). Strženo 180 Kč. Zbývá ti 1 820 Kč kreditu.</div></div>
+    </div>
+
+    <!-- Demo 2: Kredit -->
+    <div class="chat-demo">
+      <div class="chat-header">
+        <div class="chat-avatar">Z4</div>
+        <div>
+          <div class="chat-name">Zone4You Asistent</div>
+          <div class="chat-status">Online</div>
+        </div>
+      </div>
+      <div class="msg user"><div class="bubble">Kolik mám kreditu?</div></div>
+      <div class="msg bot"><div class="bubble">Tvůj aktuální zůstatek je <strong>1 820 Kč</strong>.<br><br>Tento týden: 2 lekce (360 Kč), poslední dobití 5 000 Kč dne 20.2.</div></div>
+      <div class="msg user"><div class="bubble">Chci dobít 2000</div></div>
+      <div class="msg bot"><div class="bubble">Připravil jsem platbu <strong>2 000 Kč</strong> přes Stripe. Klikni na odkaz pro dokončení platby:<br><br><u>Zaplatit 2 000 Kč</u><br><br>Podporujeme kartu, Apple Pay i Google Pay.</div></div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- USE CASES -->
+  <div class="section-header">
+    <div class="icon" style="background: var(--blue-light); color: var(--blue);">&#x1F3AF;</div>
+    <h2>Hlavní scénáře použití</h2>
+  </div>
+
+  <div class="card">
+    <div class="usecase">
+      <div class="num">1</div>
+      <div class="content">
+        <h4>Rychlá rezervace hlasem</h4>
+        <p>"Zarezervuj mi cokoliv na zítra odpoledne" — chatbot nabídne dostupné lekce, klient vybere, hotovo za 10 sekund.</p>
+      </div>
+    </div>
+    <div class="usecase">
+      <div class="num">2</div>
+      <div class="content">
+        <h4>Kontrola a správa rezervací</h4>
+        <p>"Co mám zarezervováno?" / "Zruš mi páteční Yogu" — přehled aktivních rezervací a snadná správa.</p>
+      </div>
+    </div>
+    <div class="usecase">
+      <div class="num">3</div>
+      <div class="content">
+        <h4>Informace o obsazenosti</h4>
+        <p>"Je volno na Reformer ve čtvrtek?" — okamžitá informace o dostupnosti s možností zapsat se na čekací listinu.</p>
+      </div>
+    </div>
+    <div class="usecase">
+      <div class="num">4</div>
+      <div class="content">
+        <h4>Přehled kreditu a transakcí</h4>
+        <p>"Za co jsem utratil kredit tento měsíc?" — detailní přehled stržení, dobití a storno poplatků.</p>
+      </div>
+    </div>
+    <div class="usecase">
+      <div class="num">5</div>
+      <div class="content">
+        <h4>Proaktivní motivace (Fáze 2)</h4>
+        <p>Chatbot sám upozorní: "Tento týden máš 2 lekce — ještě jedna a máš bronzový odznak! Na zítřejší Pilates jsou 4 volná místa."</p>
+      </div>
+    </div>
+    <div class="usecase">
+      <div class="num">6</div>
+      <div class="content">
+        <h4>FAQ a podpora</h4>
+        <p>"Jaká je storno politika?" / "Jak dobít kredit?" — odpovídá na časté dotazy bez zátěže recepce.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- INTEGRACE -->
+  <div class="section-header">
+    <div class="icon" style="background: var(--purple-light); color: var(--purple);">&#x1F50C;</div>
+    <h2>Integrace a napojení</h2>
+  </div>
+
+  <div class="card">
+    <h3>Chatbot bude napojen na:</h3>
+    <div class="tech-grid">
+      <div class="tech-item">
+        <div class="tech-label">Správa dat</div>
+        <div class="tech-value">Luxart API</div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-label">Platby</div>
+        <div class="tech-value">Stripe</div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-label">Email notifikace</div>
+        <div class="tech-value">Resend / SendGrid</div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-label">Rychlé zprávy</div>
+        <div class="tech-value">WhatsApp API</div>
+      </div>
+    </div>
+    <p style="margin-top: 1rem; color: var(--text-light); font-size: 0.9rem;">Chatbot má přístup k reálným datům — rozvrhu, obsazenosti, kreditu klienta, historii rezervací. Všechna data jsou aktuální a synchronizovaná přes Luxart API.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- TECHNICKÉ ŘEŠENÍ -->
+  <div class="section-header">
+    <div class="icon" style="background: #E8F8F5; color: #1ABC9C;">&#x2699;</div>
+    <h2>Technické řešení</h2>
+  </div>
+
+  <div class="card">
+    <h3>Architektura</h3>
+    <div class="tech-grid" style="margin-bottom: 1.5rem;">
+      <div class="tech-item">
+        <div class="tech-label">AI Model</div>
+        <div class="tech-value">Claude (Anthropic)</div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-label">Framework</div>
+        <div class="tech-value">Next.js + Vercel AI SDK</div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-label">Hosting</div>
+        <div class="tech-value">Vercel</div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-label">Jazyk</div>
+        <div class="tech-value">TypeScript</div>
+      </div>
+    </div>
+
+    <h3>Klíčové vlastnosti</h3>
+    <ul style="list-style: none; margin-top: 0.8rem;">
+      <li style="padding: 0.4rem 0; padding-left: 1.5rem; position: relative; color: var(--text-light);"><span style="position:absolute; left:0; color: var(--green); font-weight:bold;">&#x2713;</span> <strong>Tool calling</strong> — chatbot volá API funkce (getSchedule, makeReservation, getCredit...)</li>
+      <li style="padding: 0.4rem 0; padding-left: 1.5rem; position: relative; color: var(--text-light);"><span style="position:absolute; left:0; color: var(--green); font-weight:bold;">&#x2713;</span> <strong>Streaming odpovědi</strong> — text se zobrazuje postupně, jako živý rozhovor</li>
+      <li style="padding: 0.4rem 0; padding-left: 1.5rem; position: relative; color: var(--text-light);"><span style="position:absolute; left:0; color: var(--green); font-weight:bold;">&#x2713;</span> <strong>Kontext konverzace</strong> — chatbot si pamatuje, o čem se bavíte v rámci session</li>
+      <li style="padding: 0.4rem 0; padding-left: 1.5rem; position: relative; color: var(--text-light);"><span style="position:absolute; left:0; color: var(--green); font-weight:bold;">&#x2713;</span> <strong>Autentizace</strong> — chatbot ví, kdo jste, a pracuje s vaším účtem</li>
+      <li style="padding: 0.4rem 0; padding-left: 1.5rem; position: relative; color: var(--text-light);"><span style="position:absolute; left:0; color: var(--green); font-weight:bold;">&#x2713;</span> <strong>Bezpečnost</strong> — nemůže provádět akce za jiné klienty, validace na serveru</li>
+      <li style="padding: 0.4rem 0; padding-left: 1.5rem; position: relative; color: var(--text-light);"><span style="position:absolute; left:0; color: var(--green); font-weight:bold;">&#x2713;</span> <strong>Fallback</strong> — pokud chatbot neví, navede na recepci nebo nabídne kontakt</li>
+    </ul>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- FÁZE IMPLEMENTACE -->
+  <div class="section-header">
+    <div class="icon" style="background: var(--primary-light); color: var(--primary);">&#x1F680;</div>
+    <h2>Fáze implementace</h2>
+  </div>
+
+  <div class="card">
+    <table class="pricing-table">
+      <thead>
+        <tr>
+          <th>Fáze</th>
+          <th>Obsah</th>
+          <th>Tagy</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Fáze A</strong></td>
+          <td>Základní chatbot — rozvrh, dotazy na lekce, FAQ, informace o kreditu</td>
+          <td><span class="tag tag-green">Základ</span></td>
+        </tr>
+        <tr>
+          <td><strong>Fáze B</strong></td>
+          <td>Akce — rezervace lekcí, zrušení, zápis na čekací listinu přes chat</td>
+          <td><span class="tag tag-blue">Akce</span></td>
+        </tr>
+        <tr>
+          <td><strong>Fáze C</strong></td>
+          <td>Platby — dobití kreditu přes chat, přehled transakcí</td>
+          <td><span class="tag tag-purple">Platby</span></td>
+        </tr>
+        <tr>
+          <td><strong>Fáze D</strong></td>
+          <td>Proaktivní asistent — motivační zprávy, doporučení lekcí, gamifikace</td>
+          <td><span class="tag tag-orange">Fáze 2</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="margin-top: 1rem; color: var(--text-light); font-size: 0.9rem;">Fáze A a B se nasazují společně s bookingem (Fáze 1 projektu). Fáze C po integraci Stripe. Fáze D společně s gamifikací (Fáze 2 projektu).</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- KDE BUDE CHATBOT -->
+  <div class="section-header">
+    <div class="icon" style="background: #FFF0F0; color: var(--red);">&#x1F4CD;</div>
+    <h2>Kde bude chatbot umístěn</h2>
+  </div>
+
+  <div class="card">
+    <ul style="list-style: none;">
+      <li style="padding: 0.5rem 0; padding-left: 1.5rem; position: relative; color: var(--text-light);"><span style="position:absolute; left:0;">&#x1F4AC;</span> <strong>Plovoucí ikonka</strong> — v pravém dolním rohu bookingového systému (booking.zone4you.cz)</li>
+      <li style="padding: 0.5rem 0; padding-left: 1.5rem; position: relative; color: var(--text-light);"><span style="position:absolute; left:0;">&#x1F4F1;</span> <strong>Mobilní verze</strong> — na mobilu se chatbot otevře na celou obrazovku pro pohodlné psaní</li>
+      <li style="padding: 0.5rem 0; padding-left: 1.5rem; position: relative; color: var(--text-light);"><span style="position:absolute; left:0;">&#x1F517;</span> <strong>Přímý odkaz</strong> — možnost sdílet odkaz na chatbot (např. z WhatsApp zprávy)</li>
+      <li style="padding: 0.5rem 0; padding-left: 1.5rem; position: relative; color: var(--text-light);"><span style="position:absolute; left:0;">&#x1F4E7;</span> <strong>V emailech</strong> — tlačítko "Potřebuješ pomoct?" v potvrzovacích emailech</li>
+    </ul>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta-section">
+    <h2>Připraveni začít?</h2>
+    <p>Chatbot se vyvíjí paralelně s bookingem. Základní verze bude připravena s MVP.</p>
+    <a href="scope-of-work.html" class="cta-btn">Zobrazit Scope of Work &rarr;</a>
+  </div>
+
+  <div class="footer">
+    <p>Zone4You AI Chatbot — Návrh &copy; 2026 Michal Baturko</p>
+  </div>
+
+</div>
+
+</body>
+</html>
