@@ -56,6 +56,7 @@ export interface Reservation {
   reservedAt: ISODateTime;
   cancelledAt?: ISODateTime;
   priceKc: number;
+  holdAmountKc?: number;
   cancellationFeeKc?: number;
   creditTransactionId?: ID;
 }
@@ -149,9 +150,12 @@ export interface BookingSnapshot {
 
 export interface BookingRules {
   resortId: number;
+  scheduleDays: number;
   freeCancellationHours: number;
   lateCancelFeeKc: number;
   noShowFeeKc: number;
+  minimumCreditForReservationKc: number;
+  reservationHoldKc: number;
   reservationWindowHours: number;
   topupAmounts: number[];
 }

@@ -16,7 +16,8 @@ import { bookingRules } from "./bookingRules";
 
 const RESORT_ID = bookingRules.resortId;
 const FREE_CANCELLATION_HOURS = bookingRules.freeCancellationHours;
-const LATE_CANCEL_FEE_KC = bookingRules.lateCancelFeeKc;
+const MINIMUM_CREDIT_FOR_RESERVATION_KC = bookingRules.minimumCreditForReservationKc;
+const RESERVATION_HOLD_KC = bookingRules.reservationHoldKc;
 const RESERVATION_WINDOW_HOURS = bookingRules.reservationWindowHours;
 
 const demoUser: User = {
@@ -140,7 +141,7 @@ function startOfToday() {
 function at(dayOffset: number, time: string) {
   const [hours, minutes] = time.split(":").map(Number);
   const today = pragueDateParts(new Date());
-  return pragueTimeToUtc(today.year, today.month, today.day + dayOffset + 1, hours, minutes);
+  return pragueTimeToUtc(today.year, today.month, today.day + dayOffset, hours, minutes);
 }
 
 function lessonSeed(
@@ -190,21 +191,30 @@ let userState: User = { ...demoUser };
 
 function createSeedLessons(): Lesson[] {
   return [
-  lessonSeed("les_001", 0, "16:30", 50, "HEAT easy", "Sál 2", "Cardio", "Lenka Olivová", 14, 9, 180, true),
-  lessonSeed("les_002", 0, "17:30", 50, "SPINNING", "Sál 2", "Cardio", "Petra Uhrová", 16, 15, 180, true),
-  lessonSeed("les_003", 0, "18:00", 55, "POWER JOGA", "Sál 1", "Body & Mind", "Charlota Treblíková", 18, 12, 170),
-  lessonSeed("les_004", 0, "18:30", 50, "PUMPING", "Sál 1", "Síla", "Pavel Vácha", 14, 14, 190),
-  lessonSeed("les_005", 0, "19:00", 55, "REFORMER", "Reformer", "Reformer", "Reformer tým", 6, 6, 320, true),
-  lessonSeed("les_006", 1, "7:10", 55, "PILATES", "Sál 1", "Body & Mind", "Hana Hrnčiariková", 16, 6, 170),
-  lessonSeed("les_007", 1, "8:30", 55, "PUMPING", "Sál 1", "Síla", "Pavel Vácha", 14, 8, 190),
-  lessonSeed("les_008", 1, "9:30", 50, "SPINNING", "Sál 2", "Cardio", "Petra Uhrová", 16, 13, 180),
-  lessonSeed("les_009", 1, "16:30", 90, "SPINNING", "Sál 2", "Cardio", "Petra Uhrová", 16, 5, 250),
-  lessonSeed("les_010", 1, "17:30", 80, "REFORMER", "Reformer", "Reformer", "Reformer tým", 6, 4, 320),
-  lessonSeed("les_011", 2, "8:30", 55, "ZDRAVÁ ZÁDA", "Sál 1", "Zdraví", "Hana Hrnčiariková", 16, 7, 160),
-  lessonSeed("les_012", 2, "9:30", 55, "RANNÍ JOGA", "Sál 1", "Body & Mind", "Charlota Treblíková", 18, 11, 170),
-  lessonSeed("les_013", 2, "10:20", 50, "SPINNING", "Sál 2", "Cardio", "Petra Uhrová", 16, 16, 180),
-  lessonSeed("les_014", 3, "17:00", 55, "BODY FORMING", "Sál 1", "Síla", "Zuzana Chlupová", 16, 10, 180),
-  lessonSeed("les_015", 3, "18:00", 50, "HIIT", "Sál 2", "Cardio", "Zuzana Chlupová", 14, 7, 190),
+    lessonSeed("les_001", 0, "16:30", 50, "HEAT easy", "Sál 2", "Cardio", "Lenka Olivová", 14, 9, 180, true),
+    lessonSeed("les_002", 0, "17:30", 50, "SPINNING", "Sál 2", "Cardio", "Petra Uhrová", 16, 15, 180, true),
+    lessonSeed("les_003", 0, "18:00", 55, "POWER JOGA", "Sál 1", "Body & Mind", "Charlota Treblíková", 18, 12, 170),
+    lessonSeed("les_004", 0, "18:30", 50, "PUMPING", "Sál 1", "Síla", "Pavel Vácha", 14, 14, 190),
+    lessonSeed("les_005", 0, "19:00", 55, "REFORMER", "Reformer", "Reformer", "Reformer tým", 6, 6, 320, true),
+    lessonSeed("les_006", 1, "7:10", 55, "PILATES", "Sál 1", "Body & Mind", "Hana Hrnčiariková", 16, 6, 170),
+    lessonSeed("les_007", 1, "8:30", 55, "PUMPING", "Sál 1", "Síla", "Pavel Vácha", 14, 8, 190),
+    lessonSeed("les_008", 1, "9:30", 50, "SPINNING", "Sál 2", "Cardio", "Petra Uhrová", 16, 13, 180),
+    lessonSeed("les_009", 1, "16:30", 90, "SPINNING", "Sál 2", "Cardio", "Petra Uhrová", 16, 5, 250),
+    lessonSeed("les_010", 1, "17:30", 80, "REFORMER", "Reformer", "Reformer", "Reformer tým", 6, 4, 320),
+    lessonSeed("les_011", 2, "8:30", 55, "ZDRAVÁ ZÁDA", "Sál 1", "Zdraví", "Hana Hrnčiariková", 16, 7, 160),
+    lessonSeed("les_012", 2, "9:30", 55, "RANNÍ JOGA", "Sál 1", "Body & Mind", "Charlota Treblíková", 18, 11, 170),
+    lessonSeed("les_013", 2, "10:20", 50, "SPINNING", "Sál 2", "Cardio", "Petra Uhrová", 16, 16, 180),
+    lessonSeed("les_014", 3, "17:00", 55, "BODY FORMING", "Sál 1", "Síla", "Zuzana Chlupová", 16, 10, 180),
+    lessonSeed("les_015", 3, "18:00", 50, "HIIT", "Sál 2", "Cardio", "Zuzana Chlupová", 14, 7, 190),
+    lessonSeed("les_016", 4, "7:10", 55, "PILATES", "Sál 1", "Body & Mind", "Hana Hrnčiariková", 16, 4, 170),
+    lessonSeed("les_017", 4, "17:30", 50, "SPINNING", "Sál 2", "Cardio", "Petra Uhrová", 16, 10, 180, true),
+    lessonSeed("les_018", 4, "18:30", 50, "PUMPING", "Sál 1", "Síla", "Pavel Vácha", 14, 11, 190),
+    lessonSeed("les_019", 5, "8:30", 55, "ZDRAVÁ ZÁDA", "Sál 1", "Zdraví", "Hana Hrnčiariková", 16, 5, 160),
+    lessonSeed("les_020", 5, "17:00", 55, "BODY FORMING", "Sál 1", "Síla", "Zuzana Chlupová", 16, 12, 180),
+    lessonSeed("les_021", 5, "18:00", 80, "REFORMER", "Reformer", "Reformer", "Reformer tým", 6, 5, 320),
+    lessonSeed("les_022", 6, "9:30", 55, "RANNÍ JOGA", "Sál 1", "Body & Mind", "Charlota Treblíková", 18, 8, 170),
+    lessonSeed("les_023", 6, "16:30", 50, "HEAT easy", "Sál 2", "Cardio", "Lenka Olivová", 14, 6, 180),
+    lessonSeed("les_024", 6, "18:00", 50, "HIIT", "Sál 2", "Cardio", "Zuzana Chlupová", 14, 9, 190),
   ];
 }
 
@@ -217,6 +227,7 @@ function createSeedReservations(): Reservation[] {
       status: "active",
       reservedAt: new Date(Date.now() - 2 * hourMs).toISOString(),
       priceKc: 170,
+      holdAmountKc: RESERVATION_HOLD_KC,
       creditTransactionId: "trx_seed_001",
     },
   ];
@@ -241,11 +252,11 @@ function createSeedTransactions(): CreditTransaction[] {
       id: "trx_seed_001",
       userId: demoUser.id,
       type: "reservation_charge",
-      amountKc: -170,
+      amountKc: -RESERVATION_HOLD_KC,
       balanceAfterKc: 1450,
       occurredAt: new Date(Date.now() - 2 * hourMs).toISOString(),
       relatedReservationId: "res_seed_001",
-      note: "Rezervace PILATES",
+      note: "Blokace rezervace PILATES",
     },
     {
       id: "trx_seed_002",
@@ -352,6 +363,19 @@ function activeReservationFor(lessonId: string) {
   return reservations.find((reservation) => reservation.lessonId === lessonId && reservation.status === "active");
 }
 
+function activeReservationCount(userId: string) {
+  return reservations.filter((reservation) => reservation.userId === userId && reservation.status === "active").length;
+}
+
+function requiredCreditForNextReservation(userId: string) {
+  return MINIMUM_CREDIT_FOR_RESERVATION_KC + activeReservationCount(userId) * RESERVATION_HOLD_KC;
+}
+
+function fourDigitCardPassword(value?: string) {
+  const digits = value?.replace(/\D/g, "") ?? "";
+  return digits.slice(-4);
+}
+
 function isWithinReservationWindow(lesson: Lesson) {
   const now = Date.now();
   const start = new Date(lesson.startsAt).getTime();
@@ -379,8 +403,29 @@ export const luxartRules = bookingRules;
 export const mockLuxartAdapter: LuxartAdapter = {
   async login(input: LoginInput): Promise<LoginResult> {
     if (!input.login || !input.password) {
-      throw new Error("Vyplňte login i heslo.");
+      throw new Error("Vyplňte příjmení i čtyřmístné heslo.");
     }
+
+    const normalize = (value: string) =>
+      value
+        .trim()
+        .toLocaleLowerCase("cs-CZ")
+        .normalize("NFD")
+        .replace(/\p{Diacritic}/gu, "");
+    const login = normalize(input.login);
+    const fullName = normalize(userState.fullName);
+    const surname = fullName.split(" ").at(-1) ?? fullName;
+    const email = normalize(userState.email);
+    const cardDigits = fourDigitCardPassword(userState.memberCardNumber);
+    const cardInputDigits = fourDigitCardPassword(input.memberCardNumber);
+    const loginMatches = login === surname || login === fullName || login === email || login === "demo@zone4you.cz";
+    const passwordMatches = input.password.trim() === cardDigits || input.password.trim() === "1234";
+    const cardMatches = !input.memberCardNumber || cardInputDigits === cardDigits;
+
+    if (!loginMatches || !passwordMatches || !cardMatches) {
+      throw new Error("Přihlášení se nepodařilo. Použijte příjmení a čtyřmístné heslo z členské karty.");
+    }
+
     currentUser = { ...userState };
     return {
       user: currentUser,
@@ -422,7 +467,10 @@ export const mockLuxartAdapter: LuxartAdapter = {
     if (!isWithinReservationWindow(lesson)) throw new Error("Rezervace jsou otevřené maximálně 48 hodin dopředu.");
     if (activeReservationFor(lesson.id)) throw new Error("Tuto lekci už máte rezervovanou.");
     if (lesson.occupiedCount >= lesson.capacity) throw new Error("Lekce je plná. Můžete se zapsat na čekací listinu.");
-    if (user.creditBalanceKc < lesson.priceKc) throw new Error("Nemáte dostatečný kredit pro rezervaci.");
+    const requiredCreditKc = requiredCreditForNextReservation(user.id);
+    if (user.creditBalanceKc < requiredCreditKc) {
+      throw new Error(`Pro další rezervaci je potřeba mít kredit alespoň ${requiredCreditKc.toLocaleString("cs-CZ")} Kč.`);
+    }
 
     const reservation: Reservation = {
       id: uid("res"),
@@ -431,13 +479,14 @@ export const mockLuxartAdapter: LuxartAdapter = {
       status: "active",
       reservedAt: new Date().toISOString(),
       priceKc: lesson.priceKc,
+      holdAmountKc: RESERVATION_HOLD_KC,
     };
     const transaction = addTransaction({
       userId: user.id,
       type: "reservation_charge",
-      amountKc: -lesson.priceKc,
+      amountKc: -RESERVATION_HOLD_KC,
       relatedReservationId: reservation.id,
-      note: `Rezervace ${lesson.name}`,
+      note: `Blokace rezervace ${lesson.name}`,
     });
     reservation.creditTransactionId = transaction.id;
     reservations = [reservation, ...reservations];
@@ -456,26 +505,18 @@ export const mockLuxartAdapter: LuxartAdapter = {
     if (!lesson) throw new Error("Lekce nebyla nalezena.");
 
     const hoursToStart = (new Date(lesson.startsAt).getTime() - Date.now()) / hourMs;
-    const cancellationFeeKc = hoursToStart >= FREE_CANCELLATION_HOURS ? 0 : LATE_CANCEL_FEE_KC;
-    const refundKc = Math.max(0, reservation.priceKc - cancellationFeeKc);
-    if (refundKc > 0) {
-      addTransaction({
-        userId: user.id,
-        type: "reservation_refund",
-        amountKc: refundKc,
-        relatedReservationId: reservation.id,
-        note: `Vrácení kreditu ${lesson.name}`,
-      });
+    if (hoursToStart < FREE_CANCELLATION_HOURS) {
+      throw new Error(`Online storno je možné nejpozději ${FREE_CANCELLATION_HOURS} hodiny před lekcí.`);
     }
-    if (cancellationFeeKc > 0) {
-      addTransaction({
-        userId: user.id,
-        type: "late_cancel_fee",
-        amountKc: -cancellationFeeKc,
-        relatedReservationId: reservation.id,
-        note: `Pozdní storno ${lesson.name}`,
-      });
-    }
+    const cancellationFeeKc = 0;
+    const refundKc = reservation.holdAmountKc ?? RESERVATION_HOLD_KC;
+    addTransaction({
+      userId: user.id,
+      type: "reservation_refund",
+      amountKc: refundKc,
+      relatedReservationId: reservation.id,
+      note: `Vrácení blokace ${lesson.name}`,
+    });
 
     const cancelled: Reservation = {
       ...reservation,
@@ -559,7 +600,7 @@ export const mockLuxartAdapter: LuxartAdapter = {
 
 export async function getBookingSnapshot(): Promise<BookingSnapshot> {
   const from = startOfToday();
-  const to = new Date(from.getTime() + 4 * dayMs);
+  const to = new Date(from.getTime() + bookingRules.scheduleDays * dayMs);
   const [user, loadedLessons] = await Promise.all([
     mockLuxartAdapter.getCurrentUser(),
     mockLuxartAdapter.getLessons({ from: from.toISOString(), to: to.toISOString(), resortId: RESORT_ID }),

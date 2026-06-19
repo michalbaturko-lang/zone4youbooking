@@ -371,6 +371,18 @@ button:disabled {
   border-color: var(--primary);
 }
 
+.filter-chip svg {
+  width: 14px;
+  height: 14px;
+}
+
+.favorite-filter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
 .schedule-search {
   display: flex;
   align-items: center;
@@ -515,6 +527,9 @@ button:disabled {
 
 .lesson-status,
 .reservation-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 6px 12px;
   border-radius: 20px;
   font-size: 12px;
@@ -683,6 +698,13 @@ button:disabled {
   font-size: 13px;
 }
 
+.reservation-note {
+  display: block;
+  margin-top: 5px;
+  color: var(--gray-400);
+  font-size: 12px;
+}
+
 .btn-cancel {
   flex-shrink: 0;
   padding: 8px 16px;
@@ -691,6 +713,12 @@ button:disabled {
   border: 0;
   border-radius: var(--radius-sm);
   font-weight: 500;
+}
+
+.btn-cancel:disabled {
+  color: var(--gray-500);
+  background: var(--gray-100);
+  cursor: not-allowed;
 }
 
 .credit-header {
@@ -984,6 +1012,13 @@ button:disabled {
 .login-form {
   display: grid;
   gap: 12px;
+}
+
+.login-help {
+  margin-bottom: 16px;
+  color: var(--gray-600);
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .login-field {

@@ -1,4 +1,5 @@
 const baseUrl = process.env.APP_BASE_URL ?? "http://localhost:3007";
+const vercelProtectionBypass = process.env.VERCEL_PROTECTION_BYPASS;
 let demoState;
 
 function bodyWithDemoState(body = {}) {
@@ -10,6 +11,7 @@ async function request(path, init) {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      ...(vercelProtectionBypass ? { "x-vercel-protection-bypass": vercelProtectionBypass } : {}),
       ...init?.headers,
     },
   });
@@ -23,8 +25,21 @@ async function request(path, init) {
   return json;
 }
 
-function findReservableLesson(lessons) {
-  return lessons.find((lesson) => lesson.occupiedCount < lesson.capacity);
+function findReservableLesson(lessons, reservations, rules) {
+  const now = Date.now();
+  const activeLessonIds = new Set(
+    reservations.filter((reservation) => reservation.status === "active").map((reservation) => reservation.lessonId),
+  );
+  return lessons.find((lesson) => {
+    const start = new Date(lesson.startsAt).getTime();
+    return (
+      !activeLessonIds.has(lesson.id) &&
+      lesson.occupiedCount < lesson.capacity &&
+      start > now &&
+      start - now >= rules.freeCancellationHours * 60 * 60 * 1000 &&
+      start - now <= rules.reservationWindowHours * 60 * 60 * 1000
+    );
+  });
 }
 
 function findFullLesson(lessons) {
@@ -36,9 +51,8 @@ async function main() {
   const login = await request("/api/auth/login", {
     method: "POST",
     body: bodyWithDemoState({
-      login: "tereza.novakova@email.cz",
-      password: "1234",
-      memberCardNumber: "Z4Y-2048",
+      login: "Nováková",
+      password: "2048",
     }),
   });
 
@@ -46,13 +60,20 @@ async function main() {
     method: "POST",
     body: bodyWithDemoState(),
   });
-  const reservable = findReservableLesson(snapshot.lessons);
+  if (snapshot.rules.scheduleDays !== 7) throw new Error(`Unexpected scheduleDays: ${snapshot.rules.scheduleDays}`);
+  if (snapshot.rules.reservationHoldKc !== 100) {
+    throw new Error(`Unexpected reservationHoldKc: ${snapshot.rules.reservationHoldKc}`);
+  }
+  const reservable = findReservableLesson(snapshot.lessons, snapshot.reservations, snapshot.rules);
   if (!reservable) throw new Error("No reservable lesson found in snapshot.");
 
   const created = await request("/api/reservations", {
     method: "POST",
     body: bodyWithDemoState({ lessonId: reservable.id }),
   });
+  if (created.reservation.holdAmountKc !== snapshot.rules.reservationHoldKc) {
+    throw new Error(`Unexpected hold amount: ${created.reservation.holdAmountKc}`);
+  }
 
   await request(`/api/reservations/${created.reservation.id}`, {
     method: "DELETE",

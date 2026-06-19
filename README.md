@@ -29,9 +29,8 @@ APP_BASE_URL=http://localhost:3007 npm run smoke:api
 
 ## Demo klient
 
-- login: `demo@zone4you.cz`
-- heslo: `1234`
-- karta: `Z4Y-2048`
+- příjmení: `Nováková`
+- čtyřmístné heslo: `2048`
 
 V aplikaci je tlacitko `Reset demo`, ktere vrati mock data do cisteho startovniho stavu.
 

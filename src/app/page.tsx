@@ -10,6 +10,7 @@ import {
   Loader2,
   LockKeyhole,
   Search,
+  Star,
   UserRound,
   WalletCards,
   X,
@@ -85,6 +86,24 @@ function canReserve(lesson: Lesson, rules: BookingRules) {
   return start > now && start - now <= rules.reservationWindowHours * 60 * 60 * 1000;
 }
 
+function addDaysToKey(dayKey: string, offset: number) {
+  const [year, month, day] = dayKey.split("-").map(Number);
+  return dateKey(new Date(Date.UTC(year, month - 1, day + offset, 12, 0, 0, 0)).toISOString());
+}
+
+function cancellationDeadline(lesson: Lesson, rules: BookingRules) {
+  const deadline = new Date(new Date(lesson.startsAt).getTime() - rules.freeCancellationHours * 60 * 60 * 1000);
+  return deadline.toISOString();
+}
+
+function canCancelReservation(lesson: Lesson, rules: BookingRules) {
+  return Date.now() < new Date(cancellationDeadline(lesson, rules)).getTime();
+}
+
+function reservationHold(reservation: Reservation, rules: BookingRules) {
+  return reservation.holdAmountKc ?? rules.reservationHoldKc;
+}
+
 function reservationFor(lesson: Lesson, reservations: Reservation[]) {
   return reservations.find((reservation) => reservation.lessonId === lesson.id && reservation.status === "active");
 }
@@ -120,6 +139,7 @@ export default function Home() {
   const [view, setView] = useState<ViewMode>("day");
   const [room, setRoom] = useState("Všechny");
   const [category, setCategory] = useState("Všechny");
+  const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [query, setQuery] = useState("");
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
@@ -130,7 +150,7 @@ export default function Home() {
     const next = await bookingApiClient.snapshot();
     setSnapshot(next);
     setRules(next.rules);
-    setSelectedDay((current) => current ?? dateKey(next.lessons[0]?.startsAt ?? new Date().toISOString()));
+    setSelectedDay((current) => current ?? dateKey(new Date().toISOString()));
     setLoading(false);
   }
 
@@ -151,19 +171,24 @@ export default function Home() {
   const reservations = snapshot?.reservations ?? [];
   const waitlist = snapshot?.waitlist ?? [];
   const todayKey = dateKey(new Date().toISOString());
+  const scheduleDays = Math.max(1, rules.scheduleDays ?? fallbackRules.scheduleDays);
 
-  const days = useMemo(() => Array.from(new Set(sortLessons(lessons).map((lesson) => dateKey(lesson.startsAt)))), [lessons]);
+  const days = useMemo(
+    () => Array.from({ length: scheduleDays }, (_, index) => addDaysToKey(todayKey, index)),
+    [scheduleDays, todayKey],
+  );
   const lessonById = useMemo(() => new Map(lessons.map((lesson) => [lesson.id, lesson])), [lessons]);
 
   const filteredLessons = useMemo(() => {
     return sortLessons(lessons).filter((lesson) => {
       if (room !== "Všechny" && lesson.roomName !== room) return false;
       if (category !== "Všechny" && lesson.category !== category) return false;
+      if (favoriteOnly && !lesson.favorite) return false;
       if (view === "day" && selectedDay && dateKey(lesson.startsAt) !== selectedDay) return false;
       const haystack = `${lesson.name} ${lesson.instructorName} ${lesson.roomName}`.toLowerCase();
       return haystack.includes(query.trim().toLowerCase());
     });
-  }, [lessons, room, category, selectedDay, query, view]);
+  }, [lessons, room, category, favoriteOnly, selectedDay, query, view]);
 
   const visibleLessonsByDay = useMemo(() => {
     return days.map((day) => ({
@@ -184,7 +209,7 @@ export default function Home() {
 
   const activeReservations = reservations.filter((reservation) => reservation.status === "active");
   const waitingEntries = waitlist.filter((entry) => entry.status === "waiting");
-  const hasActiveFilters = room !== "Všechny" || category !== "Všechny" || query.trim().length > 0;
+  const hasActiveFilters = room !== "Všechny" || category !== "Všechny" || favoriteOnly || query.trim().length > 0;
 
   async function withBusy<T>(key: string, action: () => Promise<T>, success?: string) {
     setBusy(key);
@@ -207,7 +232,7 @@ export default function Home() {
   }
 
   async function handleLogin(
-    input: LoginInput = { login: "tereza.novakova@email.cz", password: "1234", memberCardNumber: "Z4Y-2048" },
+    input: LoginInput = { login: "Nováková", password: "2048" },
   ) {
     await withBusy(
       "login",
@@ -239,7 +264,7 @@ export default function Home() {
     await withBusy(
       `cancel-${reservation.id}`,
       () => bookingApiClient.cancelReservation(reservation.id),
-      "Rezervace byla zrušena a kredit byl přepočten podle storno pravidel.",
+      "Rezervace byla zrušena a blokace kreditu byla uvolněna.",
     );
   }
 
@@ -280,6 +305,7 @@ export default function Home() {
   function clearFilters() {
     setRoom("Všechny");
     setCategory("Všechny");
+    setFavoriteOnly(false);
     setQuery("");
   }
 
@@ -402,6 +428,14 @@ export default function Home() {
                   </button>
                 ))}
               </div>
+              <button
+                className={`filter-chip favorite-filter ${favoriteOnly ? "active" : ""}`}
+                onClick={() => setFavoriteOnly((current) => !current)}
+                type="button"
+              >
+                <Star size={14} />
+                Oblíbené
+              </button>
               <label className="schedule-search">
                 <Search size={16} />
                 <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Lekce, instruktor, sál" />
@@ -541,14 +575,28 @@ export default function Home() {
                   <>
                     {activeReservations.map((reservation) => {
                       const lesson = lessonById.get(reservation.lessonId);
+                      const cancellationOpen = lesson ? canCancelReservation(lesson, rules) : false;
                       return (
                         <div className="reservation-card" key={reservation.id}>
                           <div className="reservation-info">
                             <h4>{lesson ? activeReservationLabel(reservation, lesson) : "Rezervace"}</h4>
-                            <p>{lesson ? `${lesson.roomName} • ${money(reservation.priceKc)}` : money(reservation.priceKc)}</p>
+                            <p>
+                              {lesson
+                                ? `${lesson.roomName} • blokace ${money(reservationHold(reservation, rules))} • cena lekce ${money(reservation.priceKc)}`
+                                : `Blokace ${money(reservationHold(reservation, rules))}`}
+                            </p>
+                            {lesson && (
+                              <span className="reservation-note">
+                                Online storno do {formatDateTime(cancellationDeadline(lesson, rules))}
+                              </span>
+                            )}
                           </div>
-                          <button className="btn-cancel" disabled={busy === `cancel-${reservation.id}`} onClick={() => handleCancel(reservation)}>
-                            {busy === `cancel-${reservation.id}` ? "Ruším..." : "Zrušit"}
+                          <button
+                            className="btn-cancel"
+                            disabled={!cancellationOpen || busy === `cancel-${reservation.id}`}
+                            onClick={() => handleCancel(reservation)}
+                          >
+                            {!cancellationOpen ? "Storno uzavřeno" : busy === `cancel-${reservation.id}` ? "Ruším..." : "Zrušit"}
                           </button>
                         </div>
                       );
@@ -643,10 +691,6 @@ export default function Home() {
                     <dd>{snapshot.user.phone}</dd>
                   </div>
                   <div>
-                    <dt>Členská karta</dt>
-                    <dd>{snapshot.user.memberCardNumber}</dd>
-                  </div>
-                  <div>
                     <dt>Kredit</dt>
                     <dd>{money(snapshot.user.creditBalanceKc)}</dd>
                   </div>
@@ -731,8 +775,18 @@ function LessonRow({
         </div>
       </div>
       <div className="lesson-badges">
-        {booked && <span className="reservation-badge">Rezervováno</span>}
-        {listed && <span className="reservation-badge wait">Čekací listina #{waitlistEntry?.position}</span>}
+        {booked && (
+          <span className="reservation-badge">
+            <Check size={13} />
+            Rezervováno
+          </span>
+        )}
+        {listed && (
+          <span className="reservation-badge wait">
+            <Clock size={13} />
+            Čekací listina #{waitlistEntry?.position}
+          </span>
+        )}
         {!booked && !listed && !reservable && <span className="reservation-badge muted">Rezervace později</span>}
         <span className={`lesson-status ${occupancyClass(lesson)}`}>{state.label}</span>
       </div>
@@ -749,13 +803,12 @@ function LoginModal({
   onClose: () => void;
   onLogin: (input: LoginInput) => void;
 }) {
-  const [login, setLogin] = useState("tereza.novakova@email.cz");
-  const [password, setPassword] = useState("1234");
-  const [memberCardNumber, setMemberCardNumber] = useState("Z4Y-2048");
+  const [login, setLogin] = useState("Nováková");
+  const [password, setPassword] = useState("2048");
 
   function submitLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onLogin({ login, password, memberCardNumber });
+    onLogin({ login, password });
   }
 
   return (
@@ -768,23 +821,24 @@ function LoginModal({
           </button>
         </div>
         <div className="modal-body">
+          <p className="login-help">
+            Přihlaste se příjmením a čtyřmístným heslem z členské karty. Pokud údaje nefungují, pomůže vám recepce.
+          </p>
           <form className="login-form" onSubmit={submitLogin}>
             <label className="login-field">
-              <span>Email</span>
-              <input value={login} onChange={(event) => setLogin(event.target.value)} autoComplete="email" />
+              <span>Příjmení</span>
+              <input value={login} onChange={(event) => setLogin(event.target.value)} autoComplete="username" />
             </label>
             <label className="login-field">
-              <span>Heslo</span>
+              <span>Čtyřmístné heslo</span>
               <input
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 type="password"
+                inputMode="numeric"
+                maxLength={4}
                 autoComplete="current-password"
               />
-            </label>
-            <label className="login-field">
-              <span>Číslo karty</span>
-              <input value={memberCardNumber} onChange={(event) => setMemberCardNumber(event.target.value)} autoComplete="off" />
             </label>
             <div className="modal-actions">
               <button className="btn btn-outline" type="button" onClick={onClose}>
@@ -878,6 +932,16 @@ function LessonModal({
             <div className="modal-info-row">
               <span className="modal-info-label">Cena</span>
               <span className="modal-info-value">{money(lesson.priceKc)}</span>
+            </div>
+            <div className="modal-info-row">
+              <span className="modal-info-label">Blokace kreditu</span>
+              <span className="modal-info-value">{money(rules.reservationHoldKc)}</span>
+            </div>
+            <div className="modal-info-row">
+              <span className="modal-info-label">Storno online</span>
+              <span className="modal-info-value">
+                do {formatDateTime(cancellationDeadline(lesson, rules))}
+              </span>
             </div>
           </div>
 

@@ -7,7 +7,7 @@ const dayMs = 24 * 60 * 60 * 1000;
 function defaultRange() {
   const from = new Date();
   from.setHours(0, 0, 0, 0);
-  const to = new Date(from.getTime() + 5 * dayMs);
+  const to = new Date(from.getTime() + bookingRules.scheduleDays * dayMs);
   return { from: from.toISOString(), to: to.toISOString() };
 }
 
