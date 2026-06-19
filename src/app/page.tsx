@@ -449,6 +449,12 @@ export default function Home() {
                 ) : (
                   <>
                     <table className="week-table">
+                      <colgroup>
+                        <col className="week-time-col" />
+                        {days.map((day) => (
+                          <col key={day} />
+                        ))}
+                      </colgroup>
                       <thead>
                         <tr>
                           <th>Čas</th>
