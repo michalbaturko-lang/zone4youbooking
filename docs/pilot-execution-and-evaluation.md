@@ -230,7 +230,8 @@ Práce se zastaví pouze před akcí, která vyžaduje novou autoritu (živá mu
 
 ### Červené / externě blokované brány
 
-- port 9191 je domluvený ke zveřejnění, ale chybí host/HTTPS, stav aktivace, test DB a auth režim;
+- kandidát `http://api.memberzone.online:9191/Service1.svc` je veřejně dostupný a obsahuje rezervační SOAP/WCF operace, ale není potvrzené, že jde o autoritativní Zone4You test DB; HTTPS není funkční;
+- chybí společné rozhodnutí IT/Luxart, zda má redesign používat REST kontrakt z `http://api.memberzone.online:9295/Help`, nebo odlišný SOAP/WCF kontrakt `Service1.svc` na portu `9191`; současný adaptér je implementovaný pro REST a pouhá změna portu není možná;
 - chybí rozhodnutí IT, zda gateway používá IP/VPN bez hlavičky, Basic, Bearer nebo vlastní `X-*` hlavičku; veřejný datový endpoint zatím vracel 401;
 - chybí potvrzené mapování `cislo_salu` → `id_resource`;
 - chybí povolení a důkaz živých mutací v Luxart test DB;
@@ -245,10 +246,11 @@ Aktuální release stav: `NO-GO`. To je očekávané a správné, dokud nejsou �
 
 ### Blokuje zahájení nového D1
 
-1. Zone4You IT: přesná `http(s)://<host>:9191/Help` URL, potvrzení že je dostupná nyní, testovací DB, HTTPS a případná další autentizace.
-2. Zone4You IT/Luxart: tabulka `cislo_salu` → `id_resource` pro všechny sály a Reformer.
-3. Zone4You/Luxart: výslovné povolení vytvořit a zrušit rezervaci na dodaném testovacím klientovi a určení bezpečné test lekce.
-4. Luxart: potvrdit, že Zone4You používá `POST Reservations/watchdog_III`, `GET watchdog_II/user` a `DELETE Watchdog/{id}` a že notifikace jsou zapnuté; veřejný kontrakt neobsahuje pořadí.
+1. Zone4You IT + Luxart: písemně určit autoritativní integrační kontrakt — REST `:9295/api/*`, nebo SOAP/WCF `:9191/Service1.svc` — a potvrdit, že cíl používá testovací databázi Zone4You.
+2. Zone4You IT: dodat bezpečný šifrovaný přístup k vybranému kontraktu, jeho auth režim a případný allowlist/VPN; testovací credentials nebudou odeslány přes prosté HTTP.
+3. Zone4You IT/Luxart: tabulka `cislo_salu` → `id_resource` pro všechny sály a Reformer.
+4. Zone4You/Luxart: výslovné povolení vytvořit a zrušit rezervaci na dodaném testovacím klientovi a určení bezpečné test lekce.
+5. Luxart: pokud je autoritativní REST kontrakt, potvrdit, že Zone4You používá `POST Reservations/watchdog_III`, `GET watchdog_II/user` a `DELETE Watchdog/{id}` a že notifikace jsou zapnuté; pokud je autoritativní SOAP kontrakt, dodat ekvivalentní operace a příklady payloadů. Veřejný kontrakt neobsahuje pořadí.
 
 ### Blokuje finální business akceptaci
 
