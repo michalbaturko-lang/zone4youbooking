@@ -10,6 +10,8 @@ import {
   mapLuxartUser,
   mapLuxartWatchdog,
   mapLuxartCreditPayment,
+  luxartLessonOccurrenceId,
+  parseLuxartLessonId,
   parseLuxartWatchdogId,
   type LuxartLessonData,
 } from "../src/lib/luxartContract";
@@ -55,6 +57,22 @@ test("maps every Luxart lesson occurrence without a fixed room union", () => {
   assert.equal(documentedFractionalTimestamp.startsAt, "2026-09-11T15:20:08.925Z");
 });
 
+test("Luxart lesson occurrence IDs accept only canonical positive safe integers", () => {
+  const startsAt = "2026-09-01T16:30:00+02:00";
+  assert.equal(parseLuxartLessonId(`luxart:1:12:321:${startsAt}`)?.serviceId, 321);
+  for (const lessonId of [
+    `luxart:01:12:321:${startsAt}`,
+    `luxart:1:0:321:${startsAt}`,
+    `luxart:1:12:9007199254740992:${startsAt}`,
+  ]) {
+    assert.equal(parseLuxartLessonId(lessonId), null);
+  }
+  assert.throws(
+    () => luxartLessonOccurrenceId({ resort: 1, categoryId: 12, serviceId: Number.MAX_SAFE_INTEGER + 1, startsAt }),
+    /invalid identifiers/i,
+  );
+});
+
 test("keeps unknown rooms and lesson types visible with safe fallbacks", () => {
   const lesson = mapLuxartLesson({
     ...baseLesson,
@@ -70,17 +88,21 @@ test("keeps unknown rooms and lesson types visible with safe fallbacks", () => {
 test("rejects malformed required Luxart lesson values instead of coercing them to zero", () => {
   for (const invalid of [
     { resort: 0 },
+    { resort: Number.MAX_SAFE_INTEGER + 1 },
     { id_service: 0 },
+    { id_service: Number.MAX_SAFE_INTEGER + 1 },
     { kategorie: 0 },
     { delka: 0 },
     { cena: Number.NaN },
     { cena: -1 },
     { kapacita: -1 },
+    { kapacita: Number.MAX_SAFE_INTEGER + 1 },
     { obsazeno: -1 },
     { obsazeno: 15 },
     { volno: -1 },
     { volno: 6 },
     { cislo_salu: -1 },
+    { cislo_salu: Number.MAX_SAFE_INTEGER + 1 },
   ]) {
     assert.throws(
       () => mapLuxartLesson({ ...baseLesson, ...invalid }),
@@ -142,6 +164,10 @@ test("rejects a Luxart user without a valid positive ID and finite credit", () =
   );
   assert.throws(
     () => mapLuxartUser({ user_id: 42, current_balance: Number.NaN }),
+    /invalid required fields/i,
+  );
+  assert.throws(
+    () => mapLuxartUser({ user_id: Number.MAX_SAFE_INTEGER + 1, current_balance: 500 }),
     /invalid required fields/i,
   );
 });
@@ -270,6 +296,15 @@ test("builds the documented reservation payload only with an explicit resource m
   assert.equal(payload.id_resource_1, 207);
   assert.equal(payload.zpusob_uhrady, 0);
   assert.throws(() => buildLuxartReservationInsert(lesson, "42", 0), /resource mapping/i);
+  assert.throws(
+    () => buildLuxartReservationInsert({ ...lesson, serviceId: "322" }, "42", 207),
+    /inconsistent/i,
+  );
+  assert.throws(
+    () => buildLuxartReservationInsert({ ...lesson, startsAt: "2026-09-01T17:30:00+02:00" }, "42", 207),
+    /inconsistent/i,
+  );
+  assert.throws(() => buildLuxartReservationInsert(lesson, "042", 207), /inconsistent/i);
 });
 
 test("maps the documented Luxart watchdog as a seat alert without inventing a queue position", () => {
@@ -294,7 +329,13 @@ test("maps the documented Luxart watchdog as a seat alert without inventing a qu
   assert.equal(entry?.position, 0);
   assert.equal(parseLuxartWatchdogId("watchdog:777"), 777);
   assert.equal(parseLuxartWatchdogId("wl-777"), null);
+  assert.equal(parseLuxartWatchdogId("watchdog:0777"), null);
+  assert.equal(parseLuxartWatchdogId("watchdog:9007199254740992"), null);
   assert.throws(() => buildLuxartWatchdogInsert(lesson, "42", 0, "cz"), /resource mapping/i);
+  assert.throws(
+    () => buildLuxartWatchdogInsert({ ...lesson, luxartCategoryId: 13 }, "42", 207, "cz"),
+    /inconsistent/i,
+  );
   for (const invalid of [
     { resort: 0 },
     { id_kategorie: 0 },

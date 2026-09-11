@@ -439,6 +439,11 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
   assert.equal(watched.id, "watchdog:777");
   assert.equal(capturedWatchdogBody?.id_resource_1, 207);
   assert.equal(capturedWatchdogBody?.language, "en");
+  await assert.rejects(
+    adapter.leaveWaitlist({ waitlistEntryId: "watchdog:778" }),
+    (error: unknown) => error instanceof BookingApiError && error.code === "WATCHDOG_NOT_FOUND",
+  );
+  assert.equal(watchdogDeleted, false);
   malformedMutation = "watchdog-delete";
   await assert.rejects(
     adapter.leaveWaitlist({ waitlistEntryId: watched.id }),

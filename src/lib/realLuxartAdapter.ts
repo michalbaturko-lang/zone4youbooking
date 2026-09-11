@@ -751,11 +751,13 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
     async leaveWaitlist(_input: { waitlistEntryId?: string; lessonId?: string }): Promise<void> {
       requireCurrentUserId();
       assertWatchdogEnabled();
-      let watchdogId = _input.waitlistEntryId ? parseLuxartWatchdogId(_input.waitlistEntryId) : null;
-      if (!watchdogId && _input.lessonId) {
-        const entry = (await this.getWaitlist()).find((candidate) => candidate.lessonId === _input.lessonId);
-        watchdogId = entry ? parseLuxartWatchdogId(entry.id) : null;
-      }
+      const entries = await this.getWaitlist();
+      const ownedEntry = _input.waitlistEntryId
+        ? entries.find((entry) => entry.id === _input.waitlistEntryId)
+        : _input.lessonId
+          ? entries.find((entry) => entry.lessonId === _input.lessonId)
+          : undefined;
+      const watchdogId = ownedEntry ? parseLuxartWatchdogId(ownedEntry.id) : null;
       if (!watchdogId) throw new BookingApiError(404, "WATCHDOG_NOT_FOUND", "Hlídání místa nebylo nalezeno.");
 
       const response = await luxartFetch<unknown>(

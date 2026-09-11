@@ -177,6 +177,14 @@ function requiredNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : Number.NaN;
 }
 
+function positiveSafeInteger(value: number) {
+  return Number.isSafeInteger(value) && value > 0;
+}
+
+function nonNegativeSafeInteger(value: number) {
+  return Number.isSafeInteger(value) && value >= 0;
+}
+
 function parseExplicitLuxartDateTime(value: unknown) {
   if (typeof value !== "string") return null;
   const normalized = value.trim();
@@ -225,6 +233,13 @@ export function luxartLessonOccurrenceId(input: {
   serviceId: number;
   startsAt: string;
 }) {
+  if (
+    !positiveSafeInteger(input.resort) ||
+    !positiveSafeInteger(input.categoryId) ||
+    !positiveSafeInteger(input.serviceId)
+  ) {
+    throw new Error("Luxart lesson occurrence contains invalid identifiers.");
+  }
   const startsAt = parseExplicitLuxartDateTime(input.startsAt);
   if (!startsAt) throw new Error("Luxart lesson occurrence contains an invalid timestamp.");
   return [input.resort, input.categoryId, input.serviceId, startsAt.toISOString()].join(":");
@@ -233,12 +248,23 @@ export function luxartLessonOccurrenceId(input: {
 export function parseLuxartLessonId(lessonId: string) {
   const match = /^luxart:(\d+):(\d+):(\d+):(.+)$/.exec(lessonId);
   if (!match) return null;
+  const resort = Number(match[1]);
+  const categoryId = Number(match[2]);
+  const serviceId = Number(match[3]);
+  if (
+    !positiveSafeInteger(resort) ||
+    !positiveSafeInteger(categoryId) ||
+    !positiveSafeInteger(serviceId) ||
+    String(resort) !== match[1] ||
+    String(categoryId) !== match[2] ||
+    String(serviceId) !== match[3]
+  ) return null;
   const startsAt = parseExplicitLuxartDateTime(match[4]);
   if (!startsAt) return null;
   return {
-    resort: Number(match[1]),
-    categoryId: Number(match[2]),
-    serviceId: Number(match[3]),
+    resort,
+    categoryId,
+    serviceId,
     startsAt: startsAt.toISOString(),
   };
 }
@@ -246,7 +272,7 @@ export function parseLuxartLessonId(lessonId: string) {
 export function mapLuxartUser(data: LuxartUserData): User {
   const userId = requiredNumber(data?.user_id);
   const creditBalanceKc = requiredNumber(data?.current_balance);
-  if (!Number.isInteger(userId) || userId <= 0 || !Number.isFinite(creditBalanceKc)) {
+  if (!positiveSafeInteger(userId) || !Number.isFinite(creditBalanceKc)) {
     throw new Error("Luxart user contains invalid required fields.");
   }
 
@@ -277,16 +303,16 @@ export function mapLuxartLesson(data: LuxartLessonData, mapping: LuxartLessonMap
   const availableCount = requiredNumber(data?.volno);
   const roomNumber = requiredNumber(data?.cislo_salu);
   if (
-    !Number.isInteger(resort) || resort <= 0 ||
-    !Number.isInteger(categoryId) || categoryId <= 0 ||
-    !Number.isInteger(serviceId) || serviceId <= 0 ||
-    !Number.isInteger(durationMinutes) || durationMinutes <= 0 ||
+    !positiveSafeInteger(resort) ||
+    !positiveSafeInteger(categoryId) ||
+    !positiveSafeInteger(serviceId) ||
+    !positiveSafeInteger(durationMinutes) ||
     !Number.isFinite(priceKc) || priceKc < 0 ||
-    !Number.isInteger(capacity) || capacity < 0 ||
-    !Number.isInteger(occupiedCount) || occupiedCount < 0 || occupiedCount > capacity ||
-    !Number.isInteger(availableCount) || availableCount < 0 ||
+    !nonNegativeSafeInteger(capacity) ||
+    !nonNegativeSafeInteger(occupiedCount) || occupiedCount > capacity ||
+    !nonNegativeSafeInteger(availableCount) ||
     availableCount > capacity || occupiedCount + availableCount > capacity ||
-    !Number.isInteger(roomNumber) || roomNumber < 0
+    !nonNegativeSafeInteger(roomNumber)
   ) {
     throw new Error("Luxart lesson contains invalid required numeric fields.");
   }
@@ -297,7 +323,11 @@ export function mapLuxartLesson(data: LuxartLessonData, mapping: LuxartLessonMap
   }
 
   const startsAt = startsAtDate.toISOString();
-  const endsAt = new Date(startsAtDate.getTime() + durationMinutes * 60_000).toISOString();
+  const endsAtDate = new Date(startsAtDate.getTime() + durationMinutes * 60_000);
+  if (Number.isNaN(endsAtDate.getTime())) {
+    throw new Error("Luxart lesson duration produces an invalid end time.");
+  }
+  const endsAt = endsAtDate.toISOString();
   const name = text(data.nazev, `Lekce ${serviceId}`);
   const roomFromConfig = mapping.roomNames?.[String(roomNumber)];
   const roomName =
@@ -340,28 +370,47 @@ export function mapLuxartLesson(data: LuxartLessonData, mapping: LuxartLessonMap
   };
 }
 
+function lessonMutationIdentifiers(lesson: Lesson, userId: string, operation: "reservation" | "watchdog") {
+  const categoryId = lesson.luxartCategoryId;
+  const serviceId = Number(lesson.serviceId);
+  const numericUserId = Number(userId);
+  const identity = parseLuxartLessonId(lesson.id);
+  const startsAt = parseExplicitLuxartDateTime(lesson.startsAt);
+  if (
+    typeof categoryId !== "number" ||
+    !positiveSafeInteger(categoryId) ||
+    !positiveSafeInteger(serviceId) ||
+    !positiveSafeInteger(numericUserId) ||
+    String(serviceId) !== lesson.serviceId ||
+    String(numericUserId) !== userId ||
+    !positiveSafeInteger(lesson.durationMinutes) ||
+    !identity ||
+    !startsAt ||
+    identity.categoryId !== categoryId ||
+    identity.serviceId !== serviceId ||
+    identity.startsAt !== startsAt.toISOString()
+  ) {
+    throw new Error(`Luxart ${operation} identifiers are incomplete or inconsistent.`);
+  }
+  return { categoryId, serviceId, numericUserId, resort: identity.resort };
+}
+
 export function buildLuxartReservationInsert(
   lesson: Lesson,
   userId: string,
   resourceId: number,
 ): LuxartReservationInsertData {
-  const categoryId = lesson.luxartCategoryId;
-  const serviceId = Number(lesson.serviceId);
-  const numericUserId = Number(userId);
-  if (
-    typeof categoryId !== "number" ||
-    !Number.isInteger(categoryId) ||
-    !Number.isInteger(serviceId) ||
-    !Number.isInteger(numericUserId)
-  ) {
-    throw new Error("Luxart reservation identifiers are incomplete.");
-  }
-  if (!Number.isInteger(resourceId) || resourceId <= 0) {
+  const { categoryId, serviceId, numericUserId, resort } = lessonMutationIdentifiers(
+    lesson,
+    userId,
+    "reservation",
+  );
+  if (!positiveSafeInteger(resourceId)) {
     throw new Error("Luxart resource mapping is missing for this lesson room.");
   }
 
   return {
-    resort: parseLuxartLessonId(lesson.id)?.resort ?? 1,
+    resort,
     id_kategorie: categoryId,
     user_id: numericUserId,
     datum: lesson.startsAt,
@@ -389,23 +438,17 @@ export function buildLuxartWatchdogInsert(
   resourceId: number,
   language: "cz" | "en",
 ): LuxartWatchdogInsertData {
-  const categoryId = lesson.luxartCategoryId;
-  const serviceId = Number(lesson.serviceId);
-  const numericUserId = Number(userId);
-  if (
-    typeof categoryId !== "number" ||
-    !Number.isInteger(categoryId) ||
-    !Number.isInteger(serviceId) ||
-    !Number.isInteger(numericUserId)
-  ) {
-    throw new Error("Luxart watchdog identifiers are incomplete.");
-  }
-  if (!Number.isInteger(resourceId) || resourceId <= 0) {
+  const { categoryId, serviceId, numericUserId, resort } = lessonMutationIdentifiers(
+    lesson,
+    userId,
+    "watchdog",
+  );
+  if (!positiveSafeInteger(resourceId)) {
     throw new Error("Luxart resource mapping is missing for this lesson room.");
   }
 
   return {
-    resort: parseLuxartLessonId(lesson.id)?.resort ?? 1,
+    resort,
     id_kategorie: categoryId,
     user_id: numericUserId,
     datum: lesson.startsAt,
@@ -474,7 +517,9 @@ export function mapLuxartWatchdog(
 
 export function parseLuxartWatchdogId(id: string) {
   const match = /^watchdog:(\d+)$/.exec(id);
-  return match ? Number(match[1]) : null;
+  if (!match) return null;
+  const watchdogId = Number(match[1]);
+  return positiveSafeInteger(watchdogId) && String(watchdogId) === match[1] ? watchdogId : null;
 }
 
 export function buildLuxartCreditPaymentInsert(
