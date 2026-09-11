@@ -83,6 +83,15 @@ test("production session cookie is secure, readable by the server and explicitly
     headers: { cookie: `z4y_booking_session=${token}` },
   });
   assert.equal(readBookingSession(authenticatedRequest)?.userId, "42");
+  for (const invalidCookie of [
+    "z4y_booking_session=%",
+    `z4y_booking_session=${token}; z4y_booking_session=${token}`,
+    `z4y_booking_session=${token}.extra`,
+  ]) {
+    assert.equal(readBookingSession(new Request("https://booking.zone4you.cz/api/booking/snapshot", {
+      headers: { cookie: invalidCookie },
+    })), null);
+  }
 
   const logoutResponse = NextResponse.json({ ok: true });
   clearBookingSession(logoutResponse);

@@ -70,6 +70,7 @@ export function verifyBookingSessionToken(
     typeof token !== "string" ||
     token.length === 0 ||
     token.length > maximumSessionTokenLength ||
+    !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token) ||
     secret.length < 32 ||
     !Number.isSafeInteger(nowSeconds) ||
     nowSeconds < 0
@@ -111,11 +112,14 @@ export function verifyBookingSessionToken(
 function cookieValue(request: Request, name: string) {
   const cookies = request.headers.get("cookie");
   if (!cookies) return undefined;
+  let matchedValue: string | undefined;
   for (const part of cookies.split(";")) {
     const [cookieName, ...valueParts] = part.trim().split("=");
-    if (cookieName === name) return decodeURIComponent(valueParts.join("="));
+    if (cookieName !== name) continue;
+    if (matchedValue !== undefined) return undefined;
+    matchedValue = valueParts.join("=");
   }
-  return undefined;
+  return matchedValue;
 }
 
 export function readBookingSession(request: Request) {
