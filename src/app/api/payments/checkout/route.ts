@@ -5,6 +5,7 @@ import { getPostgresPaymentLedger } from "@/lib/paymentLedger";
 import { assertPaymentRuntimeReady } from "@/lib/paymentConfig";
 import { assertRateLimit, rateLimitRules } from "@/lib/rateLimit";
 import { assertTrustedMutation } from "@/lib/requestSecurity";
+import { readBoundedJson } from "@/lib/requestBody";
 import { readBookingSession } from "@/lib/session";
 import { createStripeClient } from "@/lib/stripeClient";
 import { approvedStripeCheckoutUrl, buildStripeTopupCheckoutParams } from "@/lib/stripeTopup";
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
 
     const session = readBookingSession(request);
     if (!session) throw new BookingApiError(401, "AUTH_REQUIRED", "Pro dobití kreditu se přihlaste.");
-    const body = (await request.json()) as { amountKc?: number };
+    const body = await readBoundedJson<{ amountKc?: number }>(request);
     const amountKc = Number(body.amountKc);
     await assertRateLimit(request, rateLimitRules.topup, session.userId);
 

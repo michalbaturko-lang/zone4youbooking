@@ -4,6 +4,7 @@ import {
   setMockLuxartState,
   type MockLuxartState,
 } from "./mockLuxart";
+import { readBoundedJson } from "./requestBody";
 
 type BodyWithDemoState = {
   demoState?: MockLuxartState;
@@ -27,7 +28,7 @@ export function restoreDemoState(body: unknown) {
 }
 
 export async function readJsonWithDemoState<T>(request: Request): Promise<T> {
-  const body = (await request.json().catch(() => ({}))) as T;
+  const body = await readBoundedJson<T>(request);
   restoreDemoState(body);
   return body;
 }

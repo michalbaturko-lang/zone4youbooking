@@ -26,6 +26,8 @@ Výchozí a rollback hodnoty jsou `BOOKING_MUTATIONS_ENABLED=false`, `BOOKING_RU
 7. E0–E9 v prováděcím plánu jsou vyhodnocené; vypnutá funkce má doložený fallback.
 8. UAT checklist nemá otevřený P0/P1.
 9. Je známý support kontakt, pilotní skupina a osoba oprávněná rozhodnout rollback.
+
+Všechny běžné JSON mutation endpointy před parsováním zastaví tělo nad 64 KiB se stabilním `413 REQUEST_TOO_LARGE`; neplatný JSON vrací privacy-safe `400 INVALID_JSON`. Stripe webhook je záměrně oddělený, ověřuje nezměněné raw tělo a má vlastní limit 1 MiB.
 10. Starý Memberzone je dostupný a jeho odkaz je připravený jako fallback.
 11. Pro multi-instance/serverless hosting je přes schválený migrační proces aplikovaný `migrations/003_rate_limit.sql`, `npm run test:rate-limit-postgres` prošel proti staging databázi a readiness hlásí `rateLimit=postgres`. Paměťová alternativa vyžaduje doložený jediný proces a `RATE_LIMIT_SINGLE_INSTANCE=true`.
 12. Pro E3 je přes schválený migrační proces aplikovaný `migrations/002_booking_mutation_ledger.sql`, `npm run test:booking-postgres` prošel proti staging databázi a readiness hlásí `booking=ready`.
