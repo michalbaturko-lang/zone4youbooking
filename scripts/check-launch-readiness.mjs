@@ -242,9 +242,9 @@ check(
   "LUXART_API_BASE_URL must point to the approved HTTPS Luxart endpoint.",
 );
 check(
-  "Luxart endpoint mapping",
-  !realAdapter.includes("notMapped("),
-  "RealLuxartAdapter still contains unmapped production operations.",
+  "Luxart REST contract and endpoint mapping",
+  process.env.LUXART_API_CONTRACT === "memberzone_rest_v1" && !realAdapter.includes("notMapped("),
+  "LUXART_API_CONTRACT must select the implemented Memberzone REST contract and RealLuxartAdapter must contain no unmapped production operations.",
 );
 check(
   "Luxart gateway authentication",

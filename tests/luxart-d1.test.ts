@@ -10,16 +10,16 @@ import {
 } from "../scripts/verify-luxart-d1";
 
 const now = new Date("2026-09-11T14:00:00.000Z");
-const approvedOrigin = "https://zone4you-api.example.cz:9191";
+const approvedOrigin = "https://zone4you-api.example.cz:9443";
 const approvedOriginFingerprint = createHash("sha256").update(approvedOrigin).digest("hex");
 
 function environment(outputPath: string) {
   return {
     LUXART_MOCK: "false",
+    LUXART_API_CONTRACT: "memberzone_rest_v1",
     LUXART_API_BASE_URL: approvedOrigin,
     LUXART_HELP_URL: `${approvedOrigin}/Help`,
     LUXART_APPROVED_ORIGIN_SHA256: approvedOriginFingerprint,
-    LUXART_EXPECTED_PORT: "9191",
     LUXART_ALLOW_INSECURE_TEST_HTTP: "false",
     LUXART_REQUIRE_AUTHENTICATED_PROBE: "true",
     LUXART_RESORT_ID: "1",
@@ -46,6 +46,7 @@ function readonlyEvidence(gatewayAuthMode: "none" | "basic" = "none") {
     ok: true as const,
     checkedAt: now.toISOString(),
     target: approvedOrigin,
+    apiContract: "memberzone_rest_v1" as const,
     gatewayAuthMode,
     range: {
       from: "2026-09-10T22:00:00.000Z",
@@ -69,42 +70,45 @@ function readonlyEvidence(gatewayAuthMode: "none" | "basic" = "none") {
   };
 }
 
-test("D1 configuration is locked to the exact HTTPS Zone4You port and a protected external file", () => {
+test("D1 configuration is locked to the exact approved HTTPS REST origin and a protected external file", () => {
   const directory = mkdtempSync(join(tmpdir(), "zone4you-d1-"));
   try {
     const outputPath = join(directory, "luxart.json");
     assert.deepEqual(loadLuxartD1Configuration(environment(outputPath), "/repository"), {
       apiOrigin: approvedOrigin,
+      apiContract: "memberzone_rest_v1",
+      port: "9443",
       targetFingerprintSha256: approvedOriginFingerprint,
       outputPath,
     });
 
     const unsafe = [
-      { LUXART_API_BASE_URL: "http://zone4you-api.example.cz:9191" },
-      { LUXART_API_BASE_URL: "https://zone4you-api.example.cz:9759" },
-      { LUXART_HELP_URL: "https://other.example.cz:9191/Help" },
+      { LUXART_API_BASE_URL: "http://zone4you-api.example.cz:9443" },
+      { LUXART_HELP_URL: "https://other.example.cz:9443/Help" },
       { LUXART_APPROVED_ORIGIN_SHA256: "a".repeat(64) },
       { LUXART_APPROVED_ORIGIN_SHA256: "not-a-fingerprint" },
-      { LUXART_EXPECTED_PORT: "9759" },
+      { LUXART_API_CONTRACT: "soap_wcf" },
       { LUXART_ALLOW_INSECURE_TEST_HTTP: "true" },
       { LUXART_REQUIRE_AUTHENTICATED_PROBE: "false" },
     ];
     for (const drift of unsafe) {
       assert.throws(
         () => loadLuxartD1Configuration({ ...environment(outputPath), ...drift }, "/repository"),
-        /HTTPS|port 9191|same approved origin|SHA-256|does not match|must exactly equal|refuses|authenticated/i,
+        /HTTPS|REST|same approved origin|SHA-256|does not match|must exactly equal|refuses|authenticated/i,
       );
     }
 
-    const memberzoneOrigin = "https://api.memberzone.online:9191";
+    const alternateRestOrigin = "https://rest-gateway.example.cz:9759";
     assert.deepEqual(loadLuxartD1Configuration({
       ...environment(outputPath),
-      LUXART_API_BASE_URL: memberzoneOrigin,
-      LUXART_HELP_URL: `${memberzoneOrigin}/Help`,
-      LUXART_APPROVED_ORIGIN_SHA256: createHash("sha256").update(memberzoneOrigin).digest("hex"),
+      LUXART_API_BASE_URL: alternateRestOrigin,
+      LUXART_HELP_URL: `${alternateRestOrigin}/Help`,
+      LUXART_APPROVED_ORIGIN_SHA256: createHash("sha256").update(alternateRestOrigin).digest("hex"),
     }, "/repository"), {
-      apiOrigin: memberzoneOrigin,
-      targetFingerprintSha256: createHash("sha256").update(memberzoneOrigin).digest("hex"),
+      apiOrigin: alternateRestOrigin,
+      apiContract: "memberzone_rest_v1",
+      port: "9759",
+      targetFingerprintSha256: createHash("sha256").update(alternateRestOrigin).digest("hex"),
       outputPath,
     });
   } finally {
@@ -132,14 +136,15 @@ test("D1 performs only transport, gateway and authenticated read-only checks bef
           gatewayDecisionConfirmed: true,
         };
       },
-      helpProbe: async () => {
+      helpProbe: async ({ environment: probeEnvironment }) => {
         calls.push("help");
+        assert.equal(probeEnvironment.LUXART_EXPECTED_PORT, "9443");
         return {
           ok: true,
           checkedAt: now.toISOString(),
           targetFingerprintSha256: approvedOriginFingerprint,
           transport: "https",
-          port: "9191",
+          port: "9443",
           reached: true,
           httpStatus: 200,
           classification: "ready",
@@ -154,6 +159,8 @@ test("D1 performs only transport, gateway and authenticated read-only checks bef
 
     assert.deepEqual(calls, ["gateway", "help", "readonly"]);
     assert.equal(receipt.ok, true);
+    assert.equal(receipt.apiContract, "memberzone_rest_v1");
+    assert.equal(receipt.port, "9443");
     assert.equal(receipt.targetFingerprintSha256, approvedOriginFingerprint);
     assert.equal(receipt.czechLessonCount, 24);
     assert.equal(receipt.reformerCount, 3);
@@ -170,15 +177,16 @@ test("D1 performs only transport, gateway and authenticated read-only checks bef
     delete parsed.d1;
     assert.deepEqual(parsed, readonlyEvidence());
     assert.deepEqual(d1, {
-      schemaVersion: 1,
+      schemaVersion: 2,
       checkedAt: now.toISOString(),
       targetFingerprintSha256: approvedOriginFingerprint,
       helpClassification: "ready",
       helpTransport: "https",
-      helpPort: "9191",
+      helpPort: "9443",
       helpHttpStatus: 200,
       helpBodySha256: "c".repeat(64),
       gatewayAuthMode: "none",
+      apiContract: "memberzone_rest_v1",
       approvedOriginFingerprintVerified: true,
       authenticatedReadOnlyVerified: true,
       personalizedLessonSetVerified: true,
@@ -210,7 +218,7 @@ test("D1 rejects Help evidence from a different origin before the authenticated 
           checkedAt: now.toISOString(),
           targetFingerprintSha256: "d".repeat(64),
           transport: "https",
-          port: "9191",
+          port: "9443",
           reached: true,
           httpStatus: 200,
           classification: "ready",
@@ -221,7 +229,7 @@ test("D1 rejects Help evidence from a different origin before the authenticated 
           return readonlyEvidence();
         },
       }),
-      /does not match the approved HTTPS origin and port/i,
+      /does not match the approved HTTPS origin/i,
     );
     assert.equal(readonlyCalls, 0);
     assert.equal(existsSync(outputPath), false);
@@ -252,7 +260,7 @@ test("D1 rejects internally inconsistent Help success before the authenticated r
           checkedAt: now.toISOString(),
           targetFingerprintSha256: approvedOriginFingerprint,
           transport: "https",
-          port: "9191",
+          port: "9443",
           reached: true,
           httpStatus: 204,
           classification: "ready",
@@ -294,7 +302,7 @@ test("D1 rejects an unavailable Help path before the authenticated read-only req
           checkedAt: now.toISOString(),
           targetFingerprintSha256: approvedOriginFingerprint,
           transport: "https",
-          port: "9191",
+          port: "9443",
           reached: false,
           classification: "network_unavailable",
           networkCode: "TIMEOUT",
@@ -339,7 +347,7 @@ test("D1 accepts an authentication challenge only when a non-empty gateway mode 
         checkedAt: now.toISOString(),
         targetFingerprintSha256: approvedOriginFingerprint,
         transport: "https",
-        port: "9191",
+        port: "9443",
         reached: true,
         httpStatus: 401,
         classification: "authentication_required",

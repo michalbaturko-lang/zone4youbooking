@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { runLuxartHelpProbe } from "./probe-luxart-help";
 import { verifyLuxartGatewayConfiguration } from "./verify-luxart-gateway-config";
 import { runLuxartReadonlyVerification } from "./verify-luxart-readonly";
+import { assertSupportedLuxartApiContract } from "../src/lib/luxartApiContract";
 
 type Environment = Record<string, string | undefined>;
 type HelpEvidence = Awaited<ReturnType<typeof runLuxartHelpProbe>>;
@@ -23,7 +24,6 @@ interface LuxartD1Options extends LuxartD1Dependencies {
   repositoryRoot?: string;
 }
 
-const expectedPort = "9191";
 const repositoryRootDefault = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 function required(environment: Environment, name: string) {
@@ -49,9 +49,6 @@ function cleanHttpsUrl(raw: string, name: string, pathname: RegExp) {
     !pathname.test(url.pathname)
   ) {
     throw new Error(`${name} must be the approved clean HTTPS Luxart URL.`);
-  }
-  if (effectivePort(url) !== expectedPort) {
-    throw new Error(`${name} must use the approved port ${expectedPort}.`);
   }
   return url;
 }
@@ -97,9 +94,7 @@ export function loadLuxartD1Configuration(
   if (environment.LUXART_MOCK !== "false") {
     throw new Error("Luxart D1 verification requires LUXART_MOCK=false.");
   }
-  if (environment.LUXART_EXPECTED_PORT !== expectedPort) {
-    throw new Error(`LUXART_EXPECTED_PORT must exactly equal ${expectedPort}.`);
-  }
+  const apiContract = assertSupportedLuxartApiContract(environment);
   if (environment.LUXART_ALLOW_INSECURE_TEST_HTTP !== "false") {
     throw new Error("Luxart D1 verification refuses the insecure HTTP override.");
   }
@@ -119,6 +114,8 @@ export function loadLuxartD1Configuration(
 
   return {
     apiOrigin: apiUrl.origin,
+    apiContract,
+    port: effectivePort(apiUrl),
     targetFingerprintSha256,
     outputPath: outputTarget(
       required(environment, "ZONE4YOU_LUXART_EVIDENCE_OUTPUT_PATH"),
@@ -142,13 +139,16 @@ export async function runLuxartD1Verification({
 }: LuxartD1Options = {}) {
   const configuration = loadLuxartD1Configuration(environment, repositoryRoot);
   const gateway = gatewayVerifier(environment);
-  const help = await helpProbe({ environment, now });
+  const help = await helpProbe({
+    environment: { ...environment, LUXART_EXPECTED_PORT: configuration.port },
+    now,
+  });
   if (
     help.targetFingerprintSha256 !== configuration.targetFingerprintSha256 ||
     help.transport !== "https" ||
-    help.port !== expectedPort
+    help.port !== configuration.port
   ) {
-    throw new Error("Luxart Help evidence does not match the approved HTTPS origin and port.");
+    throw new Error("Luxart Help evidence does not match the approved HTTPS origin.");
   }
   const helpHttpStatus = "httpStatus" in help ? help.httpStatus : undefined;
   const helpBodySha256 = "bodySha256" in help ? help.bodySha256 : undefined;
@@ -172,6 +172,9 @@ export async function runLuxartD1Verification({
   if (!evidence.ok || evidence.target !== configuration.apiOrigin) {
     throw new Error("Luxart read-only evidence does not match the approved API origin.");
   }
+  if (evidence.apiContract !== configuration.apiContract) {
+    throw new Error("Luxart read-only evidence does not match the approved REST API contract.");
+  }
   if (evidence.gatewayAuthMode !== gateway.gatewayAuthMode) {
     throw new Error("Luxart read-only evidence does not match the confirmed gateway auth mode.");
   }
@@ -185,7 +188,7 @@ export async function runLuxartD1Verification({
   const d1Evidence = {
     ...evidence,
     d1: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       checkedAt: help.checkedAt,
       targetFingerprintSha256: configuration.targetFingerprintSha256,
       helpClassification: help.classification,
@@ -194,6 +197,7 @@ export async function runLuxartD1Verification({
       helpHttpStatus,
       ...(help.classification === "ready" ? { helpBodySha256 } : {}),
       gatewayAuthMode: gateway.gatewayAuthMode,
+      apiContract: configuration.apiContract,
       approvedOriginFingerprintVerified: true,
       authenticatedReadOnlyVerified: true,
       personalizedLessonSetVerified: true,
@@ -210,7 +214,8 @@ export async function runLuxartD1Verification({
   return {
     ok: true,
     checkedAt: evidence.checkedAt,
-    port: expectedPort,
+    port: configuration.port,
+    apiContract: configuration.apiContract,
     targetFingerprintSha256: configuration.targetFingerprintSha256,
     helpClassification: help.classification,
     gatewayAuthMode: gateway.gatewayAuthMode,

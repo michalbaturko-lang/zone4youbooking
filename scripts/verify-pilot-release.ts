@@ -8,6 +8,7 @@ import { rateLimitRuntimeReady } from "../src/lib/rateLimit";
 import { zone4YouDateKey, zone4YouScheduleRange, zone4YouTimeZone } from "../src/lib/zone4YouTime";
 import { validateProductionDomainBaselineEvidence } from "./capture-production-domain-baseline";
 import { readStableReleaseJson } from "./release-evidence-file";
+import { assertSupportedLuxartApiContract, supportedLuxartApiContract } from "../src/lib/luxartApiContract";
 
 type Environment = Record<string, string | undefined>;
 type JsonObject = Record<string, unknown>;
@@ -202,14 +203,13 @@ export function validateLuxartEvidence(
 ) {
   const expectedOrigin = new URL(expectedLuxartOrigin);
   const expectedPort = expectedOrigin.port || (expectedOrigin.protocol === "https:" ? "443" : "80");
-  if (expectedPort !== "9191") {
-    throw new Error("The release Luxart origin must use the approved Zone4You port 9191.");
-  }
   const expectedFingerprint = createHash("sha256").update(expectedOrigin.origin).digest("hex");
   const d1 = objectValue(evidence.d1, "artifacts.luxartReadOnly.d1");
-  if (d1.schemaVersion !== 1) {
-    throw new Error("artifacts.luxartReadOnly.d1.schemaVersion must be 1.");
+  if (d1.schemaVersion !== 2) {
+    throw new Error("artifacts.luxartReadOnly.d1.schemaVersion must be 2.");
   }
+  exactString(d1.apiContract, supportedLuxartApiContract, "Luxart D1 apiContract");
+  exactString(evidence.apiContract, supportedLuxartApiContract, "Luxart evidence apiContract");
   exactString(
     stringValue(d1.checkedAt, "Luxart D1 checkedAt"),
     stringValue(evidence.checkedAt, "Luxart evidence checkedAt"),
@@ -221,7 +221,7 @@ export function validateLuxartEvidence(
     "Luxart D1 targetFingerprintSha256",
   );
   exactString(d1.helpTransport, "https", "Luxart D1 helpTransport");
-  exactString(d1.helpPort, "9191", "Luxart D1 helpPort");
+  exactString(d1.helpPort, expectedPort, "Luxart D1 helpPort");
   exactString(d1.gatewayAuthMode, gatewayAuthMode, "Luxart D1 gatewayAuthMode");
   trueValue(d1.approvedOriginFingerprintVerified, "Luxart D1 approvedOriginFingerprintVerified");
   trueValue(d1.authenticatedReadOnlyVerified, "Luxart D1 authenticatedReadOnlyVerified");
@@ -486,6 +486,8 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
   const stagingTarget = cleanHttpsOrigin(dossier.stagingTarget, "stagingTarget");
   if (stagingTarget === target) throw new Error("stagingTarget must not be the production target.");
   const luxartOrigin = cleanHttpsOrigin(dossier.luxartOrigin, "luxartOrigin");
+  const apiContract = assertSupportedLuxartApiContract(environment);
+  exactString(dossier.luxartApiContract, apiContract, "luxartApiContract");
 
   const expectedCommit = required(environment, "ZONE4YOU_RELEASE_COMMIT").toLowerCase();
   if (!/^[a-f0-9]{40}$/.test(expectedCommit)) throw new Error("ZONE4YOU_RELEASE_COMMIT must be a full 40-character Git SHA.");

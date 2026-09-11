@@ -24,6 +24,7 @@ function readOnlyStagingEnvironment(overrides: Record<string, string | undefined
     NEXT_PUBLIC_APP_ENV: "staging",
     APP_BASE_URL: "https://staging.booking.zone4you.cz/",
     LUXART_MOCK: "false",
+    LUXART_API_CONTRACT: "memberzone_rest_v1",
     LUXART_API_BASE_URL: "https://luxart-test.example.com:9759/",
     LUXART_ALLOW_INSECURE_TEST_HTTP: "false",
     LUXART_RESORT_ID: "1",
@@ -63,6 +64,7 @@ test("read-only staging preflight and live runtime region gate fail closed", asy
   assert.equal(report.phase, "read_only");
   assert.equal(report.configuration.bookingMutations, "disabled");
   assert.equal(report.configuration.payments, "disabled");
+  assert.equal(report.configuration.luxartApiContract, "memberzone_rest_v1");
   assert.equal(report.commit, commit);
   assert.deepEqual(report.issues, []);
   assert.equal(runtimeDeploymentRegion({ VERCEL_REGION: " FRA1 " }), "fra1");
@@ -203,6 +205,11 @@ test("preflight fails closed on commit drift, phase drift and production HTTP ov
     LUXART_API_BASE_URL: "https://luxart-test.example.com:9191/api/",
   }));
   assert.ok(nestedApiPath.some(({ code }) => code === "LUXART_API_TRANSPORT"));
+
+  const ambiguousApiContract = deploymentRuntimeConfigurationProblems(readOnlyStagingEnvironment({
+    LUXART_API_CONTRACT: "soap_wcf",
+  }));
+  assert.ok(ambiguousApiContract.some(({ code }) => code === "LUXART_API_CONTRACT"));
 
   for (const [name, value] of [
     ["LUXART_ROOM_MAP_JSON", JSON.stringify({ room: "Cycling" })],

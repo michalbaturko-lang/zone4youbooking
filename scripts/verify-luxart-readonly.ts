@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import { createRealLuxartAdapter } from "../src/lib/realLuxartAdapter";
 import type { Lesson, LuxartAdapter } from "../src/lib/domain";
 import { loadLuxartGatewayAuthConfig } from "../src/lib/luxartGatewayAuth";
+import { assertSupportedLuxartApiContract } from "../src/lib/luxartApiContract";
 import { bookingRules } from "../src/lib/bookingRules";
 import { zone4YouDateKey, zone4YouScheduleRange, zone4YouTimeZone } from "../src/lib/zone4YouTime";
 
@@ -16,6 +17,7 @@ interface LuxartReadonlyVerificationOptions {
 }
 
 function requireSafeConfiguration(environment: Environment) {
+  const apiContract = assertSupportedLuxartApiContract(environment);
   if (environment.LUXART_MOCK !== "false") {
     throw new Error("Set LUXART_MOCK=false explicitly for the live read-only verification.");
   }
@@ -26,7 +28,7 @@ function requireSafeConfiguration(environment: Environment) {
   if (url.protocol !== "https:" && !(url.protocol === "http:" && insecureTestAllowed)) {
     throw new Error("Luxart verification requires HTTPS. Insecure HTTP is allowed only for an explicitly approved test endpoint.");
   }
-  return url;
+  return { url, apiContract };
 }
 
 function lessonEvidence(lessons: Lesson[], range: { from: string; to: string }) {
@@ -112,7 +114,7 @@ export async function runLuxartReadonlyVerification({
   now = new Date(),
   adapterFactory = createRealLuxartAdapter,
 }: LuxartReadonlyVerificationOptions = {}) {
-  const target = requireSafeConfiguration(environment);
+  const { url: target, apiContract } = requireSafeConfiguration(environment);
   const gatewayAuth = loadLuxartGatewayAuthConfig(environment);
   const authentication = loadLuxartTestCredentials(environment);
   if (authentication && target.protocol !== "https:") {
@@ -183,6 +185,7 @@ export async function runLuxartReadonlyVerification({
     ok: true,
     checkedAt: now.toISOString(),
     target: target.origin,
+    apiContract,
     gatewayAuthMode: gatewayAuth.mode,
     range: {
       from: query.from,

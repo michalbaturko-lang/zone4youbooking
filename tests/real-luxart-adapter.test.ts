@@ -280,6 +280,7 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
   if (!address || typeof address === "string") throw new Error("Test server did not start.");
 
   const previousEnvironment = {
+    apiContract: process.env.LUXART_API_CONTRACT,
     baseUrl: process.env.LUXART_API_BASE_URL,
     resortId: process.env.LUXART_RESORT_ID,
     timeout: process.env.LUXART_TIMEOUT_MS,
@@ -299,6 +300,7 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
   };
   context.after(() => {
     const pairs = [
+      ["LUXART_API_CONTRACT", previousEnvironment.apiContract],
       ["LUXART_API_BASE_URL", previousEnvironment.baseUrl],
       ["LUXART_RESORT_ID", previousEnvironment.resortId],
       ["LUXART_TIMEOUT_MS", previousEnvironment.timeout],
@@ -322,6 +324,7 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
     }
   });
 
+  process.env.LUXART_API_CONTRACT = "memberzone_rest_v1";
   process.env.LUXART_API_BASE_URL = `http://127.0.0.1:${address.port}`;
   process.env.LUXART_RESORT_ID = "1";
   process.env.LUXART_TIMEOUT_MS = "1000";
@@ -581,6 +584,7 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
 
 test("runtime adapter accepts only a clean HTTPS origin outside an explicit staging test", () => {
   const names = [
+    "LUXART_API_CONTRACT",
     "LUXART_API_BASE_URL",
     "LUXART_RESORT_ID",
     "LUXART_TIMEOUT_MS",
@@ -599,6 +603,7 @@ test("runtime adapter accepts only a clean HTTPS origin outside an explicit stag
   };
 
   try {
+    process.env.LUXART_API_CONTRACT = "memberzone_rest_v1";
     process.env.LUXART_RESORT_ID = "1";
     process.env.LUXART_TIMEOUT_MS = "12000";
     process.env.LUXART_API_AUTH_MODE = "none";
@@ -619,6 +624,10 @@ test("runtime adapter accepts only a clean HTTPS origin outside an explicit stag
 
     process.env.LUXART_API_BASE_URL = "https://luxart.example.com:9191/";
     assert.doesNotThrow(() => createRealLuxartAdapter());
+
+    process.env.LUXART_API_CONTRACT = "soap_wcf";
+    assert.throws(() => createRealLuxartAdapter(), /LUXART_API_CONTRACT must exactly equal memberzone_rest_v1/i);
+    process.env.LUXART_API_CONTRACT = "memberzone_rest_v1";
 
     process.env.LUXART_API_BASE_URL = "http://127.0.0.1:9191/";
     process.env.LUXART_ALLOW_INSECURE_TEST_HTTP = "true";

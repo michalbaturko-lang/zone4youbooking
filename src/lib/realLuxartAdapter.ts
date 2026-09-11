@@ -37,6 +37,7 @@ import { availablePlacesForLesson, bookingRules, canCancelLessonAt } from "./boo
 import { BookingApiError, BookingMutationOutcomeUnknownError } from "./errors";
 import type { Locale } from "./i18n";
 import { loadLuxartGatewayAuthConfig } from "./luxartGatewayAuth";
+import { assertSupportedLuxartApiContract } from "./luxartApiContract";
 import { parseLuxartResourceMapping, parseLuxartTextMapping } from "./luxartMappings";
 import { zone4YouScheduleRange } from "./zone4YouTime";
 
@@ -147,6 +148,7 @@ class LuxartHttpError extends BookingApiError {
 }
 
 function loadConfig(): RealLuxartConfig {
+  assertSupportedLuxartApiContract();
   const baseUrl = normalizedLuxartBaseUrl();
   const resortId = Number(process.env.LUXART_RESORT_ID ?? "1");
   if (resortId !== 1) throw new Error("LUXART_RESORT_ID must be 1 for the Zone4You pilot.");

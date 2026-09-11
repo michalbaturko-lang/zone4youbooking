@@ -1,6 +1,6 @@
 # Zone4You Booking - stav a Luxart integrační plán
 
-> Aktualizace 11. 9. 2026: Zone4You IT potvrdilo dohodu s Luxartem o zveřejnění portu `9191` kvůli rezervacím. Historický port `9759` níže popisuje původní komunikaci. Pro aktuální integraci stále chybí přesná URL/host, schéma HTTP(S), potvrzení že je `9191` už aktivní, testovací databáze a gateway auth režim.
+> Aktualizace 11. 9. 2026: port `9191` je veřejně dostupný, ale zpřístupňuje SOAP/WCF `Service1.svc`, zatímco současný adapter implementuje dříve dodaný REST kontrakt na portu `9295`. Historický port `9759` níže popisuje původní komunikaci. Pro aktuální integraci chybí společné rozhodnutí Luxart/IT, přesný HTTPS test origin, potvrzení testovací databáze a gateway auth režim.
 
 Datum auditu: 2026-06-18
 
@@ -343,6 +343,6 @@ Tyto body je potřeba potvrdit před ostrou implementací:
 
 ## 10. Krátký verdikt
 
-Historická session uváděla storno 4 h, pozdní storno 100 Kč a no-show 100 Kč. Novější rozhodnutí klienta 30. 8. 2026 čtyřhodinový cutoff nahrazuje bezplatným stornem do půlnoci, pracovně `00:00 Europe/Prague` na začátku dne lekce. Částky 100 Kč / 100 Kč zůstávají pouze historické a pro pilot nepotvrzené. Pro aktuální port `9191` stále chybí přesná URL a potvrzení aktivního testovacího přístupu.
+Historická session uváděla storno 4 h, pozdní storno 100 Kč a no-show 100 Kč. Novější rozhodnutí klienta 30. 8. 2026 čtyřhodinový cutoff nahrazuje bezplatným stornem do půlnoci, pracovně `00:00 Europe/Prague` na začátku dne lekce. Částky 100 Kč / 100 Kč zůstávají pouze historické a pro pilot nepotvrzené. Pro aktuální integraci stále chybí rozhodnutí REST versus SOAP/WCF a potvrzený šifrovaný testovací přístup.
 
-Luxart API je podle komunikace připravené jako testovací backend a aplikace už obsahuje serverovou integrační vrstvu i fail-closed launch gate. Nejbližší bezpečný krok je read-only spike proti přesné Zone4You `/Help` URL na portu `9191`; živé zápisy se nezapnou bez UAT, ledgeru, rollbacku a schválení.
+Luxart API je podle komunikace připravené jako testovací backend a aplikace už obsahuje serverovou REST integrační vrstvu i fail-closed launch gate. Nejbližší bezpečný krok je potvrzení autoritativního kontraktu; u REST varianty následně read-only D1 proti přesnému schválenému HTTPS originu. Živé zápisy se nezapnou bez UAT, ledgeru, rollbacku a schválení.

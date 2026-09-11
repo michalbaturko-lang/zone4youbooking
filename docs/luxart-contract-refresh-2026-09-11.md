@@ -27,7 +27,7 @@ Tento záznam je pouze neosobní read-only evidence veřejné referenční dokum
 
 ## Aktuální automatický důkaz kontraktu
 
-Znovu ověřeno v 20:52 CEST:
+Znovu ověřeno ve 21:39 CEST:
 
 ```bash
 npm run verify:luxart-public-contract
@@ -37,6 +37,8 @@ npm run verify:luxart-public-contract
 - ověřeno: `11/11` endpointů;
 - chybějící pole nebo neočekávaný dokument: `0`;
 - sémantický SHA-256 nad názvy endpointů a jejich dokumentovanými poli: `869beb3af67e648854462982b15f099aad622992dbbc81c2ec5bb4c9afc7bf20`.
+
+První běh ve 21:38 CEST krátce vrátil `500` pouze pro dokumentační stránku `POST api/Reservations/watchdog_III`. Tři bezprostřední read-only kontroly stejné stránky následně shodně vrátily HTTP 200 a celý 11endpointový verifier znovu prošel se stejným sémantickým hashem. Jde o pozorovanou přechodnou nestabilitu referenční dokumentace, nikoli živý Zone4You důkaz; release autoritu má nadále až D1 proti potvrzenému šifrovanému test originu.
 
 Sémantický otisk záměrně ignoruje CSS, bundlované asset URL a další prezentační HTML. Při změně názvu endpointu nebo datových polí se naopak změní a povinné pole použité adaptérem způsobí `NO-GO` výsledek.
 

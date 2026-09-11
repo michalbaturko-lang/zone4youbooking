@@ -9,7 +9,7 @@ import { verifyPilotReleaseEvidence } from "../scripts/verify-pilot-release";
 const now = new Date("2026-09-05T08:00:00.000Z");
 const commit = "1234567890abcdef1234567890abcdef12345678";
 const stagingTarget = "https://staging.booking.zone4you.cz";
-const luxartTarget = "https://luxart-test.example.com:9191";
+const luxartTarget = "https://luxart-test.example.com:9443";
 const luxartTargetFingerprint = createHash("sha256").update(luxartTarget).digest("hex");
 const occurrenceSetSha256 = "a".repeat(64);
 
@@ -27,17 +27,19 @@ function validFixture() {
       ok: true,
       checkedAt,
       target: luxartTarget,
+      apiContract: "memberzone_rest_v1",
       gatewayAuthMode: "none",
       d1: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         checkedAt,
         targetFingerprintSha256: luxartTargetFingerprint,
         helpClassification: "ready",
         helpTransport: "https",
-        helpPort: "9191",
+        helpPort: "9443",
         helpHttpStatus: 200,
         helpBodySha256: "b".repeat(64),
         gatewayAuthMode: "none",
+        apiContract: "memberzone_rest_v1",
         approvedOriginFingerprintVerified: true,
         authenticatedReadOnlyVerified: true,
         personalizedLessonSetVerified: true,
@@ -214,6 +216,7 @@ function validFixture() {
     target: "https://booking.zone4you.cz/",
     stagingTarget: `${stagingTarget}/`,
     luxartOrigin: `${luxartTarget}/`,
+    luxartApiContract: "memberzone_rest_v1",
     commit,
     launchMode: "booking_without_payments",
     maximumEvidenceAgeHours: 72,
@@ -255,6 +258,7 @@ function validFixture() {
     ZONE4YOU_RELEASE_DOSSIER_CONFIRMATION: `VERIFY_ZONE4YOU_RELEASE_DOSSIER:${dossierSha}`,
     ZONE4YOU_RELEASE_COMMIT: commit,
     LUXART_RESOURCE_MAP_JSON: JSON.stringify({ 1: 101, 2: 102, 3: 203 }),
+    LUXART_API_CONTRACT: "memberzone_rest_v1",
     LUXART_API_AUTH_MODE: "none",
     LUXART_API_AUTH_CONFIRMED: "true",
     RATE_LIMIT_MODE: "memory",
@@ -480,6 +484,20 @@ test("pilot release dossier binds the live Luxart evidence to the confirmed gate
       LUXART_API_BASIC_PASSWORD: "gateway-password",
     }, now),
     /gatewayAuthMode must exactly equal basic/i,
+  );
+});
+
+test("pilot release dossier binds runtime evidence to the implemented REST API contract", () => {
+  const fixture = validFixture();
+  const dossier = structuredClone(fixture.dossier);
+  dossier.luxartApiContract = "soap_wcf";
+  const dossierSha = writeJson(fixture.dossierPath, dossier);
+  assert.throws(
+    () => verifyPilotReleaseEvidence({
+      ...fixture.environment,
+      ZONE4YOU_RELEASE_DOSSIER_CONFIRMATION: `VERIFY_ZONE4YOU_RELEASE_DOSSIER:${dossierSha}`,
+    }, now),
+    /luxartApiContract must exactly equal memberzone_rest_v1/i,
   );
 });
 

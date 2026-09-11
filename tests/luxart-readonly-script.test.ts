@@ -12,6 +12,7 @@ const now = new Date("2026-09-05T08:00:00.000Z");
 const target = "https://luxart-test.example.com:9191";
 const environment = {
   LUXART_MOCK: "false",
+  LUXART_API_CONTRACT: "memberzone_rest_v1",
   LUXART_API_BASE_URL: `${target}/`,
   LUXART_API_AUTH_MODE: "none",
   LUXART_TEST_LOGIN: "release-test-user",
@@ -102,7 +103,7 @@ test("standalone Luxart evidence remains diagnostic while D1-attested evidence s
   validateLuxartEvidence({
     ...evidence,
     d1: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       checkedAt: now.toISOString(),
       targetFingerprintSha256: createHash("sha256").update(target).digest("hex"),
       helpClassification: "ready",
@@ -111,6 +112,7 @@ test("standalone Luxart evidence remains diagnostic while D1-attested evidence s
       helpHttpStatus: 200,
       helpBodySha256: "b".repeat(64),
       gatewayAuthMode: "none",
+      apiContract: "memberzone_rest_v1",
       approvedOriginFingerprintVerified: true,
       authenticatedReadOnlyVerified: true,
       personalizedLessonSetVerified: true,

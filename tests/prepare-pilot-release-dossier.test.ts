@@ -38,7 +38,8 @@ function fixture() {
     ZONE4YOU_RELEASE_COMMIT: "1234567890abcdef1234567890abcdef12345678",
     ZONE4YOU_DEPLOYMENT_PHASE: "booking_without_payments",
     ZONE4YOU_STAGING_APP_ORIGIN: "https://staging.booking.zone4you.cz/",
-    LUXART_API_BASE_URL: "https://luxart-test.example.com:9191/",
+    LUXART_API_CONTRACT: "memberzone_rest_v1",
+    LUXART_API_BASE_URL: "https://luxart-test.example.com:9443/",
     ZONE4YOU_RELEASE_WINDOW_STARTS_AT: "2026-09-05T08:00:00.000Z",
     ZONE4YOU_RELEASE_WINDOW_ENDS_AT: "2026-09-05T12:00:00.000Z",
     ZONE4YOU_LUXART_EVIDENCE_PATH: evidencePaths.luxart,
@@ -58,6 +59,7 @@ test("dossier preparation hashes real evidence but remains an explicit human-app
   const dossier = JSON.parse(body) as {
     schemaVersion: number;
     draft: boolean;
+    luxartApiContract: string;
     artifacts: Record<string, { path: string; sha256: string }>;
     approvals: {
       uat: { decision: string; approvedBy: string };
@@ -72,6 +74,7 @@ test("dossier preparation hashes real evidence but remains an explicit human-app
   assert.equal(result.dossierSha256, createHash("sha256").update(body).digest("hex"));
   assert.equal(dossier.schemaVersion, 3);
   assert.equal(dossier.draft, true);
+  assert.equal(dossier.luxartApiContract, "memberzone_rest_v1");
   assert.equal(dossier.approvals.uat.decision, "NO-GO");
   assert.equal(dossier.approvals.uat.approvedBy, "pending-human-approval");
   assert.equal(dossier.approvals.alertReceipt.confirmed, false);
@@ -99,13 +102,13 @@ test("dossier preparation refuses failed evidence and unsafe origins", () => {
     /must not be production/i,
   );
 
-  const wrongLuxartPort = fixture();
+  const wrongLuxartContract = fixture();
   assert.throws(
     () => buildPilotReleaseDossier({
-      ...wrongLuxartPort.environment,
-      LUXART_API_BASE_URL: "https://luxart-test.example.com:9759/",
+      ...wrongLuxartContract.environment,
+      LUXART_API_CONTRACT: "soap_wcf",
     }),
-    /must use the approved Zone4You port 9191/i,
+    /LUXART_API_CONTRACT must exactly equal memberzone_rest_v1/i,
   );
 
   const writableEvidence = fixture();

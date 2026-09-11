@@ -6,6 +6,7 @@ import {
   type BusinessRulesProfile,
 } from "./businessRuleConfirmation";
 import { assertConfirmedLuxartGatewayAuth, type LuxartGatewayAuthMode } from "./luxartGatewayAuth";
+import { luxartApiContract, type LuxartApiContract } from "./luxartApiContract";
 import { validLuxartResourceMapping, validLuxartTextMapping } from "./luxartMappings";
 import { paymentConfigurationProblems } from "./paymentConfig";
 import {
@@ -33,6 +34,7 @@ export interface DeploymentPreflightReport {
   commit?: string;
   configuration: {
     luxartMode: "live" | "invalid";
+    luxartApiContract: LuxartApiContract | "invalid";
     luxartTransport: "https" | "approved_test_http" | "invalid";
     gatewayAuthMode: LuxartGatewayAuthMode | "invalid";
     rateLimitMode: "memory" | "postgres" | "invalid";
@@ -252,6 +254,9 @@ export function deploymentRuntimeConfigurationProblems(
     issues.push(issue("DEPLOYMENT_COMMIT", "VERCEL_GIT_COMMIT_SHA", "ZONE4YOU_DEPLOYMENT_COMMIT"));
   }
   if (environment.LUXART_MOCK !== "false") issues.push(issue("LUXART_LIVE_MODE", "LUXART_MOCK"));
+  if (luxartApiContract(environment) === "invalid") {
+    issues.push(issue("LUXART_API_CONTRACT", "LUXART_API_CONTRACT"));
+  }
   if (transport === "invalid") {
     issues.push(issue("LUXART_API_TRANSPORT", "LUXART_API_BASE_URL", "LUXART_ALLOW_INSECURE_TEST_HTTP"));
   }
@@ -385,6 +390,7 @@ export function buildDeploymentPreflightReport(
     ...(commit ? { commit } : {}),
     configuration: {
       luxartMode: environment.LUXART_MOCK === "false" ? "live" : "invalid",
+      luxartApiContract: luxartApiContract(environment),
       luxartTransport: luxartTransport(environment, target),
       gatewayAuthMode,
       rateLimitMode: ["memory", "postgres"].includes(environment.RATE_LIMIT_MODE ?? "")

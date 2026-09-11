@@ -166,7 +166,7 @@ Verze: 1.1 (aktualizováno na základě upřesnění)
 
 ### Kritické (blokují vývoj)
 1. **Stripe přístupy** — čekáme na API klíče od klienta
-2. **Luxart API přístup a dokumentace** — port 9191 je domluvený ke zveřejnění; čekáme na přesnou `/Help` URL a potvrzení aktivního testovacího přístupu
+2. **Luxart API kontrakt a přístup** — port 9191 zpřístupňuje SOAP/WCF, zatímco implementace vychází z REST dokumentace na 9295; čekáme na společné rozhodnutí Luxart/IT, přesný HTTPS test origin a auth režim
 
 ### Důležité (potřebné brzy)
 3. **Minimální zůstatek kreditu** pro rezervaci — jaká je minimální částka?

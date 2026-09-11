@@ -236,7 +236,7 @@ Projekt je rozdělen do dvou fází. **Fáze 1** pokrývá kompletní funkční 
 
 Pro úspěšnou realizaci projektu je potřeba součinnost klienta v těchto oblastech:
 
-1. **Luxart API** — port 9191 je domluvený ke zveřejnění pravděpodobně jako veřejný vstup na interní Luxart port 9759; čekáme na přesnou `/Help` URL, potvrzení této vazby, aktivního přístupu, test DB a auth režimu
+1. **Luxart API** — port 9191 zpřístupňuje SOAP/WCF, zatímco současný adapter implementuje REST `memberzone_rest_v1`; čekáme na společné rozhodnutí Luxart/IT, přesný HTTPS test origin, test DB a auth režim
 2. **Stripe účet** — API klíče (testovací i produkční) — **čekáme na klienta**
 3. **Doména** — potvrzení a nastavení DNS pro booking.zone4you.cz
 4. **HTTPS certifikát** — na serveru, kde poběží aplikace
