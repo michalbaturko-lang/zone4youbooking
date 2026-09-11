@@ -42,7 +42,7 @@ Musí být současně známé:
 - výslovné povolení read-only testu;
 - případné credentials jsou vložené mimo e-mail a repozitář.
 
-Poté lze spustit pouze `verify:luxart-gateway-config` a `verify:luxart-readonly`. Výstup smí obsahovat jen agregované počty, rozsah dat, čísla sálů a hashe množiny výskytů — nikdy osobní data nebo syrové odpovědi.
+Poté lze spustit pouze složenou read-only bránu `verify:luxart-d1`, která nejprve znovu ověří port 9191, HTTPS, `/Help`, potvrzený gateway režim a resort 1 a až potom provede autentizovaný CS/EN read-only test. Výstup smí obsahovat jen agregované počty, rozsah dat, čísla sálů a hashe množiny výskytů — nikdy osobní data nebo syrové odpovědi.
 
 ### B — lze připravit řízené rezervační UAT
 

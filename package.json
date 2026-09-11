@@ -10,6 +10,7 @@
     "smoke:api": "node scripts/smoke-booking-api.mjs",
     "probe:runtime": "node scripts/probe-runtime.mjs",
     "probe:luxart-help": "tsx scripts/probe-luxart-help.ts",
+    "verify:luxart-d1": "tsx scripts/verify-luxart-d1.ts",
     "verify:deployment-preflight": "tsx scripts/verify-deployment-preflight.ts",
     "verify:luxart-gateway-config": "tsx scripts/verify-luxart-gateway-config.ts",
     "verify:luxart-readonly": "tsx scripts/verify-luxart-readonly.ts",

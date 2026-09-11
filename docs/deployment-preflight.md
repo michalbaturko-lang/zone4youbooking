@@ -1,6 +1,6 @@
 # Zone4You Booking — staging a produkční preflight
 
-Aktualizace: 2026-08-30
+Aktualizace: 2026-09-11
 
 Preflight je fail-closed kontrola konfigurace přesného nasazovaného commitu. Neprovádí deploy, DNS změnu ani Luxart/Stripe mutaci. Jeho JSON výstup obsahuje pouze bezpečné režimy, commit, hash schválených profilů a názvy chybných proměnných; nevypisuje secrets, databázové URL ani Luxart URL.
 
@@ -43,7 +43,7 @@ Produkce vždy vyžaduje `LUXART_ALLOW_INSECURE_TEST_HTTP=false`. Přesměrován
 
 ## Co do runtime prostředí nepatří
 
-Do hostingu se nevkládají testovací klientská hesla, UAT potvrzovací fráze, rollback/alert/release dossier proměnné, lokální integrační databáze ani `PROBE_*` hodnoty. Ty patří jen do jednorázového operátorského procesu. Preflight jejich neprázdnou přítomnost v runtime prostředí odmítne.
+Do hostingu se nevkládají testovací klientská hesla, `LUXART_HELP_URL`, cesta `ZONE4YOU_LUXART_EVIDENCE_OUTPUT_PATH`, UAT potvrzovací fráze, rollback/alert/release dossier proměnné, lokální integrační databáze ani `PROBE_*` hodnoty. Ty patří jen do jednorázového operátorského procesu. Preflight jejich neprázdnou přítomnost v runtime prostředí odmítne.
 
 ## Hodnocení výsledku
 

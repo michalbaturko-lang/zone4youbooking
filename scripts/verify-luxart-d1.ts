@@ -1,0 +1,186 @@
+import { createHash } from "node:crypto";
+import { existsSync, lstatSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { runLuxartHelpProbe } from "./probe-luxart-help";
+import { verifyLuxartGatewayConfiguration } from "./verify-luxart-gateway-config";
+import { runLuxartReadonlyVerification } from "./verify-luxart-readonly";
+
+type Environment = Record<string, string | undefined>;
+type HelpEvidence = Awaited<ReturnType<typeof runLuxartHelpProbe>>;
+type ReadonlyEvidence = Awaited<ReturnType<typeof runLuxartReadonlyVerification>>;
+type GatewayEvidence = ReturnType<typeof verifyLuxartGatewayConfiguration>;
+
+interface LuxartD1Dependencies {
+  helpProbe?: (options: { environment: Environment; now: Date }) => Promise<HelpEvidence>;
+  gatewayVerifier?: (environment: Environment) => GatewayEvidence;
+  readonlyVerifier?: (options: { environment: Environment; now: Date }) => Promise<ReadonlyEvidence>;
+}
+
+interface LuxartD1Options extends LuxartD1Dependencies {
+  environment?: Environment;
+  now?: Date;
+  repositoryRoot?: string;
+}
+
+const expectedPort = "9191";
+const repositoryRootDefault = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+function required(environment: Environment, name: string) {
+  const value = environment[name]?.trim();
+  if (!value) throw new Error(`${name} is required for the Luxart D1 verification.`);
+  return value;
+}
+
+function effectivePort(url: URL) {
+  return url.port || (url.protocol === "https:" ? "443" : "80");
+}
+
+function cleanHttpsUrl(raw: string, name: string, pathname: RegExp) {
+  const url = new URL(raw);
+  if (
+    url.protocol !== "https:" ||
+    !url.hostname ||
+    url.hostname.endsWith(".invalid") ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash ||
+    !pathname.test(url.pathname)
+  ) {
+    throw new Error(`${name} must be the approved clean HTTPS Luxart URL.`);
+  }
+  if (effectivePort(url) !== expectedPort) {
+    throw new Error(`${name} must use the approved port ${expectedPort}.`);
+  }
+  if (url.hostname.toLowerCase() === "api.memberzone.online") {
+    throw new Error(`${name} must target the Zone4You instance, not the public reference API.`);
+  }
+  return url;
+}
+
+function outputTarget(raw: string, repositoryRoot: string) {
+  const outputPath = resolve(raw);
+  if (!outputPath.endsWith(".json")) {
+    throw new Error("ZONE4YOU_LUXART_EVIDENCE_OUTPUT_PATH must end in .json.");
+  }
+  const fromRepository = relative(resolve(repositoryRoot), outputPath);
+  if (fromRepository === "" || (!fromRepository.startsWith("..") && !isAbsolute(fromRepository))) {
+    throw new Error("Luxart release evidence must be stored outside the repository.");
+  }
+  if (existsSync(outputPath)) {
+    throw new Error("Luxart evidence output already exists and will not be overwritten.");
+  }
+  const parent = lstatSync(dirname(outputPath));
+  if (!parent.isDirectory() || parent.isSymbolicLink()) {
+    throw new Error("Luxart evidence parent must be a real directory.");
+  }
+  if ((parent.mode & 0o077) !== 0) {
+    throw new Error("Luxart evidence parent must not be accessible by group or other users.");
+  }
+  return outputPath;
+}
+
+export function loadLuxartD1Configuration(
+  environment: Environment = process.env,
+  repositoryRoot = repositoryRootDefault,
+) {
+  if (environment.LUXART_MOCK !== "false") {
+    throw new Error("Luxart D1 verification requires LUXART_MOCK=false.");
+  }
+  if (environment.LUXART_EXPECTED_PORT !== expectedPort) {
+    throw new Error(`LUXART_EXPECTED_PORT must exactly equal ${expectedPort}.`);
+  }
+  if (environment.LUXART_ALLOW_INSECURE_TEST_HTTP !== "false") {
+    throw new Error("Luxart D1 verification refuses the insecure HTTP override.");
+  }
+  if (environment.LUXART_REQUIRE_AUTHENTICATED_PROBE !== "true") {
+    throw new Error("Luxart D1 verification requires the authenticated read-only probe.");
+  }
+  if (environment.LUXART_RESORT_ID !== "1") {
+    throw new Error("Luxart D1 verification is locked to Zone4You resort 1.");
+  }
+
+  const apiUrl = cleanHttpsUrl(required(environment, "LUXART_API_BASE_URL"), "LUXART_API_BASE_URL", /^\/$/);
+  const helpUrl = cleanHttpsUrl(required(environment, "LUXART_HELP_URL"), "LUXART_HELP_URL", /^\/Help\/?$/i);
+  if (apiUrl.origin !== helpUrl.origin) {
+    throw new Error("LUXART_API_BASE_URL and LUXART_HELP_URL must use the same approved origin.");
+  }
+
+  return {
+    apiOrigin: apiUrl.origin,
+    outputPath: outputTarget(
+      required(environment, "ZONE4YOU_LUXART_EVIDENCE_OUTPUT_PATH"),
+      repositoryRoot,
+    ),
+  };
+}
+
+function helpAccepted(help: HelpEvidence, gateway: GatewayEvidence) {
+  if (help.classification === "ready") return true;
+  return help.classification === "authentication_required" && gateway.gatewayAuthMode !== "none";
+}
+
+export async function runLuxartD1Verification({
+  environment = process.env,
+  now = new Date(),
+  repositoryRoot = repositoryRootDefault,
+  helpProbe = runLuxartHelpProbe,
+  gatewayVerifier = verifyLuxartGatewayConfiguration,
+  readonlyVerifier = runLuxartReadonlyVerification,
+}: LuxartD1Options = {}) {
+  const configuration = loadLuxartD1Configuration(environment, repositoryRoot);
+  const gateway = gatewayVerifier(environment);
+  const help = await helpProbe({ environment, now });
+  if (!helpAccepted(help, gateway)) {
+    throw new Error(`Luxart Help transport check did not pass safely (${help.classification}).`);
+  }
+
+  const evidence = await readonlyVerifier({ environment, now });
+  if (!evidence.ok || evidence.target !== configuration.apiOrigin) {
+    throw new Error("Luxart read-only evidence does not match the approved API origin.");
+  }
+  if (evidence.gatewayAuthMode !== gateway.gatewayAuthMode) {
+    throw new Error("Luxart read-only evidence does not match the confirmed gateway auth mode.");
+  }
+  if (!evidence.authenticated || evidence.authenticated.checked !== true) {
+    throw new Error("Luxart read-only evidence is not authenticated.");
+  }
+
+  const body = `${JSON.stringify(evidence, null, 2)}\n`;
+  writeFileSync(configuration.outputPath, body, { encoding: "utf8", flag: "wx", mode: 0o600 });
+  const storedBytes = readFileSync(configuration.outputPath);
+  const storedMode = lstatSync(configuration.outputPath).mode & 0o777;
+  if (storedMode !== 0o600) {
+    throw new Error("Luxart evidence file permissions are not owner-only.");
+  }
+
+  return {
+    ok: true,
+    checkedAt: evidence.checkedAt,
+    port: expectedPort,
+    helpClassification: help.classification,
+    gatewayAuthMode: gateway.gatewayAuthMode,
+    authenticated: true,
+    czechLessonCount: evidence.czech.count,
+    englishLessonCount: evidence.english.count,
+    reformerCount: evidence.czech.reformer,
+    observedRoomNumbers: evidence.czech.roomNumbers,
+    evidenceSha256: createHash("sha256").update(storedBytes).digest("hex"),
+    evidenceStoredOwnerOnly: true,
+  };
+}
+
+const isDirectRun = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isDirectRun) {
+  runLuxartD1Verification()
+    .then((receipt) => console.log(JSON.stringify(receipt, null, 2)))
+    .catch((error) => {
+      console.error(JSON.stringify({
+        ok: false,
+        checkedAt: new Date().toISOString(),
+        error: error instanceof Error ? error.message : "Luxart D1 verification failed.",
+      }, null, 2));
+      process.exitCode = 1;
+    });
+}

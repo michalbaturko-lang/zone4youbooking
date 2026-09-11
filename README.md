@@ -34,6 +34,7 @@ npm run check:launch
 npm run verify:deployment-preflight
 npm run probe:luxart-help
 npm run verify:luxart-gateway-config
+npm run verify:luxart-d1
 npm run inspect:business-rules
 npm run inspect:payment-product
 # Po výběru staging alert kanálu a support vlastníka:
@@ -51,6 +52,8 @@ npm run verify:production-cutover
 `verify:deployment-preflight` ověřuje vzájemnou shodu cíle, přesného commitu, fáze `read_only` / `booking_without_payments` / `booking_with_stripe`, capability přepínačů a runtime-only konfigurace. Výstup nikdy nevypisuje secrets ani upstream/databázové URL. Přesná staging/produkční matice je v [`docs/deployment-preflight.md`](docs/deployment-preflight.md).
 
 `probe:luxart-help` je první bezpečný síťový test po získání přesné URL. Posílá jediný neautentizovaný `GET /Help`, zakazuje redirecty, omezuje čas i velikost odpovědi a do výsledku ukládá jen port, transport, HTTP stav a SHA-256 cíle/odpovědi. Rozliší nedostupnou síť, požadovanou gateway autentizaci a skutečnou Luxart dokumentaci, aniž by poslal klientské heslo.
+
+`verify:luxart-d1` je následná jediná read-only vstupní brána integračního týdne. Pevně vyžaduje schválený Zone4You HTTPS origin na portu 9191, stejný origin pro `/Help` i API, explicitně potvrzený gateway režim, resort 1 a autentizovaný český i anglický feed včetně Reformeru. Veřejný referenční Luxart server ani HTTP nepřijme, neprovádí rezervaci či jinou mutaci a release JSON zapíše pouze do předem vytvořeného owner-only adresáře mimo repozitář bez možnosti přepsání existujícího souboru.
 
 Externí Playwright regrese je fail-closed omezená na izolovaný Zone4You Vercel Preview. Před prvním browser scénářem načte pouze `/api/readiness` a pokračuje jen při přesném profilu `mode=demo`, `luxart=mock`, demo top-upech, povinné angličtině a vypnutém zapomenutém heslu. Produkční aliasy a `booking.zone4you.cz` odmítne dříve, než test odešle login nebo rezervaci. Veřejný běh je záměrně nízkoobjemový: ve všech pěti viewports ověří rozvrh, responzivitu, přístupnost, angličtinu a oblíbené lekce, ale přihlášení, rezervaci a storno provede pouze jednou na nejmenším telefonu. Plná autentizační matice zůstává lokální, aby automat sám neobcházel ani nezahltil limit pěti přihlášení za deset minut.
 
