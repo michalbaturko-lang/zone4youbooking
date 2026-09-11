@@ -5,6 +5,7 @@ Aktualizace: 2026-08-29
 ## Potvrzeno
 
 - Veřejná dokumentace je dostupná na `http://api.memberzone.online:9295/Help` a 2026-08-29 vrátila HTTP 200.
+- Veřejný příklad `Lesson_data.date_time` používá explicitní UTC čas (`Z`); XML příklad téhož pole používá explicitní offset `+02:00`. Integrace proto přijímá pouze existující ISO datum a čas s `Z` nebo číselným offsetem a nejednoznačný čas bez zóny odmítne bezpečnou chybou.
 - Dokumentace uvádí stejný kontrakt pro testovací i produkční API.
 - Dokumentovaný resort Zone4You je `1`.
 - Luxart má posílat všechny standardní emailové notifikace. Nová aplikace je nesmí posílat duplicitně.
@@ -17,6 +18,7 @@ Aktualizace: 2026-08-29
 - Přímé volání datového `api/Lesson` i `api/Login` z vývojového prostředí vrátilo HTTP 401 bez těla.
 - Testovací klientské účty z emailu tedy samy o sobě nenahrazují síťovou nebo serverovou autorizaci API.
 - Aplikace nyní podporuje oddělenou serverovou gateway autentizaci `none` / Basic / Bearer / vlastní `X-*` hlavičku. Režim musí potvrdit IT a tajné hodnoty patří pouze do secret store; klientský login se pro gateway autentizaci nikdy nepoužije. Outbound adapter odmítá redirect, aby gateway hlavičku nepřenesl na jiný cíl.
+- Vstupní časy lekcí, rezervací, historie kreditu a watchdogu jsou validované stejně přísně. Neexistující kalendářní datum, čas bez zóny ani nepřípustný UTC offset se nesmí tiše převést podle časové zóny serveru.
 - Do vyjasnění se žádné heslo ani hash nesmí zapisovat do logu, repozitáře, URL monitoringu nebo browser storage.
 
 ## Kontrakt pro všechny lekce

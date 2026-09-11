@@ -177,6 +177,38 @@ function requiredNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : Number.NaN;
 }
 
+function parseExplicitLuxartDateTime(value: unknown) {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?(Z|([+-])(\d{2}):(\d{2}))$/i.exec(normalized);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6]);
+  const offsetHours = match[10] ? Number(match[10]) : 0;
+  const offsetMinutes = match[11] ? Number(match[11]) : 0;
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+  if (
+    year < 1 ||
+    month < 1 || month > 12 ||
+    day < 1 || day > daysInMonth[month - 1] ||
+    hour > 23 || minute > 59 || second > 59 ||
+    offsetHours > 14 || offsetMinutes > 59 ||
+    (offsetHours === 14 && offsetMinutes !== 0)
+  ) {
+    return null;
+  }
+
+  const parsed = new Date(normalized);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 function inferredLessonType(name: string) {
   const normalized = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
   if (normalized.includes("REFORMER")) return "Reformer";
@@ -193,14 +225,16 @@ export function luxartLessonOccurrenceId(input: {
   serviceId: number;
   startsAt: string;
 }) {
-  return [input.resort, input.categoryId, input.serviceId, new Date(input.startsAt).toISOString()].join(":");
+  const startsAt = parseExplicitLuxartDateTime(input.startsAt);
+  if (!startsAt) throw new Error("Luxart lesson occurrence contains an invalid timestamp.");
+  return [input.resort, input.categoryId, input.serviceId, startsAt.toISOString()].join(":");
 }
 
 export function parseLuxartLessonId(lessonId: string) {
   const match = /^luxart:(\d+):(\d+):(\d+):(.+)$/.exec(lessonId);
   if (!match) return null;
-  const startsAt = new Date(match[4]);
-  if (Number.isNaN(startsAt.getTime())) return null;
+  const startsAt = parseExplicitLuxartDateTime(match[4]);
+  if (!startsAt) return null;
   return {
     resort: Number(match[1]),
     categoryId: Number(match[2]),
@@ -254,9 +288,8 @@ export function mapLuxartLesson(data: LuxartLessonData, mapping: LuxartLessonMap
     throw new Error("Luxart lesson contains invalid required numeric fields.");
   }
 
-  const startsAtValue = typeof data?.date_time === "string" ? data.date_time.trim() : "";
-  const startsAtDate = new Date(startsAtValue);
-  if (Number.isNaN(startsAtDate.getTime())) {
+  const startsAtDate = parseExplicitLuxartDateTime(data?.date_time);
+  if (!startsAtDate) {
     throw new Error("Luxart lesson contains an invalid date_time value.");
   }
 
@@ -400,8 +433,7 @@ export function mapLuxartWatchdog(
   const durationMinutes = requiredNumber(data?.delka_1);
   const resourceId = requiredNumber(data?.id_resource_1);
   const watchdogId = requiredNumber(data?.id_watchdog);
-  const startsAtValue = typeof data?.datum === "string" ? data.datum.trim() : "";
-  const startsAt = new Date(startsAtValue);
+  const startsAt = parseExplicitLuxartDateTime(data?.datum);
   if (
     !Number.isSafeInteger(resort) || resort <= 0 ||
     (expectedResort !== undefined && resort !== expectedResort) ||
@@ -413,7 +445,7 @@ export function mapLuxartWatchdog(
     !Number.isSafeInteger(durationMinutes) || durationMinutes <= 0 ||
     !Number.isSafeInteger(resourceId) || resourceId <= 0 ||
     !Number.isSafeInteger(watchdogId) || watchdogId <= 0 ||
-    Number.isNaN(startsAt.getTime())
+    !startsAt
   ) {
     throw new Error("Luxart watchdog contains invalid required fields.");
   }
@@ -526,9 +558,8 @@ export function mapLuxartReservation(
     throw new Error("Luxart reservation contains invalid required fields.");
   }
 
-  const startsAtValue = typeof data?.datum === "string" ? data.datum.trim() : "";
-  const startsAt = new Date(startsAtValue);
-  if (Number.isNaN(startsAt.getTime())) {
+  const startsAt = parseExplicitLuxartDateTime(data?.datum);
+  if (!startsAt) {
     throw new Error("Luxart reservation contains an invalid datum value.");
   }
 
@@ -579,14 +610,13 @@ export function mapLuxartCreditHistory(
     const resort = requiredNumber(entry?.resort);
     const amountKc = requiredNumber(entry?.castka);
     const historyId = requiredNumber(entry?.cdd);
-    const occurredAtValue = typeof entry?.datum === "string" ? entry.datum.trim() : "";
-    const occurredAtDate = new Date(occurredAtValue);
+    const occurredAtDate = parseExplicitLuxartDateTime(entry?.datum);
     if (
       !Number.isSafeInteger(resort) || resort <= 0 ||
       (expectedResort !== undefined && resort !== expectedResort) ||
       !Number.isFinite(amountKc) ||
       !Number.isSafeInteger(historyId) || historyId <= 0 ||
-      Number.isNaN(occurredAtDate.getTime())
+      !occurredAtDate
     ) {
       throw new Error("Luxart credit history contains invalid required fields.");
     }

@@ -46,6 +46,12 @@ test("maps every Luxart lesson occurrence without a fixed room union", () => {
   assert.equal(lesson.luxartCategoryId, 12);
   assert.equal(lesson.endsAt, "2026-09-01T15:20:00.000Z");
   assert.match(lesson.id, /^luxart:1:12:321:/);
+
+  const documentedFractionalTimestamp = mapLuxartLesson({
+    ...baseLesson,
+    date_time: "2026-09-11T15:20:08.9258227Z",
+  });
+  assert.equal(documentedFractionalTimestamp.startsAt, "2026-09-11T15:20:08.925Z");
 });
 
 test("keeps unknown rooms and lesson types visible with safe fallbacks", () => {
@@ -75,6 +81,16 @@ test("rejects malformed required Luxart lesson values instead of coercing them t
     assert.throws(
       () => mapLuxartLesson({ ...baseLesson, ...invalid }),
       /invalid required numeric fields/i,
+    );
+  }
+  for (const date_time of [
+    "2026-09-01T16:30:00",
+    "2026-02-30T16:30:00+01:00",
+    "2026-09-01T16:30:00+14:30",
+  ]) {
+    assert.throws(
+      () => mapLuxartLesson({ ...baseLesson, date_time }),
+      /invalid date_time/i,
     );
   }
 });
@@ -156,6 +172,8 @@ test("maps an active reservation back to the same Luxart lesson occurrence", () 
     { price: -1 },
     { status: Number.NaN },
     { datum: "invalid" },
+    { datum: "2026-09-01T16:30:00" },
+    { datum: "2026-02-30T16:30:00+01:00" },
   ]) {
     assert.throws(
       () => mapLuxartReservation({ ...source, ...invalid }, "42", 1),
@@ -206,6 +224,8 @@ test("derives running credit balances from newest Luxart history entry", () => {
   for (const invalid of [
     { resort: 0 },
     { datum: "invalid" },
+    { datum: "2026-08-29T08:00:00" },
+    { datum: "2026-02-30T08:00:00Z" },
     { castka: Number.NaN },
     { cdd: 0 },
   ]) {
@@ -276,6 +296,8 @@ test("maps the documented Luxart watchdog as a seat alert without inventing a qu
     { id_kategorie: 0 },
     { user_id: 999 },
     { datum: "invalid" },
+    { datum: "2026-09-01T16:30:00" },
+    { datum: "2026-02-30T16:30:00+01:00" },
     { id_service_1: 0 },
     { delka_1: 0 },
     { id_resource_1: 0 },

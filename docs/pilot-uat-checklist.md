@@ -11,6 +11,7 @@ Každý bod označte `PASS`, `FAIL` nebo `N/A — funkce bezpečně vypnutá`. K
 - [ ] Všechny položky aktuální sedmidenní odpovědi `api/Lesson` jsou dohledatelné v UI.
 - [ ] Privacy-safe request evidence potvrzuje `date_start` dnešního pražského dne, `pocet_dni_dopredu=7`, `id_kategorie=0`, `id_service=0` a resort 1.
 - [ ] Výskyt s duplicitním occurrence ID, chybějícím zobrazovaným polem, neplatným časovým intervalem nebo na osmém pražském dni vyvolá bezpečný stav nedostupnosti; nesmí se potichu zobrazit ani zahodit jako údajně úplný feed.
+- [ ] Čas bez explicitního `Z` / UTC offsetu a neexistující kalendářní datum v lekci, rezervaci, kreditu nebo watchdogu vyvolají bezpečný stav nedostupnosti; desktop, mobil ani hostingová časová zóna je nesmí interpretovat rozdílně.
 - [ ] Všechny sály a Reformer jsou viditelné a filtrovatelné.
 - [ ] Neznámý sál nebo typ lekce nezpůsobí zmizení lekce ani pád stránky.
 - [ ] CS i EN mají srozumitelný rozvrh, detail, stav míst a instrukce.
