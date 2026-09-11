@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -30,6 +30,7 @@ function fixture() {
       return [name, path];
     }),
   );
+  chmodSync(evidencePaths.dns, 0o600);
   const outputPath = join(directory, "pilot-release-dossier.json");
   const environment = {
     ZONE4YOU_RELEASE_DOSSIER_OUTPUT_PATH: outputPath,
@@ -105,5 +106,30 @@ test("dossier preparation refuses failed evidence and unsafe origins", () => {
       LUXART_API_BASE_URL: "https://luxart-test.example.com:9759/",
     }),
     /must use the approved Zone4You port 9191/i,
+  );
+
+  const writableEvidence = fixture();
+  chmodSync(writableEvidence.evidencePaths.runtime, 0o660);
+  assert.throws(
+    () => buildPilotReleaseDossier(writableEvidence.environment),
+    /runtime evidence must not be writable by group or other users/i,
+  );
+
+  const readableDnsEvidence = fixture();
+  chmodSync(readableDnsEvidence.evidencePaths.dns, 0o640);
+  assert.throws(
+    () => buildPilotReleaseDossier(readableDnsEvidence.environment),
+    /DNS rollback baseline evidence must not be accessible by group or other users/i,
+  );
+
+  const symlinkedEvidence = fixture();
+  const runtimeLink = join(symlinkedEvidence.directory, "runtime-link.json");
+  symlinkSync(symlinkedEvidence.evidencePaths.runtime, runtimeLink);
+  assert.throws(
+    () => buildPilotReleaseDossier({
+      ...symlinkedEvidence.environment,
+      ZONE4YOU_RUNTIME_EVIDENCE_PATH: runtimeLink,
+    }),
+    /runtime evidence must be an existing regular file, not a symlink/i,
   );
 });

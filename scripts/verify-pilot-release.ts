@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { lstatSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { assertConfirmedLuxartGatewayAuth, type LuxartGatewayAuthMode } from "../src/lib/luxartGatewayAuth";
@@ -8,6 +7,7 @@ import { bookingRules } from "../src/lib/bookingRules";
 import { rateLimitRuntimeReady } from "../src/lib/rateLimit";
 import { zone4YouDateKey, zone4YouScheduleRange, zone4YouTimeZone } from "../src/lib/zone4YouTime";
 import { validateProductionDomainBaselineEvidence } from "./capture-production-domain-baseline";
+import { readStableReleaseJson } from "./release-evidence-file";
 
 type Environment = Record<string, string | undefined>;
 type JsonObject = Record<string, unknown>;
@@ -77,22 +77,11 @@ function cleanHttpsOrigin(value: unknown, label: string) {
   return url.origin;
 }
 
-function readBoundedJson(path: string, label: string): JsonEvidenceFile {
-  const stat = lstatSync(path);
-  if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`${label} must be a regular file, not a symlink.`);
-  if (stat.size < 2 || stat.size > maximumJsonBytes) {
-    throw new Error(`${label} must contain between 2 and ${maximumJsonBytes} bytes.`);
-  }
-  const bytes = readFileSync(path);
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(bytes.toString("utf8"));
-  } catch {
-    throw new Error(`${label} is not valid JSON.`);
-  }
+function readBoundedJson(path: string, label: string, ownerOnly = false): JsonEvidenceFile {
+  const loaded = readStableReleaseJson(path, label, { maximumBytes: maximumJsonBytes, ownerOnly });
   return {
-    data: objectValue(parsed, label),
-    sha256: createHash("sha256").update(bytes).digest("hex"),
+    data: objectValue(loaded.data, label),
+    sha256: loaded.sha256,
   };
 }
 
@@ -133,7 +122,7 @@ function artifact(
   if (!/^[a-f0-9]{64}$/.test(expectedSha256)) {
     throw new Error(`artifacts.${name}.sha256 must be a full SHA-256 digest.`);
   }
-  const loaded = readBoundedJson(path, `artifacts.${name}`);
+  const loaded = readBoundedJson(path, `artifacts.${name}`, name === "dnsRollbackBaseline");
   if (loaded.sha256 !== expectedSha256) throw new Error(`artifacts.${name} SHA-256 does not match the dossier.`);
   trueValue(loaded.data.ok, `artifacts.${name}.ok`);
   checkedAt(loaded.data.checkedAt, `artifacts.${name}`, now, maximumAgeHours);
@@ -551,14 +540,6 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
   );
   validateBookingUatEvidence(load("bookingMutationUat"), stagingTarget, resources, expectedCommit, launchMode);
   validateRollbackEvidence(load("rollback", Math.min(24, maximumAgeHours)), stagingTarget);
-  const dnsRollbackReference = objectValue(artifacts.dnsRollbackBaseline, "artifacts.dnsRollbackBaseline");
-  const dnsRollbackPathValue = stringValue(dnsRollbackReference.path, "artifacts.dnsRollbackBaseline.path");
-  const dnsRollbackPath = isAbsolute(dnsRollbackPathValue)
-    ? dnsRollbackPathValue
-    : resolve(dossierDirectory, dnsRollbackPathValue);
-  if ((lstatSync(dnsRollbackPath).mode & 0o077) !== 0) {
-    throw new Error("artifacts.dnsRollbackBaseline must not be accessible by group or other users.");
-  }
   validateProductionDomainBaselineEvidence(load("dnsRollbackBaseline", Math.min(24, maximumAgeHours)));
   const alertEventId = validateAlertEvidence(load("alertDelivery"), stagingTarget);
   if (launchMode === "booking_with_stripe") validateStripeUatEvidence(load("stripeUat"), stagingTarget);

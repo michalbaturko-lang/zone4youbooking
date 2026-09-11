@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -280,6 +280,36 @@ test("pilot release dossier binds live Luxart, UAT, application and DNS rollback
   assert.throws(
     () => verifyPilotReleaseEvidence(fixture.environment, now),
     /dnsRollbackBaseline must not be accessible/i,
+  );
+});
+
+test("pilot release dossier refuses writable or symlinked release evidence", () => {
+  const writableArtifact = validFixture();
+  chmodSync(writableArtifact.dossier.artifacts.runtimeProbe.path, 0o660);
+  assert.throws(
+    () => verifyPilotReleaseEvidence(writableArtifact.environment, now),
+    /runtimeProbe must not be writable by group or other users/i,
+  );
+
+  const writableDossier = validFixture();
+  chmodSync(writableDossier.dossierPath, 0o660);
+  assert.throws(
+    () => verifyPilotReleaseEvidence(writableDossier.environment, now),
+    /release dossier must not be writable by group or other users/i,
+  );
+
+  const symlinkedArtifact = validFixture();
+  const runtimeLink = join(symlinkedArtifact.directory, "runtime-link.json");
+  symlinkSync(symlinkedArtifact.dossier.artifacts.runtimeProbe.path, runtimeLink);
+  const dossier = structuredClone(symlinkedArtifact.dossier);
+  dossier.artifacts.runtimeProbe.path = runtimeLink;
+  const dossierSha = writeJson(symlinkedArtifact.dossierPath, dossier);
+  assert.throws(
+    () => verifyPilotReleaseEvidence({
+      ...symlinkedArtifact.environment,
+      ZONE4YOU_RELEASE_DOSSIER_CONFIRMATION: `VERIFY_ZONE4YOU_RELEASE_DOSSIER:${dossierSha}`,
+    }, now),
+    /runtimeProbe must be an existing regular file, not a symlink/i,
   );
 });
 

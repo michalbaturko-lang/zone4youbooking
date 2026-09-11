@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
-import { lstatSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { statSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { readStableReleaseJson } from "./release-evidence-file";
 
 type Environment = Record<string, string | undefined>;
 type JsonObject = Record<string, unknown>;
@@ -45,20 +46,10 @@ function boundedInteger(environment: Environment, name: string, fallback: number
   return value;
 }
 
-function evidenceFile(rawPath: string, label: string) {
+function evidenceFile(rawPath: string, label: string, ownerOnly = false) {
   const path = resolve(rawPath);
-  const stat = lstatSync(path);
-  if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`${label} must be a regular JSON file, not a symlink.`);
-  if (stat.size < 2 || stat.size > maximumJsonBytes) {
-    throw new Error(`${label} must contain between 2 and ${maximumJsonBytes} bytes.`);
-  }
-  const bytes = readFileSync(path);
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(bytes.toString("utf8"));
-  } catch {
-    throw new Error(`${label} is not valid JSON.`);
-  }
+  const loaded = readStableReleaseJson(path, label, { maximumBytes: maximumJsonBytes, ownerOnly });
+  const parsed = loaded.data;
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
     throw new Error(`${label} must be a JSON object.`);
   }
@@ -69,7 +60,7 @@ function evidenceFile(rawPath: string, label: string) {
     data,
     reference: {
       path,
-      sha256: createHash("sha256").update(bytes).digest("hex"),
+      sha256: loaded.sha256,
     },
   };
 }
@@ -106,6 +97,7 @@ export function buildPilotReleaseDossier(environment: Environment = process.env)
     dnsRollbackBaseline: evidenceFile(
       required(environment, "ZONE4YOU_DNS_BASELINE_EVIDENCE_PATH"),
       "DNS rollback baseline evidence",
+      true,
     ),
     alertDelivery: evidenceFile(required(environment, "ZONE4YOU_ALERT_EVIDENCE_PATH"), "alert evidence"),
   };
