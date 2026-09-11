@@ -1475,6 +1475,14 @@ function LessonModal({
                 <Check size={16} />
                 {t("status.reserved")}
               </button>
+            ) : businessRulesStatus !== "demo" && lesson.canCurrentUserReserve === false ? (
+              <button className="btn btn-outline" disabled>
+                {t("lesson.notEligible")}
+              </button>
+            ) : businessRulesStatus !== "demo" && lesson.canCurrentUserReserve === undefined ? (
+              <button className="btn btn-outline" disabled>
+                {t("lesson.eligibilityUnavailable")}
+              </button>
             ) : isFull && waitlistEnabled ? (
               <button className="btn btn-primary" onClick={onWaitlist} disabled={actionBusy}>
                 {actionBusy ? <Loader2 className="spin" size={16} /> : <Clock size={16} />}

@@ -45,6 +45,7 @@ export interface Lesson {
   capacity: number;
   occupiedCount: number;
   availableCount?: number;
+  canCurrentUserReserve?: boolean;
   priceKc: number;
   reservationOpensAt?: ISODateTime;
   reservationClosesAt?: ISODateTime;

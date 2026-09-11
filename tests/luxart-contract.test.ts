@@ -57,6 +57,16 @@ test("maps every Luxart lesson occurrence without a fixed room union", () => {
   assert.equal(documentedFractionalTimestamp.startsAt, "2026-09-11T15:20:08.925Z");
 });
 
+test("maps Luxart personalized lesson eligibility only from binary user_posible values", () => {
+  assert.equal(mapLuxartLesson({ ...baseLesson, user_posible: 1 }).canCurrentUserReserve, true);
+  assert.equal(mapLuxartLesson({ ...baseLesson, user_posible: 0 }).canCurrentUserReserve, false);
+  assert.equal(mapLuxartLesson({ ...baseLesson, user_posible: null }).canCurrentUserReserve, undefined);
+  assert.throws(
+    () => mapLuxartLesson({ ...baseLesson, user_posible: 2 }),
+    /user_posible.*binary/i,
+  );
+});
+
 test("Luxart lesson occurrence IDs accept only canonical positive safe integers", () => {
   const startsAt = "2026-09-01T16:30:00+02:00";
   assert.equal(parseLuxartLessonId(`luxart:1:12:321:${startsAt}`)?.serviceId, 321);

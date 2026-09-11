@@ -186,6 +186,14 @@ function requiredNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : Number.NaN;
 }
 
+function optionalLuxartBoolean(value: unknown, field: string) {
+  if (value === undefined || value === null || value === "") return undefined;
+  const parsed = requiredNumber(value);
+  if (parsed === 0) return false;
+  if (parsed === 1) return true;
+  throw new Error(`Luxart ${field} field is not a supported binary value.`);
+}
+
 function positiveSafeInteger(value: number) {
   return Number.isSafeInteger(value) && value > 0;
 }
@@ -377,6 +385,7 @@ export function mapLuxartLesson(data: LuxartLessonData, mapping: LuxartLessonMap
     capacity,
     occupiedCount,
     availableCount,
+    canCurrentUserReserve: optionalLuxartBoolean(data.user_posible, "user_posible"),
     priceKc,
     waitlistEnabled: true,
   };

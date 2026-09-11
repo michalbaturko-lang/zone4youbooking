@@ -234,6 +234,48 @@ test("kredit pod 200 Kč zablokuje rezervaci bez zápisu", async ({ page }) => {
   expect(reservationWrites).toBe(0);
 });
 
+test("personalizovaná způsobilost lekci neschová a bezpečně zablokuje zápis", async ({ page }) => {
+  let eligibility: false | undefined = false;
+  let reservationWrites = 0;
+  page.on("request", (request) => {
+    if (request.method() === "POST" && new URL(request.url()).pathname === "/api/reservations") {
+      reservationWrites += 1;
+    }
+  });
+  await page.route("**/api/booking/snapshot**", async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    body.capabilities.businessRulesStatus = "confirmed";
+    body.lessons = body.lessons.map((lesson: Record<string, unknown>) => ({
+      ...lesson,
+      canCurrentUserReserve: eligibility,
+    }));
+    await route.fulfill({ response, json: body });
+  });
+  await openCleanDemo(page);
+
+  await page.getByRole("button", { name: "Přihlásit se" }).first().click();
+  const loginDialog = page.getByRole("dialog", { name: "Přihlášení" });
+  await loginDialog.getByLabel("Příjmení, e-mail nebo login").fill("Nováková");
+  await loginDialog.getByLabel("Heslo", { exact: true }).fill("2048");
+  await loginDialog.getByRole("button", { name: "Přihlásit se" }).click();
+
+  const firstLesson = page.locator(".lesson-row").first();
+  await expect(firstLesson).toBeVisible();
+  await firstLesson.click();
+  let lessonDialog = page.getByRole("dialog");
+  await expect(lessonDialog.getByRole("button", { name: "Tuto lekci nelze rezervovat pro váš účet" })).toBeDisabled();
+  await lessonDialog.getByRole("button", { name: "Zavřít" }).first().click();
+
+  eligibility = undefined;
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Odhlásit" })).toBeVisible();
+  await page.locator(".lesson-row").first().click();
+  lessonDialog = page.getByRole("dialog");
+  await expect(lessonDialog.getByRole("button", { name: "Možnost rezervace se nepodařila ověřit" })).toBeDisabled();
+  expect(reservationWrites).toBe(0);
+});
+
 test("session přežije reload a logout odstraní klienta i přístup k rezervacím", async ({ page }, testInfo) => {
   const browserErrors = captureUnexpectedBrowserErrors(page);
   await openCleanDemo(page);

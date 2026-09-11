@@ -81,6 +81,8 @@
   "lesson.waitlistLeave": "Ukončit hlídání místa",
   "lesson.reservationLater": "Rezervace bude otevřená později",
   "lesson.bookingUnavailable": "Booking je dočasně pouze pro čtení",
+  "lesson.notEligible": "Tuto lekci nelze rezervovat pro váš účet",
+  "lesson.eligibilityUnavailable": "Možnost rezervace se nepodařila ověřit",
   "lesson.insufficientCredit": "Je potřeba alespoň {amount} kreditu",
   "lesson.reserve": "Rezervovat",
   "favorite.add": "Přidat do oblíbených",

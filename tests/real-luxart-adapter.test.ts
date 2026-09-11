@@ -19,7 +19,15 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
   let watchdogDeleted = false;
   let delayReservationPost = false;
   let redirectFollowed = false;
-  let malformedRead: "lessons" | "duplicate-lessons" | "reservations" | "watchdog" | "credit" | undefined;
+  let malformedRead:
+    | "lessons"
+    | "duplicate-lessons"
+    | "missing-user-possible"
+    | "blocked-user"
+    | "reservations"
+    | "watchdog"
+    | "credit"
+    | undefined;
   let malformedMutation:
     | "reservation-create"
     | "reservation-cancel"
@@ -58,6 +66,7 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
     kapacita: 14,
     obsazeno: 9,
     volno: 5,
+    user_posible: 1,
     cislo_salu: 2,
     typ_lekce: 8,
   };
@@ -135,6 +144,15 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
       }
       if (malformedRead === "duplicate-lessons") {
         response.end(JSON.stringify([lesson, { ...lesson, cislo_salu: 3 }]));
+        return;
+      }
+      if (malformedRead === "missing-user-possible") {
+        const { user_posible: _ignored, ...withoutEligibility } = lesson;
+        response.end(JSON.stringify([withoutEligibility]));
+        return;
+      }
+      if (malformedRead === "blocked-user") {
+        response.end(JSON.stringify([{ ...lesson, user_posible: 0 }]));
         return;
       }
       response.end(JSON.stringify([
@@ -364,6 +382,20 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
       error.code === "LUXART_RESPONSE_INVALID",
   );
   assert.equal(reservationPostCount, postsBeforeDuplicateLesson);
+  malformedRead = undefined;
+
+  for (const [mode, code] of [
+    ["missing-user-possible", "LESSON_ELIGIBILITY_UNKNOWN"],
+    ["blocked-user", "CLIENT_NOT_ELIGIBLE"],
+  ] as const) {
+    malformedRead = mode;
+    const postsBeforeEligibilityCheck = reservationPostCount;
+    await assert.rejects(
+      adapter.createReservation({ lessonId: lessons[0].id }),
+      (error: unknown) => error instanceof BookingApiError && error.code === code,
+    );
+    assert.equal(reservationPostCount, postsBeforeEligibilityCheck);
+  }
   malformedRead = undefined;
 
   for (const endpoint of ["lessons", "reservations", "watchdog", "credit"] as const) {
@@ -674,6 +706,7 @@ test("fails closed before a reservation when credit, capacity or booking window 
   rejectsWithCode({ ...lesson, occupiedCount: 10 }, user, "LESSON_FULL");
   rejectsWithCode({ ...lesson, capacity: 0, occupiedCount: 0 }, user, "LESSON_FULL");
   rejectsWithCode({ ...lesson, availableCount: 0 }, user, "LESSON_FULL");
+  rejectsWithCode({ ...lesson, canCurrentUserReserve: false }, user, "CLIENT_NOT_ELIGIBLE");
   rejectsWithCode({ ...lesson, startsAt: "2026-09-01T11:00:00.000Z" }, user, "RESERVATION_NOT_OPEN");
   rejectsWithCode({ ...lesson, startsAt: "2026-08-30T09:59:59.000Z" }, user, "RESERVATION_CLOSED");
 });

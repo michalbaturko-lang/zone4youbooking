@@ -66,6 +66,8 @@ const englishApiErrors: Record<string, string> = {
   RESERVATION_NOT_OPEN: "Booking for this class is not open yet.",
   RESERVATION_CLOSED: "This class can no longer be booked.",
   LESSON_FULL: "This class is full.",
+  CLIENT_NOT_ELIGIBLE: "This class is not available for your account.",
+  LESSON_ELIGIBILITY_UNKNOWN: "Booking eligibility for this class could not be verified.",
   BOOKING_READ_ONLY: "Booking is temporarily read-only. Reception can help you.",
   RESERVATION_NOT_FOUND: "The booking could not be found.",
   CANCELLATION_REJECTED: "This booking could not be cancelled.",

@@ -39,6 +39,7 @@ export function assertLessonFeedWithinQuery(lessons: Lesson[], query: LessonQuer
         lesson.availableCount > lesson.capacity ||
         lesson.occupiedCount + lesson.availableCount > lesson.capacity
       )) ||
+      (lesson.canCurrentUserReserve !== undefined && typeof lesson.canCurrentUserReserve !== "boolean") ||
       !Number.isFinite(lesson.priceKc) || lesson.priceKc < 0 ||
       typeof lesson.waitlistEnabled !== "boolean"
     ) {

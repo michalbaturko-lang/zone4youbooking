@@ -81,6 +81,8 @@
   "lesson.waitlistLeave": "Stop watching this class",
   "lesson.reservationLater": "Booking will open later",
   "lesson.bookingUnavailable": "Booking is temporarily read-only",
+  "lesson.notEligible": "This class is not available for your account",
+  "lesson.eligibilityUnavailable": "Booking eligibility could not be verified",
   "lesson.insufficientCredit": "At least {amount} credit is required",
   "lesson.reserve": "Book",
   "favorite.add": "Add to favorites",

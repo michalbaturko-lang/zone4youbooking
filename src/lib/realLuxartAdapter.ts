@@ -393,6 +393,13 @@ export function assertReservationPreconditions(lesson: Lesson, user: User, now =
   if (startTime - nowTime > bookingRules.reservationWindowHours * 60 * 60 * 1000) {
     throw new BookingApiError(409, "RESERVATION_NOT_OPEN", "Rezervace této lekce ještě není otevřená.");
   }
+  if (lesson.canCurrentUserReserve === false) {
+    throw new BookingApiError(
+      409,
+      "CLIENT_NOT_ELIGIBLE",
+      "Tuto lekci nelze pro váš účet rezervovat.",
+    );
+  }
 
   const availableCount = availablePlacesForLesson(lesson);
   const capacityInvalidOrFull =
@@ -614,6 +621,13 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
       });
       const lesson = lessons.find((candidate) => candidate.id === _input.lessonId);
       if (!lesson) throw new BookingApiError(404, "LESSON_NOT_FOUND", "Lekce už není v aktuálním rozvrhu.");
+      if (lesson.canCurrentUserReserve === undefined) {
+        throw new BookingApiError(
+          502,
+          "LESSON_ELIGIBILITY_UNKNOWN",
+          "Luxart nepotvrdil, zda lze lekci pro tento účet rezervovat.",
+        );
+      }
 
       const user = await this.getCurrentUser();
       if (!user || user.id !== userId) {

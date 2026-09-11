@@ -102,6 +102,7 @@ test("runtime feed rejects ambiguous or structurally invalid Luxart occurrences"
     { occupiedCount: 7 },
     { availableCount: -1 },
     { availableCount: 7 },
+    { canCurrentUserReserve: "yes" },
     { priceKc: Number.NaN },
     { waitlistEnabled: undefined },
   ]) {
