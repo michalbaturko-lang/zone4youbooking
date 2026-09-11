@@ -925,6 +925,13 @@ button:disabled {
   margin: 16px 0 4px;
 }
 
+.profile-card h3,
+.profile-card p,
+.profile-details dd {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
 .profile-card p {
   color: var(--gray-500);
 }

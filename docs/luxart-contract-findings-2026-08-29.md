@@ -20,6 +20,7 @@ Aktualizace: 2026-08-29
 - Aplikace nyní podporuje oddělenou serverovou gateway autentizaci `none` / Basic / Bearer / vlastní `X-*` hlavičku. Režim musí potvrdit IT a tajné hodnoty patří pouze do secret store; klientský login se pro gateway autentizaci nikdy nepoužije. Outbound adapter odmítá redirect, aby gateway hlavičku nepřenesl na jiný cíl.
 - Vstupní časy lekcí, rezervací, historie kreditu a watchdogu jsou validované stejně přísně. Neexistující kalendářní datum, čas bez zóny ani nepřípustný UTC offset se nesmí tiše převést podle časové zóny serveru.
 - Odpověď `GET api/User` musí vrátit stejné `user_id`, jaké je v podepsané session a query. Neshoda se odmítne před zobrazením profilu, kreditu nebo kreditní historie.
+- Zobrazované texty z API mají podle pole omezený typ a délku; řídicí znaky se odmítnou, zatímco víceřádkový popis lekce zůstává podporovaný.
 - Do vyjasnění se žádné heslo ani hash nesmí zapisovat do logu, repozitáře, URL monitoringu nebo browser storage.
 
 ## Kontrakt pro všechny lekce

@@ -85,6 +85,22 @@ test("keeps unknown rooms and lesson types visible with safe fallbacks", () => {
   assert.equal(lesson.category, "Ostatní");
 });
 
+test("bounds Luxart lesson text without rejecting ordinary multiline descriptions", () => {
+  assert.equal(
+    mapLuxartLesson({ ...baseLesson, popis: "První řádek\nDruhý řádek" }).description,
+    "První řádek\nDruhý řádek",
+  );
+  for (const invalid of [
+    { nazev: "x".repeat(201) },
+    { popis: "x".repeat(8_001) },
+    { osloveni: "Instruktor\nPodvržený řádek" },
+    { pohlavi: "x".repeat(33) },
+    { nazev: 42 as unknown as string },
+  ]) {
+    assert.throws(() => mapLuxartLesson({ ...baseLesson, ...invalid }), /Luxart text field/i);
+  }
+});
+
 test("rejects malformed required Luxart lesson values instead of coercing them to zero", () => {
   for (const invalid of [
     { resort: 0 },
@@ -170,6 +186,16 @@ test("rejects a Luxart user without a valid positive ID and finite credit", () =
     () => mapLuxartUser({ user_id: Number.MAX_SAFE_INTEGER + 1, current_balance: 500 }),
     /invalid required fields/i,
   );
+  for (const invalid of [
+    { email: "x".repeat(255) },
+    { name: "Test\nPodvržený řádek" },
+    { membership: 42 as unknown as string },
+  ]) {
+    assert.throws(
+      () => mapLuxartUser({ user_id: 42, current_balance: 500, ...invalid }),
+      /Luxart text field/i,
+    );
+  }
 });
 
 test("maps an active reservation back to the same Luxart lesson occurrence", () => {
@@ -212,6 +238,10 @@ test("maps an active reservation back to the same Luxart lesson occurrence", () 
   }
   assert.throws(() => mapLuxartReservation(source, "invalid-user", 1), /invalid/i);
   assert.throws(() => mapLuxartReservation({ ...source, resort: 2 }, "42", 1), /invalid/i);
+  assert.throws(
+    () => mapLuxartReservation({ ...source, uuid: "x".repeat(257) }, "42", 1),
+    /Luxart text field/i,
+  );
 });
 
 test("derives running credit balances from newest Luxart history entry", () => {
@@ -282,6 +312,10 @@ test("derives running credit balances from newest Luxart history entry", () => {
   assert.throws(
     () => mapLuxartCreditHistory([{ ...validEntry, resort: 2 }], "42", 1_400, 1),
     /invalid/i,
+  );
+  assert.throws(
+    () => mapLuxartCreditHistory([{ ...validEntry, text: "x".repeat(1_001) }], "42", 1_400, 1),
+    /Luxart text field/i,
   );
 });
 

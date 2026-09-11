@@ -160,8 +160,17 @@ export interface LuxartPaymentResult {
   id_mp: number;
 }
 
-function text(value: unknown, fallback: string) {
+function text(value: unknown, fallback: string, maximumLength: number, multiline = false) {
+  if (value !== undefined && value !== null && typeof value !== "string") {
+    throw new Error("Luxart text field has an invalid type.");
+  }
   const normalized = typeof value === "string" ? value.trim() : "";
+  const invalidControlCharacters = multiline
+    ? /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/
+    : /[\u0000-\u001f\u007f]/;
+  if (normalized.length > maximumLength || invalidControlCharacters.test(normalized)) {
+    throw new Error("Luxart text field exceeds its safe display bounds.");
+  }
   return normalized || fallback;
 }
 
@@ -276,18 +285,21 @@ export function mapLuxartUser(data: LuxartUserData): User {
     throw new Error("Luxart user contains invalid required fields.");
   }
 
-  const firstName = text(data.name, "");
-  const surname = text(data.surname, "");
-  const fullName = `${firstName} ${surname}`.trim() || text(data.login, "Klient Zone4You");
+  const firstName = text(data.name, "", 120);
+  const surname = text(data.surname, "", 120);
+  const email = text(data.email, "", 254);
+  const login = text(data.login, email, 254);
+  const fullName = `${firstName} ${surname}`.trim() || login || "Klient Zone4You";
+  const memberCard = text(data.member_card, "", 128);
 
   return {
     id: String(userId),
-    login: text(data.login, text(data.email, "")),
+    login,
     fullName,
-    email: text(data.email, ""),
-    phone: text(data.phone, "") || undefined,
-    memberCardNumber: text(data.member_card_number, text(data.member_card, "")) || undefined,
-    membership: text(data.membership, "") || undefined,
+    email,
+    phone: text(data.phone, "", 64) || undefined,
+    memberCardNumber: text(data.member_card_number, memberCard, 128) || undefined,
+    membership: text(data.membership, "", 160) || undefined,
     creditBalanceKc,
   };
 }
@@ -328,7 +340,7 @@ export function mapLuxartLesson(data: LuxartLessonData, mapping: LuxartLessonMap
     throw new Error("Luxart lesson duration produces an invalid end time.");
   }
   const endsAt = endsAtDate.toISOString();
-  const name = text(data.nazev, `Lekce ${serviceId}`);
+  const name = text(data.nazev, `Lekce ${serviceId}`, 200);
   const roomFromConfig = mapping.roomNames?.[String(roomNumber)];
   const roomName =
     roomFromConfig ??
@@ -352,13 +364,13 @@ export function mapLuxartLesson(data: LuxartLessonData, mapping: LuxartLessonMap
     serviceId: String(serviceId),
     luxartCategoryId: categoryId,
     luxartRoomNumber: roomNumber,
-    luxartGender: text(data.pohlavi, "") || undefined,
+    luxartGender: text(data.pohlavi, "", 32) || undefined,
     name,
-    description: text(data.popis, ""),
+    description: text(data.popis, "", 8_000, true),
     startsAt,
     endsAt,
     durationMinutes,
-    instructorName: text(data.osloveni, "Instruktor Zone4You"),
+    instructorName: text(data.osloveni, "Instruktor Zone4You", 160),
     instructorSpecialization: "Instruktor lekce",
     roomName,
     category,
@@ -626,13 +638,16 @@ export function mapLuxartReservation(
     status: "active",
     reservedAt: startsAt.toISOString(),
     priceKc,
-    luxartUuid: text(data.uuid, "") || undefined,
+    luxartUuid: text(data.uuid, "", 256) || undefined,
     luxartCategoryId: categoryId,
   };
 }
 
 function creditTransactionType(entry: LuxartPaymentHistory): CreditTransactionType {
-  const description = text(entry.text, "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const description = text(entry.text, "", 1_000, true)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
   if (number(entry.sportoviste) === 1010 || description.includes("dobiti") || description.includes("kredit")) {
     return "topup";
   }
@@ -697,7 +712,7 @@ export function mapLuxartCreditHistory(
         amountKc,
         balanceAfterKc: balance,
         occurredAt,
-        note: text(entry.text, text(entry.uhrada, "")) || undefined,
+        note: text(entry.text, text(entry.uhrada, "", 1_000, true), 1_000, true) || undefined,
       };
       balance -= amountKc;
       if (!Number.isFinite(balance)) {
