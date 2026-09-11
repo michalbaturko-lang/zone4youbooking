@@ -248,6 +248,11 @@ function hasMinimumCredit(creditBalanceKc: number, rules: BookingRules) {
   return Number.isFinite(creditBalanceKc) && creditBalanceKc >= rules.minimumCreditForReservationKc;
 }
 
+function isReformerLesson(lesson: Lesson) {
+  return [lesson.name, lesson.category, lesson.roomName]
+    .some((value) => value.toUpperCase().includes("REFORMER"));
+}
+
 function addDaysToKey(dayKey: string, offset: number) {
   return addZone4YouCalendarDays(dayKey, offset);
 }
@@ -963,6 +968,7 @@ export default function Home() {
                       const lesson = lessonById.get(reservation.lessonId);
                       const cancellationOpen = capabilities.reservationsEnabled && lesson ? canCancelReservation(lesson) : false;
                       const policyVisible = ["demo", "confirmed"].includes(capabilities.businessRulesStatus);
+                      const reformerDemoPolicyPending = capabilities.businessRulesStatus === "demo" && Boolean(lesson && isReformerLesson(lesson));
                       return (
                         <div className="reservation-card" key={reservation.id}>
                           <div className="reservation-info">
@@ -976,7 +982,7 @@ export default function Home() {
                                   ? t("reservations.hold", { hold: money(reservationHold(reservation, rules), locale) })
                                   : t("reservations.priceOnly", { price: money(reservation.priceKc, locale) })}
                             </p>
-                            {lesson && policyVisible && (
+                            {lesson && policyVisible && !reformerDemoPolicyPending && (
                               <span className="reservation-note">
                                 {t("reservations.freeCancelUntil", { deadline: formatDateTime(freeCancellationDeadline(lesson, rules), locale) })}
                               </span>
@@ -984,7 +990,9 @@ export default function Home() {
                             {capabilities.businessRulesStatus !== "confirmed" && (
                               <span className="reservation-note">
                                 {capabilities.businessRulesStatus === "demo"
-                                  ? t("reservations.demoPolicy")
+                                  ? reformerDemoPolicyPending
+                                    ? t("reservations.reformerPolicyPending")
+                                    : t("reservations.demoPolicy")
                                   : t("reservations.policyPending")}
                               </span>
                             )}
@@ -1353,6 +1361,7 @@ function LessonModal({
   const hasEnoughCredit = creditBalanceKc !== undefined && hasMinimumCredit(creditBalanceKc, rules);
   const actionBusy = busy === `reserve-${lesson.id}` || busy === `waitlist-${lesson.id}`;
   const policyVisible = ["demo", "confirmed"].includes(businessRulesStatus);
+  const reformerDemoPolicyPending = businessRulesStatus === "demo" && isReformerLesson(lesson);
   const titleId = useId();
   const { dialogRef, onDialogKeyDown } = useAccessibleModal(onClose, "[data-modal-initial-focus]");
 
@@ -1428,26 +1437,31 @@ function LessonModal({
               <span className="modal-info-label">{t("lesson.price")}</span>
               <span className="modal-info-value">{money(lesson.priceKc, locale)}</span>
             </div>
-            {policyVisible ? (
-              <>
-                <div className="modal-info-row">
-                  <span className="modal-info-label">{t("lesson.creditHold")}</span>
-                  <span className="modal-info-value">{money(rules.reservationHoldKc, locale)}</span>
-                </div>
+            {policyVisible && (
+              <div className="modal-info-row">
+                <span className="modal-info-label">{t("lesson.creditHold")}</span>
+                <span className="modal-info-value">{money(rules.reservationHoldKc, locale)}</span>
+              </div>
+            )}
+            {policyVisible && !reformerDemoPolicyPending ? (
                 <div className="modal-info-row">
                   <span className="modal-info-label">{t("lesson.cancelOnline")}</span>
                   <span className="modal-info-value">
                     {t("lesson.freeCancelUntil", { date: formatDateTime(freeCancellationDeadline(lesson, rules), locale) })}
                   </span>
                 </div>
-              </>
+            ) : reformerDemoPolicyPending ? (
+              <div className="modal-info-row">
+                <span className="modal-info-label">{t("lesson.bookingPolicy")}</span>
+                <span className="modal-info-value">{t("lesson.reformerPolicyPending")}</span>
+              </div>
             ) : (
               <div className="modal-info-row">
                 <span className="modal-info-label">{t("lesson.bookingPolicy")}</span>
                 <span className="modal-info-value">{t("lesson.policyPending")}</span>
               </div>
             )}
-            {businessRulesStatus === "demo" && (
+            {businessRulesStatus === "demo" && !reformerDemoPolicyPending && (
               <div className="modal-info-row">
                 <span className="modal-info-label">{t("lesson.bookingPolicy")}</span>
                 <span className="modal-info-value">{t("lesson.demoPolicy")}</span>

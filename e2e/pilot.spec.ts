@@ -69,6 +69,12 @@ test("zobrazí všech 24 lekcí, všechny sály a Reformer bez browser chyby", {
     expect(label).toContain("REFORMER");
   }
 
+  await reformerLessons.first().click();
+  const reformerDialog = page.getByRole("dialog", { name: "REFORMER" });
+  await expect(reformerDialog.getByText("Storno Reformeru čeká na potvrzení", { exact: false })).toBeVisible();
+  await expect(reformerDialog.getByText("Bezplatné storno", { exact: true })).toHaveCount(0);
+  await reformerDialog.getByRole("button", { name: "Zavřít" }).first().click();
+
   const viewportOverflow = await page.evaluate(() => ({
     width: window.innerWidth,
     documentWidth: document.documentElement.scrollWidth,
@@ -342,6 +348,13 @@ test("angličtina a oblíbené lekce přežijí reload", { tag: "@preview" }, as
   for (const roomName of ["Studio 1", "Studio 2", "Studio 3", "Reformer"]) {
     await expect(englishRoomFilter.getByRole("button", { name: roomName, exact: true })).toBeVisible();
   }
+  await englishRoomFilter.getByRole("button", { name: "Reformer", exact: true }).click();
+  const englishReformer = page.locator(".lesson-row").filter({ hasText: "REFORMER" }).first();
+  await englishReformer.click();
+  const englishReformerDialog = page.getByRole("dialog", { name: "REFORMER" });
+  await expect(englishReformerDialog.getByText("Reformer cancellation terms are awaiting confirmation", { exact: false })).toBeVisible();
+  await expect(englishReformerDialog.getByText("Free cancellation", { exact: true })).toHaveCount(0);
+  await englishReformerDialog.getByRole("button", { name: "Close" }).first().click();
   await page.reload();
   await expect(englishNavigation.getByRole("button", { name: "Schedule", exact: true })).toBeVisible();
 

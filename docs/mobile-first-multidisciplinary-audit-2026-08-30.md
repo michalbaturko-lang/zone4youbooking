@@ -10,13 +10,14 @@
 
 Základ produktu je technicky vyspělý: rozvrh, přihlášení, kredit, rezervace, storno, oblíbené, CZ/EN, bezpečné session, idempotence zápisů, read-only fallback, release gate a rollback kontrakt už existují. Demo feed obsahuje 24 výskytů, všechny tři sály a 3 Reformery v přesném sedmidenním rozsahu.
 
-Audit našel a lokálně opravil pět důležitých mezer:
+Audit našel a lokálně opravil šest důležitých mezer:
 
 1. dotykové cíle 30–40 px byly zvětšeny na minimálně 44 × 44 px;
 2. landscape 844 × 390 původně schoval celý rozvrh pod filtry; kompaktní landscape režim nyní ukáže tabulku už v prvním viewportu;
 3. povinná angličtina měla české serverové chyby; anglický klient nyní používá bezpečné anglické texty podle kódu a nepropouští český upstream text;
 4. bezplatný storno limit byl chybně použit jako úplné uzavření storna; nyní je oddělen bezplatný cutoff od samotné možnosti storna a UI umí pravdivě oznámit skutečný poplatek vrácený Luxartem;
 5. dlouhá session-expiry hláška na 320px telefonu a nízkém landscape překrývala login dialog; při souběhu nyní dostane hláška vyhrazený horní prostor a dialog bezpečně scrolluje pod ní.
+6. demo přenášelo půlnoční storno běžných lekcí i na Reformer; CZ/EN detail nyní jeho pravidlo výslovně označí za nepotvrzené a živý booking bez úplného profilu zůstává vypnutý.
 
 Živý start stále blokují externí důkazy: přístup k Zone4You API, mapování sálů, povolený test rezervace/storna, výše pozdního storna a no-show, pravidlo Reformeru, rezervační okno, chování kreditu, pilotní uživatelé/support, produkční DNS/TLS, PostgreSQL, alerty, UAT a rollback drill.
 

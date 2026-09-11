@@ -59,6 +59,7 @@ Poznámka: audit neprovedl vytvoření ani zrušení skutečné rezervace. Tyto 
 - fail-closed live capability přepínače: produkční top-up je skrytý a `BOOKING_MUTATIONS_ENABLED=false` poskytuje okamžitý read-only rollback;
 - verzovaný business-rule profil už zapisuje bezplatné běžné storno do `00:00 Europe/Prague` na začátku dne lekce a drží live rezervace vypnuté, dokud Zone4You písemně nepotvrdí pozdní/no-show částky, možnost pozdního online storna, Reformer, rezervační okno a kreditní mechaniku; aktivace vyžaduje shodu implementace, stav `confirmed`, `BOOKING_RULES_CONFIRMED=true` a SHA-256 přesného profilu;
 - read-only UI nezobrazuje historické předpoklady 48 h / 4 h / 100 Kč jako fakta; demo je výslovně označuje jako ukázkové hodnoty;
+- demo v CZ i EN odděluje nepotvrzené storno Reformeru od známé půlnoci běžných lekcí; Reformer proto nedostane falešný bezplatný cutoff a živé mutace bez úplného profilu neprojdou;
 - perzistentní PostgreSQL booking ledger: `Idempotency-Key`, serializace mutací jednoho klienta, replay stejného výsledku a blokace slepého opakování po nejasném Luxart timeoutu;
 - atomický PostgreSQL rate limit pro login a mutace sdílený mezi serverless/multi-instance procesy; při výpadku ochrany požadavek fail-closed odmítne a readiness přejde do `not_ready`;
 - Vercel rate-limit klíč používá pouze validovanou platformní klientskou IP z `x-vercel-forwarded-for`; obecné podvržené proxy hlavičky se v hostovaném runtime ignorují;
