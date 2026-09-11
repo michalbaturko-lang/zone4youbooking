@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -144,6 +144,15 @@ function validFixture() {
       paymentsDisabled: true,
       requestIds: Array.from({ length: 7 }, (_, index) => `rollback-request-${index}`),
     },
+    dnsRollbackBaseline: {
+      schemaVersion: 1,
+      ok: true,
+      checkedAt,
+      hostname: "booking.zone4you.cz",
+      records: [{ type: "A", address: "203.0.113.10" }],
+      recordSetSha256: "d941c237381b8d932e810d95fefde01e79b336168fd2cf483ea709b792615511",
+      rollbackReady: true,
+    },
     alertDelivery: {
       ok: true,
       checkedAt,
@@ -162,8 +171,9 @@ function validFixture() {
       return [name, { path, sha256: writeJson(path, value) }];
     }),
   );
+  chmodSync(artifacts.dnsRollbackBaseline.path, 0o600);
   const dossier = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     draft: false,
     releaseId: "zone4you-pilot-2026-09-05",
     target: "https://booking.zone4you.cz/",
@@ -218,17 +228,23 @@ function validFixture() {
   return { directory, dossier, dossierPath, files, environment };
 }
 
-test("pilot release dossier binds live Luxart, full lesson feed, UAT, rollback, alert and cutover approval", () => {
+test("pilot release dossier binds live Luxart, UAT, application and DNS rollback, alert and cutover approval", () => {
   const fixture = validFixture();
   const result = verifyPilotReleaseEvidence(fixture.environment, now);
   assert.equal(result.ok, true);
   assert.equal(result.conditions.fullLessonFeedMatched, true);
   assert.equal(result.conditions.exactSevenDayPragueRangeVerified, true);
+  assert.equal(result.conditions.dnsRollbackBaselineReady, true);
   assert.equal(result.conditions.explicitCutoverApproval, true);
   assert.equal(result.paymentsIncluded, false);
-  assert.equal(result.artifacts.length, 5);
+  assert.equal(result.artifacts.length, 6);
   assert.equal(JSON.stringify(result).includes("approvedBy"), false);
   assert.equal(JSON.stringify(result).includes(fixture.dossierPath), false);
+  chmodSync(fixture.dossier.artifacts.dnsRollbackBaseline.path, 0o644);
+  assert.throws(
+    () => verifyPilotReleaseEvidence(fixture.environment, now),
+    /dnsRollbackBaseline must not be accessible/i,
+  );
 });
 
 test("pilot release dossier rejects evidence that cannot come from the real guarded producers", () => {
@@ -246,6 +262,13 @@ test("pilot release dossier rejects evidence that cannot come from the real guar
         delete artifact.requestIds;
       },
       /rollback requestIds must be an array/i,
+    ],
+    [
+      "dnsRollbackBaseline",
+      (artifact: Record<string, unknown>) => {
+        artifact.recordSetSha256 = "b".repeat(64);
+      },
+      /record-set SHA-256 does not match/i,
     ],
     [
       "alertDelivery",

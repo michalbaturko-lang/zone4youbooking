@@ -13,11 +13,18 @@ function fixture() {
   const directory = mkdtempSync(join(tmpdir(), "zone4you-dossier-preparation-"));
   const checkedAt = "2026-09-05T07:30:00.000Z";
   const evidencePaths = Object.fromEntries(
-    ["luxart", "runtime", "booking", "rollback", "alert"].map((name) => {
+    ["luxart", "runtime", "booking", "rollback", "dns", "alert"].map((name) => {
       const path = join(directory, `${name}.json`);
       writeFileSync(path, `${JSON.stringify({
         ok: true,
         checkedAt,
+        ...(name === "dns" ? {
+          schemaVersion: 1,
+          hostname: "booking.zone4you.cz",
+          records: [{ type: "A", address: "203.0.113.10" }],
+          recordSetSha256: "not-validated-during-preparation",
+          rollbackReady: true,
+        } : {}),
         ...(name === "alert" ? { eventId: "da7a9313-19f9-4338-b15e-0d129364b7ee" } : {}),
       })}\n`, "utf8");
       return [name, path];
@@ -37,6 +44,7 @@ function fixture() {
     ZONE4YOU_RUNTIME_EVIDENCE_PATH: evidencePaths.runtime,
     ZONE4YOU_BOOKING_UAT_EVIDENCE_PATH: evidencePaths.booking,
     ZONE4YOU_ROLLBACK_EVIDENCE_PATH: evidencePaths.rollback,
+    ZONE4YOU_DNS_BASELINE_EVIDENCE_PATH: evidencePaths.dns,
     ZONE4YOU_ALERT_EVIDENCE_PATH: evidencePaths.alert,
   } satisfies Record<string, string | undefined>;
   return { directory, evidencePaths, environment, outputPath };
@@ -58,7 +66,7 @@ test("dossier preparation hashes real evidence but remains an explicit human-app
 
   assert.equal(result.ok, true);
   assert.equal(result.draft, true);
-  assert.equal(result.artifactCount, 5);
+  assert.equal(result.artifactCount, 6);
   assert.equal(result.dossierSha256, createHash("sha256").update(body).digest("hex"));
   assert.equal(dossier.draft, true);
   assert.equal(dossier.approvals.uat.decision, "NO-GO");

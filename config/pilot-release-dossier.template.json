@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "draft": true,
   "releaseId": "zone4you-pilot-2026-09-05",
   "target": "https://booking.zone4you.cz/",
@@ -27,6 +27,10 @@
     },
     "rollback": {
       "path": "/secure/release-evidence/readonly-rollback.json",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "dnsRollbackBaseline": {
+      "path": "/secure/release-evidence/production-dns-baseline.json",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
     },
     "alertDelivery": {

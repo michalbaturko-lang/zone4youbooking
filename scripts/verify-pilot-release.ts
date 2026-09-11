@@ -6,6 +6,7 @@ import { assertConfirmedLuxartGatewayAuth, type LuxartGatewayAuthMode } from "..
 import { bookingRules } from "../src/lib/bookingRules";
 import { rateLimitRuntimeReady } from "../src/lib/rateLimit";
 import { zone4YouDateKey, zone4YouScheduleRange, zone4YouTimeZone } from "../src/lib/zone4YouTime";
+import { validateProductionDomainBaselineEvidence } from "./capture-production-domain-baseline";
 
 type Environment = Record<string, string | undefined>;
 type JsonObject = Record<string, unknown>;
@@ -400,7 +401,7 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
   }
 
   const dossier = dossierFile.data;
-  if (dossier.schemaVersion !== 1) throw new Error("release dossier schemaVersion must be 1.");
+  if (dossier.schemaVersion !== 2) throw new Error("release dossier schemaVersion must be 2.");
   falseValue(dossier.draft, "release dossier draft");
   const releaseId = stringValue(dossier.releaseId, "releaseId");
   const target = cleanHttpsOrigin(dossier.target, "target");
@@ -461,6 +462,15 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
   );
   validateBookingUatEvidence(load("bookingMutationUat"), stagingTarget);
   validateRollbackEvidence(load("rollback", Math.min(24, maximumAgeHours)), stagingTarget);
+  const dnsRollbackReference = objectValue(artifacts.dnsRollbackBaseline, "artifacts.dnsRollbackBaseline");
+  const dnsRollbackPathValue = stringValue(dnsRollbackReference.path, "artifacts.dnsRollbackBaseline.path");
+  const dnsRollbackPath = isAbsolute(dnsRollbackPathValue)
+    ? dnsRollbackPathValue
+    : resolve(dossierDirectory, dnsRollbackPathValue);
+  if ((lstatSync(dnsRollbackPath).mode & 0o077) !== 0) {
+    throw new Error("artifacts.dnsRollbackBaseline must not be accessible by group or other users.");
+  }
+  validateProductionDomainBaselineEvidence(load("dnsRollbackBaseline", Math.min(24, maximumAgeHours)));
   const alertEventId = validateAlertEvidence(load("alertDelivery"), stagingTarget);
   if (launchMode === "booking_with_stripe") validateStripeUatEvidence(load("stripeUat"), stagingTarget);
 
@@ -495,6 +505,7 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
       exactSevenDayPragueRangeVerified: true,
       bookingMutationUatPassed: true,
       rollbackUnderFiveMinutes: true,
+      dnsRollbackBaselineReady: true,
       alertReceiptConfirmed: true,
       noOpenP0P1: true,
       memberzoneFallbackAvailable: true,

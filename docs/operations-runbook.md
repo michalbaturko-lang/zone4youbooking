@@ -35,7 +35,7 @@ Všechny běžné JSON mutation endpointy před parsováním zastaví tělo nad 
 12. Pro E3 je přes schválený migrační proces aplikovaný `migrations/002_booking_mutation_ledger.sql`, `npm run test:booking-postgres` prošel proti staging databázi a readiness hlásí `booking=ready`.
 13. Pro E5 je přes schválený migrační proces aplikovaný `migrations/001_payment_ledger.sql`, `npm run test:payments-postgres` prošel proti staging databázi a readiness hlásí `payments=ready`.
 14. Platební produktový profil odpovídá schváleným částkám 500 / 1 000 / 2 000 / 5 000 / 10 000 Kč; aktivace vyžaduje `PAYMENT_PRODUCT_CONFIRMED=true` a přesný hash z `npm run inspect:payment-product` v `PAYMENT_PRODUCT_PROFILE_SHA256`.
-15. Finální `npm run verify:pilot-release` projde pro přesný commit a aktivní launch okno. Validátor porovná SHA-256 uložených Luxart/runtime/UAT/rollback/alert důkazů, vyžádá totožný interval přesně sedmi kalendářních dnů v `Europe/Prague` bez výskytu mimo rozsah, mapování každého živě pozorovaného sálu, shodu rate-limit režimu, fázi, commit i runtime capabilities, nulové P0/P1, ručně potvrzený alert event, dostupný Memberzone fallback a výslovný cutover souhlas. Současný omezený dossier vyžaduje `waitlistEnabled=false`; zapnutí watchdogu potřebuje samostatný živý důkaz a rozšíření release validátoru.
+15. Finální `npm run verify:pilot-release` projde pro přesný commit a aktivní launch okno. Validátor porovná SHA-256 uložených Luxart/runtime/UAT/aplikačního rollbacku/DNS rollback baseline/alert důkazů, vyžádá totožný interval přesně sedmi kalendářních dnů v `Europe/Prague` bez výskytu mimo rozsah, mapování každého živě pozorovaného sálu, shodu rate-limit režimu, fázi, commit i runtime capabilities, nulové P0/P1, ručně potvrzený alert event, dostupný Memberzone fallback a výslovný cutover souhlas. Současný omezený dossier vyžaduje `waitlistEnabled=false`; zapnutí watchdogu potřebuje samostatný živý důkaz a rozšíření release validátoru.
 
 `probe:runtime` odmítne živý paměťový limiter, pokud není společně s doloženou single-instance topologií výslovně nastaveno `PROBE_ALLOW_SINGLE_INSTANCE=true`. Pro Vercel/serverless se používá `rateLimit=postgres`.
 
@@ -43,7 +43,27 @@ Ve fázi `booking_without_payments` vypíše `check:launch` čtyři Stripe infra
 
 ### Finální release dossier
 
-Do schváleného evidence úložiště mimo repozitář uložte nezměněné JSON výstupy `verify:luxart-readonly`, `probe:runtime`, `verify:booking-mutations`, `verify:readonly-rollback` a `verify:alert-delivery`. Jejich cesty, přesný commit, staging/Luxart HTTPS origin a launch okno předejte jednorázovému operátorskému příkazu `npm run prepare:pilot-release`. Příkaz přijme jen pravidelné úspěšné JSON soubory, vypočítá jejich celé SHA-256, odmítne přepsat existující dossier a nový soubor uloží s oprávněním pouze pro vlastníka.
+Do schváleného evidence úložiště mimo repozitář uložte nezměněné JSON výstupy `verify:luxart-readonly`, `probe:runtime`, `verify:booking-mutations`, `verify:readonly-rollback`, `capture:production-domain-baseline` a `verify:alert-delivery`. Jejich cesty, přesný commit, staging/Luxart HTTPS origin a launch okno předejte jednorázovému operátorskému příkazu `npm run prepare:pilot-release`. Příkaz přijme jen pravidelné úspěšné JSON soubory, vypočítá jejich celé SHA-256, odmítne přepsat existující dossier a nový soubor uloží s oprávněním pouze pro vlastníka.
+
+### DNS rollback baseline před cutoverem
+
+Oprávněný operátor nejprve vytvoří mimo repozitář adresář s právy `0700` a zachytí přesné veřejné A/AAAA/CNAME záznamy cílové domény. Příkaz nic nemění, existující soubor nepřepíše a na standardní výstup nevypíše adresy:
+
+```bash
+ZONE4YOU_DNS_BASELINE_OUTPUT_PATH=/secure/release-evidence/production-dns-baseline.json \
+ZONE4YOU_DNS_BASELINE_CAPTURE_CONFIRMATION=CAPTURE_ZONE4YOU_DNS_BASELINE:booking.zone4you.cz \
+npm run capture:production-domain-baseline
+```
+
+Do finálního dossieru se cesta předá v `ZONE4YOU_DNS_BASELINE_EVIDENCE_PATH`. Bezprostředně před první DNS změnou musí operátor použít SHA-256 souboru z potvrzení capture a ověřit, že veřejný record set mezitím nedriftoval:
+
+```bash
+ZONE4YOU_DNS_BASELINE_EVIDENCE_PATH=/secure/release-evidence/production-dns-baseline.json \
+ZONE4YOU_DNS_BASELINE_VERIFY_CONFIRMATION=VERIFY_ZONE4YOU_DNS_BASELINE:<sha256-souboru> \
+npm run verify:production-domain-baseline
+```
+
+Jakákoli odchylka znamená zastavit cutover, zjistit vlastníka změny a až po novém schválení zachytit nový baseline. Soubor obsahuje veřejné DNS adresy potřebné pro přesný návrat, proto se drží owner-only mimo Git. Release validátor přijme baseline starý maximálně 24 hodin.
 
 Vygenerovaný dossier je záměrně `draft: true`, `UAT=NO-GO`, alert receipt nepotvrzený, Memberzone fallback nedostupný a cutover neschválený. Není launch autoritou. Až oprávněné osoby skutečně uzavřou UAT, potvrdí stejné alert event ID, fallback a cutover, doplní své jméno/roli a aktuální čas, lze nastavit `draft: false`. Řetězec `pending-human-approval` finální validátor odmítá. Poté se znovu spočítá SHA celého dossieru, nastaví `ZONE4YOU_RELEASE_DOSSIER_PATH`, `ZONE4YOU_RELEASE_COMMIT` a přesná potvrzovací fráze `VERIFY_ZONE4YOU_RELEASE_DOSSIER:<sha256-dossieru>`. Bez těchto živých lidských kroků `verify:pilot-release` vždy skončí NO-GO.
 

@@ -98,6 +98,10 @@ export function buildPilotReleaseDossier(environment: Environment = process.env)
     runtimeProbe: evidenceFile(required(environment, "ZONE4YOU_RUNTIME_EVIDENCE_PATH"), "runtime evidence"),
     bookingMutationUat: evidenceFile(required(environment, "ZONE4YOU_BOOKING_UAT_EVIDENCE_PATH"), "booking UAT evidence"),
     rollback: evidenceFile(required(environment, "ZONE4YOU_ROLLBACK_EVIDENCE_PATH"), "rollback evidence"),
+    dnsRollbackBaseline: evidenceFile(
+      required(environment, "ZONE4YOU_DNS_BASELINE_EVIDENCE_PATH"),
+      "DNS rollback baseline evidence",
+    ),
     alertDelivery: evidenceFile(required(environment, "ZONE4YOU_ALERT_EVIDENCE_PATH"), "alert evidence"),
   };
   const artifacts: Record<string, { path: string; sha256: string }> = Object.fromEntries(
@@ -116,7 +120,7 @@ export function buildPilotReleaseDossier(environment: Environment = process.env)
   const pendingAt = startsAt.toISOString();
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     draft: true,
     releaseId: required(environment, "ZONE4YOU_RELEASE_ID"),
     target: `${productionTarget}/`,
