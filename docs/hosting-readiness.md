@@ -10,6 +10,7 @@ Read-only kontrola propojeného Vercel projektu potvrdila:
 
 - projekt `zone4youbooking` existuje v aktuálním Vercel týmu;
 - projekt používá Node.js 24.x; repozitář deklaruje framework `nextjs` ve `vercel.json`;
+- CI i balíček jsou uzamčené na stejnou Node.js 24.x větev a CI před E2E výslovně instaluje Chromium se systémovými závislostmi;
 - v projektu není nastavená žádná runtime environment variable;
 - `booking.zone4you.cz` není k projektu připojená ani dostupná jako jeho alias;
 - veřejné DNS pro `booking.zone4you.cz` i `staging.booking.zone4you.cz` už vrací A/AAAA na existující server mimo Vercel; HTTPS certifikát neplatí pro požadovaný hostname a HTTP vrací nginx 404;
