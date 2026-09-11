@@ -6,3 +6,9 @@ out
 .DS_Store
 .env
 .env*.local
+graphify-out/
+src/graphify-out/
+playwright-report/
+test-results/
+release-evidence/
+pilot-release-dossier.local.json

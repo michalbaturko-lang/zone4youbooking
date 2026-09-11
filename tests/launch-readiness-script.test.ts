@@ -1,0 +1,51 @@
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import test from "node:test";
+
+const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+const script = join(repositoryRoot, "scripts", "check-launch-readiness.mjs");
+
+function runLaunchCheck(phase: string, paymentMutationsEnabled: string) {
+  const result = spawnSync(process.execPath, [script], {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      ZONE4YOU_DEPLOYMENT_PHASE: phase,
+      PAYMENT_MUTATIONS_ENABLED: paymentMutationsEnabled,
+    },
+  });
+  return { status: result.status, output: `${result.stdout}\n${result.stderr}` };
+}
+
+test("launch gate treats Stripe as out of scope only for booking_without_payments", () => {
+  const withoutPayments = runLaunchCheck("booking_without_payments", "false");
+  assert.equal(withoutPayments.status, 1);
+  assert.match(withoutPayments.output, /SKIP  Stripe credentials/);
+  assert.match(withoutPayments.output, /SKIP  Payment product sign-off/);
+  assert.match(withoutPayments.output, /SKIP  Durable payment ledger/);
+  assert.match(withoutPayments.output, /PASS  Payment mutation release switch/);
+  assert.match(withoutPayments.output, /PASS  Runtime readiness and region contract/);
+  assert.match(withoutPayments.output, /SKIP  Luxart Stripe payment mapping/);
+  assert.match(withoutPayments.output, /4 Stripe checks are explicitly not applicable/);
+
+  const unsafeWithoutPayments = runLaunchCheck("booking_without_payments", "true");
+  assert.equal(unsafeWithoutPayments.status, 1);
+  assert.match(unsafeWithoutPayments.output, /FAIL  Payment mutation release switch/);
+
+  const withStripe = runLaunchCheck("booking_with_stripe", "false");
+  assert.equal(withStripe.status, 1);
+  assert.match(withStripe.output, /FAIL  Stripe credentials/);
+  assert.match(withStripe.output, /FAIL  Payment product sign-off/);
+  assert.match(withStripe.output, /FAIL  Durable payment ledger/);
+  assert.match(withStripe.output, /FAIL  Payment mutation release switch/);
+  assert.match(withStripe.output, /FAIL  Luxart Stripe payment mapping/);
+  assert.doesNotMatch(withStripe.output, /SKIP  Stripe credentials/);
+
+  const readOnly = runLaunchCheck("read_only", "false");
+  assert.equal(readOnly.status, 1);
+  assert.match(readOnly.output, /FAIL  Payment mutation release switch/);
+  assert.doesNotMatch(readOnly.output, /SKIP  Stripe credentials/);
+});

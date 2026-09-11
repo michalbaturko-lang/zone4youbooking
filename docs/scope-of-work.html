@@ -258,6 +258,8 @@
 
 <div class="container">
 
+  <div class="open-point"><strong>Historický rozsah:</strong> Aktuální scope a release brány určuje launch plán; při konfliktu má novější launch plán přednost. Částky Stripe top-upu v modulu 5 zůstávají potvrzené.</div>
+
   <div class="intro">
     <p><strong>Cíl projektu:</strong> Vytvoření moderního online rezervačního systému pro fitness centrum Zone4You, který nahradí stávající řešení memberzone.cz.</p>
     <p>Nový systém bude napojen na stávající software Luxart a umožní klientům centra pohodlně si prohlížet rozvrh, rezervovat lekce, spravovat kredit a sledovat svou historii — vše v přehledném, velmi vyladěném responsivním webovém rozhraní dostupném z počítače i mobilního telefonu.</p>
@@ -301,10 +303,10 @@
       <li>Rezervace lekce jedním klikem z rozvrhu</li>
       <li>Stržení kreditu v momentě rezervace</li>
       <li>Kontrola dostatečného zůstatku kreditu před rezervací</li>
-      <li>Zrušení rezervace klientem s automatickým vrácením kreditu (min. 4 hodiny předem)</li>
-      <li>Poplatek za pozdní zrušení (méně než 4 hodiny předem) — <strong>100 Kč</strong></li>
+      <li>Zrušení bez storno pokuty do 00:00 na začátku dne lekce (Europe/Prague)</li>
+      <li>Pozdní storno, no-show a Reformer — částky a pravidla čekají na potvrzení</li>
       <li>Penalizace za no-show — <strong>100 Kč</strong></li>
-      <li>Omezení rezervací na 48 hodin dopředu</li>
+      <li>Rezervační okno po písemném potvrzení Zone4You/Luxartu</li>
       <li>Zobrazení seznamu aktivních rezervací klienta ("Moje rezervace")</li>
     </ul>
     <div class="termin">Týden 3–5</div>
@@ -465,7 +467,7 @@
   <div class="section">
     <h2>Předpoklady a součinnost klienta</h2>
     <ul class="required">
-      <li><strong>Luxart API</strong> — čekáme na přístup k API na portu 9759 a aktuální /Help dokumentaci</li>
+      <li><strong>Luxart API</strong> — port 9191 je domluvený ke zveřejnění; čekáme na přesnou /Help URL, potvrzení aktivního přístupu, test DB a auth režimu</li>
       <li><strong>Stripe účet</strong> — API klíče (testovací i produkční) — <span class="waiting">čekáme na klienta</span></li>
       <li><strong>Doména</strong> — potvrzení a nastavení DNS pro booking.zone4you.cz</li>
       <li><strong>HTTPS certifikát</strong> — na serveru, kde poběží aplikace</li>

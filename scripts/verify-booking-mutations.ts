@@ -1,0 +1,415 @@
+import { createHash, randomUUID } from "node:crypto";
+import { pathToFileURL } from "node:url";
+import type { BookingCapabilities, BookingRules, Lesson, Reservation, User } from "../src/lib/domain";
+
+type FetchLike = typeof fetch;
+type Environment = Record<string, string | undefined>;
+
+interface Snapshot {
+  user: User;
+  lessons: Lesson[];
+  reservations: Reservation[];
+  rules: BookingRules;
+  capabilities: BookingCapabilities;
+}
+
+export interface BookingMutationUatConfig {
+  target: URL;
+  login: string;
+  password: string;
+  memberCardNumber?: string;
+  expectedUserId: string;
+  lessonId: string;
+  expectedCancellationFeeKc: number;
+  minimumHoursBeforeStart: number;
+  timeoutMs: number;
+}
+
+interface ApiResult<T> {
+  body: T;
+  status: number;
+  requestId: string;
+  setCookie?: string;
+}
+
+class UatApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    readonly requestId: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+function required(environment: Environment, name: string) {
+  const value = environment[name]?.trim();
+  if (!value) throw new Error(`${name} is required.`);
+  return value;
+}
+
+function exactInteger(environment: Environment, name: string, minimum = 0) {
+  const value = Number(required(environment, name));
+  if (!Number.isSafeInteger(value) || value < minimum) throw new Error(`${name} must be an integer >= ${minimum}.`);
+  return value;
+}
+
+export function loadBookingMutationUatConfig(environment: Environment = process.env): BookingMutationUatConfig {
+  const target = new URL(required(environment, "ZONE4YOU_UAT_APP_URL"));
+  if (target.username || target.password || target.pathname !== "/" || target.search || target.hash) {
+    throw new Error("ZONE4YOU_UAT_APP_URL must be a clean origin ending in / without credentials, query or hash.");
+  }
+  const local = ["localhost", "127.0.0.1", "::1"].includes(target.hostname);
+  if (target.protocol !== "https:" && !(local && environment.ZONE4YOU_UAT_ALLOW_LOCAL_HTTP === "true")) {
+    throw new Error("Mutation UAT requires HTTPS; local HTTP needs ZONE4YOU_UAT_ALLOW_LOCAL_HTTP=true.");
+  }
+  if (target.origin === "https://booking.zone4you.cz") {
+    throw new Error("Mutation UAT refuses the production booking.zone4you.cz origin.");
+  }
+  if (!local && !target.hostname.includes("staging") && !target.hostname.endsWith(".vercel.app")) {
+    throw new Error("Mutation UAT accepts only a local, staging-named or Vercel preview hostname.");
+  }
+  const expectedConfirmation = `ZONE4YOU_TEST_DB_ONLY:${target.origin}`;
+  if (environment.ZONE4YOU_UAT_MUTATION_CONFIRMATION !== expectedConfirmation) {
+    throw new Error(`ZONE4YOU_UAT_MUTATION_CONFIRMATION must exactly equal ${expectedConfirmation}.`);
+  }
+
+  const minimumHoursBeforeStart = Number(environment.ZONE4YOU_UAT_MIN_HOURS_BEFORE_START ?? "6");
+  const timeoutMs = Number(environment.ZONE4YOU_UAT_TIMEOUT_MS ?? "12000");
+  if (!Number.isFinite(minimumHoursBeforeStart) || minimumHoursBeforeStart < 4) {
+    throw new Error("ZONE4YOU_UAT_MIN_HOURS_BEFORE_START must be at least 4 hours.");
+  }
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 30000) {
+    throw new Error("ZONE4YOU_UAT_TIMEOUT_MS must be an integer between 1000 and 30000.");
+  }
+
+  return {
+    target,
+    login: required(environment, "ZONE4YOU_UAT_LOGIN"),
+    password: required(environment, "ZONE4YOU_UAT_PASSWORD"),
+    memberCardNumber: environment.ZONE4YOU_UAT_MEMBER_CARD_NUMBER?.trim() || undefined,
+    expectedUserId: required(environment, "ZONE4YOU_UAT_EXPECTED_USER_ID"),
+    lessonId: required(environment, "ZONE4YOU_UAT_LESSON_ID"),
+    expectedCancellationFeeKc: exactInteger(environment, "ZONE4YOU_UAT_EXPECTED_CANCELLATION_FEE_KC"),
+    minimumHoursBeforeStart,
+    timeoutMs,
+  };
+}
+
+function cookieFromSetCookie(setCookie: string | undefined) {
+  const cookie = setCookie?.split(";", 1)[0]?.trim();
+  if (!cookie?.startsWith("z4y_booking_session=")) throw new Error("Login did not return the signed booking session cookie.");
+  return cookie;
+}
+
+function shortHash(value: string) {
+  return createHash("sha256").update(value, "utf8").digest("hex").slice(0, 16);
+}
+
+export function redactUatSecrets(message: string, environment: Environment = process.env) {
+  return [
+    environment.ZONE4YOU_UAT_LOGIN,
+    environment.ZONE4YOU_UAT_PASSWORD,
+    environment.ZONE4YOU_UAT_MEMBER_CARD_NUMBER,
+  ].reduce<string>((safeMessage, secret) => {
+    const value = secret?.trim();
+    return value ? safeMessage.replaceAll(value, "[redacted]") : safeMessage;
+  }, message);
+}
+
+async function api<T>(
+  config: BookingMutationUatConfig,
+  fetchImpl: FetchLike,
+  path: string,
+  init: RequestInit = {},
+): Promise<ApiResult<T>> {
+  const response = await fetchImpl(new URL(path, config.target), {
+    ...init,
+    redirect: "error",
+    signal: AbortSignal.timeout(config.timeoutMs),
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Origin: config.target.origin,
+      "X-Zone4You-Locale": "cs",
+      ...init.headers,
+    },
+  });
+  const requestId = response.headers.get("x-request-id");
+  if (!requestId) throw new Error(`${init.method ?? "GET"} ${path} did not return X-Request-ID.`);
+  const body = (await response.json().catch(() => ({}))) as T & { code?: string; error?: string };
+  if (!response.ok) {
+    throw new UatApiError(
+      response.status,
+      body.code ?? "UNKNOWN_API_ERROR",
+      requestId,
+      body.error ?? `${init.method ?? "GET"} ${path} failed.`,
+    );
+  }
+  return { body, status: response.status, requestId, setCookie: response.headers.get("set-cookie") ?? undefined };
+}
+
+async function authenticatedSnapshot(config: BookingMutationUatConfig, fetchImpl: FetchLike, cookie: string) {
+  return (await api<Snapshot>(config, fetchImpl, "/api/booking/snapshot", {
+    method: "POST",
+    headers: { Cookie: cookie },
+    body: "{}",
+  })).body;
+}
+
+function exactActiveReservation(snapshot: Snapshot, lessonId: string) {
+  return snapshot.reservations.filter((reservation) => reservation.status === "active" && reservation.lessonId === lessonId);
+}
+
+function assertReservation(
+  reservation: Reservation | undefined,
+  config: BookingMutationUatConfig,
+  expectedStatus: "active" | "cancelled",
+  expectedId?: string,
+) {
+  if (
+    !reservation ||
+    reservation.userId !== config.expectedUserId ||
+    reservation.lessonId !== config.lessonId ||
+    reservation.status !== expectedStatus ||
+    (expectedId !== undefined && reservation.id !== expectedId)
+  ) {
+    throw new Error(`Reservation response does not match the approved test user, lesson or ${expectedStatus} state.`);
+  }
+}
+
+async function reservationRequest(
+  config: BookingMutationUatConfig,
+  fetchImpl: FetchLike,
+  cookie: string,
+  idempotencyKey: string,
+) {
+  return api<{ reservation: Reservation }>(config, fetchImpl, "/api/reservations", {
+    method: "POST",
+    headers: { Cookie: cookie, "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify({ lessonId: config.lessonId }),
+  });
+}
+
+async function cancellationRequest(
+  config: BookingMutationUatConfig,
+  fetchImpl: FetchLike,
+  cookie: string,
+  reservationId: string,
+  idempotencyKey: string,
+) {
+  return api<{ reservation: Reservation }>(
+    config,
+    fetchImpl,
+    `/api/reservations/${encodeURIComponent(reservationId)}`,
+    {
+      method: "DELETE",
+      headers: { Cookie: cookie, "Idempotency-Key": idempotencyKey },
+      body: "{}",
+    },
+  );
+}
+
+async function waitForSnapshot(
+  config: BookingMutationUatConfig,
+  fetchImpl: FetchLike,
+  cookie: string,
+  predicate: (snapshot: Snapshot) => boolean,
+) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const snapshot = await authenticatedSnapshot(config, fetchImpl, cookie);
+    if (predicate(snapshot)) return snapshot;
+    if (attempt < 4) await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error("Luxart state did not converge within the bounded read-only verification window.");
+}
+
+export async function runBookingMutationUat(config: BookingMutationUatConfig, fetchImpl: FetchLike = fetch) {
+  const readiness = await api<{
+    status?: string;
+    mode?: string;
+    booking?: string;
+    capabilities?: Partial<BookingCapabilities>;
+  }>(config, fetchImpl, "/api/readiness");
+  if (
+    readiness.body.status !== "ready" ||
+    readiness.body.mode !== "live" ||
+    readiness.body.booking !== "ready" ||
+    readiness.body.capabilities?.reservationsEnabled !== true ||
+    readiness.body.capabilities?.businessRulesStatus !== "confirmed"
+  ) {
+    throw new Error("Target is not an explicitly ready live staging booking runtime.");
+  }
+
+  const login = await api<{ user: User }>(config, fetchImpl, "/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({
+      login: config.login,
+      password: config.password,
+      memberCardNumber: config.memberCardNumber,
+    }),
+  });
+  if (login.body.user?.id !== config.expectedUserId) {
+    throw new Error("Login returned a different user than ZONE4YOU_UAT_EXPECTED_USER_ID.");
+  }
+  const cookie = cookieFromSetCookie(login.setCookie);
+  const before = await authenticatedSnapshot(config, fetchImpl, cookie);
+  if (before.user?.id !== config.expectedUserId) throw new Error("Authenticated snapshot user does not match the approved test user.");
+  const lesson = before.lessons.find((candidate) => candidate.id === config.lessonId);
+  if (!lesson) throw new Error("ZONE4YOU_UAT_LESSON_ID is not present in the current staging schedule.");
+  if (exactActiveReservation(before, config.lessonId).length !== 0) {
+    throw new Error("The approved UAT lesson already has an active reservation for this test user; no mutation was attempted.");
+  }
+  if (lesson.occupiedCount >= lesson.capacity) throw new Error("The approved UAT lesson is full; no mutation was attempted.");
+  const startsAtMs = new Date(lesson.startsAt).getTime();
+  const hoursBeforeStart = (startsAtMs - Date.now()) / 3_600_000;
+  if (!Number.isFinite(hoursBeforeStart) || hoursBeforeStart < config.minimumHoursBeforeStart) {
+    throw new Error("The approved UAT lesson is too close to its start time for the configured cancellation safety margin.");
+  }
+  if (
+    !Number.isFinite(before.user.creditBalanceKc) ||
+    !Number.isFinite(before.rules.minimumCreditForReservationKc) ||
+    before.user.creditBalanceKc < before.rules.minimumCreditForReservationKc
+  ) {
+    throw new Error("The approved UAT user does not have the confirmed minimum credit; no mutation was attempted.");
+  }
+
+  const createKey = `uat:create:${randomUUID()}`;
+  let verifiedReservation: Reservation | undefined;
+  let cancelled = false;
+  const requestIds: string[] = [readiness.requestId, login.requestId];
+  try {
+    const created = await reservationRequest(config, fetchImpl, cookie, createKey);
+    requestIds.push(created.requestId);
+    assertReservation(created.body.reservation, config, "active");
+    verifiedReservation = created.body.reservation;
+
+    for (let replay = 0; replay < 3; replay += 1) {
+      const repeated = await reservationRequest(config, fetchImpl, cookie, createKey);
+      requestIds.push(repeated.requestId);
+      assertReservation(repeated.body.reservation, config, "active", verifiedReservation.id);
+    }
+
+    const crossKeyResults = await Promise.all(
+      [0, 1].map(async () => {
+        try {
+          return await reservationRequest(config, fetchImpl, cookie, `uat:create:parallel:${randomUUID()}`);
+        } catch (error) {
+          if (error instanceof UatApiError && error.code === "BOOKING_ALREADY_PROCESSING") return error;
+          throw error;
+        }
+      }),
+    );
+    let parallelSuccesses = 0;
+    for (const result of crossKeyResults) {
+      requestIds.push(result.requestId);
+      if (!(result instanceof UatApiError)) {
+        parallelSuccesses += 1;
+        assertReservation(result.body.reservation, config, "active", verifiedReservation.id);
+      }
+    }
+    if (parallelSuccesses < 1) throw new Error("Neither parallel browser key returned the confirmed reservation result.");
+
+    await waitForSnapshot(
+      config,
+      fetchImpl,
+      cookie,
+      (snapshot) => exactActiveReservation(snapshot, config.lessonId).length === 1,
+    );
+
+    const cancelKey = `uat:cancel:${randomUUID()}`;
+    const cancellation = await cancellationRequest(config, fetchImpl, cookie, verifiedReservation.id, cancelKey);
+    requestIds.push(cancellation.requestId);
+    cancelled = true;
+    assertReservation(cancellation.body.reservation, config, "cancelled", verifiedReservation.id);
+    if (Number(cancellation.body.reservation.cancellationFeeKc ?? 0) !== config.expectedCancellationFeeKc) {
+      throw new Error("Cancellation fee does not match ZONE4YOU_UAT_EXPECTED_CANCELLATION_FEE_KC.");
+    }
+    for (let replay = 0; replay < 3; replay += 1) {
+      const repeated = await cancellationRequest(config, fetchImpl, cookie, verifiedReservation.id, cancelKey);
+      requestIds.push(repeated.requestId);
+      assertReservation(repeated.body.reservation, config, "cancelled", verifiedReservation.id);
+    }
+    const crossKeyCancellation = await cancellationRequest(
+      config,
+      fetchImpl,
+      cookie,
+      verifiedReservation.id,
+      `uat:cancel:other:${randomUUID()}`,
+    );
+    requestIds.push(crossKeyCancellation.requestId);
+    assertReservation(crossKeyCancellation.body.reservation, config, "cancelled", verifiedReservation.id);
+
+    const after = await waitForSnapshot(
+      config,
+      fetchImpl,
+      cookie,
+      (snapshot) =>
+        exactActiveReservation(snapshot, config.lessonId).length === 0 &&
+        snapshot.user.creditBalanceKc === before.user.creditBalanceKc - config.expectedCancellationFeeKc,
+    );
+    if (after.reservations.filter((reservation) => reservation.status === "active").length !==
+        before.reservations.filter((reservation) => reservation.status === "active").length) {
+      throw new Error("Final active reservation count does not match the pre-test state.");
+    }
+
+    return {
+      ok: true,
+      checkedAt: new Date().toISOString(),
+      target: config.target.origin,
+      userVerified: true,
+      lessonIdSha256: shortHash(config.lessonId),
+      reservationIdSha256: shortHash(verifiedReservation.id),
+      sameKeyCreateReplays: 3,
+      parallelCreateRequests: 2,
+      sameKeyCancellationReplays: 3,
+      crossKeyCancellationReplay: true,
+      oneActiveReservationObserved: true,
+      finalStateRestored: true,
+      cancellationFeeMatched: true,
+      requestIds,
+    };
+  } finally {
+    if (verifiedReservation && !cancelled) {
+      try {
+        const cleanup = await cancellationRequest(
+          config,
+          fetchImpl,
+          cookie,
+          verifiedReservation.id,
+          `uat:cleanup:${randomUUID()}`,
+        );
+        assertReservation(cleanup.body.reservation, config, "cancelled", verifiedReservation.id);
+        if (Number(cleanup.body.reservation.cancellationFeeKc ?? 0) !== config.expectedCancellationFeeKc) {
+          throw new Error("Cleanup cancellation fee did not match the approved UAT expectation.");
+        }
+      } catch {
+        console.error(
+          `UAT cleanup could not confirm cancellation. Stop booking mutations and reconcile reservationIdSha256=${shortHash(verifiedReservation.id)}.`,
+        );
+      }
+    }
+  }
+}
+
+async function main() {
+  const config = loadBookingMutationUatConfig();
+  console.log(JSON.stringify(await runBookingMutationUat(config), null, 2));
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    const safeError = redactUatSecrets(error instanceof Error ? error.message : "Booking mutation UAT failed.");
+    const rawCode = error instanceof UatApiError ? error.code : "UAT_FAILED";
+    const safeCode = /^[A-Z0-9_]{1,80}$/.test(rawCode) ? rawCode : "UAT_FAILED";
+    console.error(JSON.stringify({
+      ok: false,
+      checkedAt: new Date().toISOString(),
+      code: safeCode,
+      requestIdPresent: error instanceof UatApiError ? Boolean(error.requestId) : undefined,
+      error: safeError,
+    }, null, 2));
+    process.exit(1);
+  });
+}

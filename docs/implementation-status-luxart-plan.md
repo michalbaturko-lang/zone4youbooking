@@ -1,6 +1,10 @@
 # Zone4You Booking - stav a Luxart integrační plán
 
+> Aktualizace 11. 9. 2026: Zone4You IT potvrdilo dohodu s Luxartem o zveřejnění portu `9191` kvůli rezervacím. Historický port `9759` níže popisuje původní komunikaci. Pro aktuální integraci stále chybí přesná URL/host, schéma HTTP(S), potvrzení že je `9191` už aktivní, testovací databáze a gateway auth režim.
+
 Datum auditu: 2026-06-18
+
+> Historický audit. Pro aktuální autoritu, scope, launch brány a stav k 2026-08-29 použijte `docs/launch-plan.md` a `docs/pilot-execution-and-evaluation.md`. Níže uvedené URL, počty a blokery mohou být zastaralé.
 
 ## 1. Aktuální stav repozitáře
 
@@ -76,10 +80,10 @@ Doplnění z historické session:
 
 - Předchozí agent také narazil na to, že API a aktuální web jsou za firewallem / blokované pro přístup zvenčí.
 - V historii se objevují dostupné oblasti API: `Login`, `User_data`, `Lesson`, `Reservations`, `Payment`. Chybí ale konkrétní aktuální dokumentace endpointů a modelů.
-- Klient později potvrdil:
-  - storno lhůta: 4 hodiny před lekcí
-  - pozdní storno: 100 Kč
-  - no-show: 100 Kč
+- Historická komunikace uváděla:
+  - storno lhůtu 4 hodiny před lekcí — překonáno rozhodnutím 30. 8. o půlnoci;
+  - pozdní storno 100 Kč — pro pilot nepotvrzeno;
+  - no-show 100 Kč — pro pilot nepotvrzeno;
   - Stripe přístupy dodá později
 - V historii se uvádí heslo = číslo karty, ale Luxart endpoint rozlišuje `password` a `member_card_number`, takže tento login flow je potřeba při integračním testu ověřit.
 - V předchozí session údajně vznikly soubory `docs/faze1-tasky.md` a `docs/CODEX-TASK-zone4you-booking.md`, ale v aktuálním repozitáři nejsou přítomné. Pokud existují jen lokálně ve starém prostředí, bude potřeba je znovu vytvořit nebo získat ze zálohy.
@@ -188,7 +192,7 @@ Níže jsou funkce, které potřebujeme potvrdit proti aktuální Luxart dokumen
   - potřeba potvrdit endpoint, payload, response a chybové kódy
   - business pravidla na naší straně i v Luxartu:
     - klient musí být přihlášený
-    - rezervace maximálně 48 hodin dopředu
+    - rezervační okno čeká na potvrzení; historických 48 hodin není pro pilot schváleno
     - kredit se strhává při rezervaci
     - dostatečný kredit
     - zákaz duplicitní rezervace stejné lekce
@@ -314,11 +318,11 @@ Pořadí implementace:
 Minimální testovací scénáře:
 
 1. Klient se přihlásí a vidí kredit.
-2. Klient vidí rozvrh na 48 hodin dopředu.
+2. Klient vidí přesně sedm pražských kalendářních dnů rozvrhu; samostatné rezervační okno odpovídá potvrzenému pravidlu.
 3. Klient se zarezervuje na lekci s volnou kapacitou.
 4. Kredit se po rezervaci sníží.
 5. Klient vidí rezervaci v "Moje rezervace".
-6. Klient zruší rezervaci více než 4 hodiny předem a kredit se vrátí.
+6. Klient zruší rezervaci před `00:00 Europe/Prague` na začátku dne lekce a Luxart potvrdí nulový storno poplatek.
 7. Klient nemůže rezervovat při nedostatečném kreditu.
 8. Plná lekce nabídne waiting list.
 9. Po uvolnění místa se klient z waiting listu automaticky přesune, pokud má dost kreditu.
@@ -335,10 +339,10 @@ Tyto body je potřeba potvrdit před ostrou implementací:
 5. Zda emaily odesílá Luxart, naše aplikace, nebo rozděleně.
 6. WhatsApp Business API poskytovatel.
 7. Stripe účet a test/live klíče.
-8. Finální potvrzení storno/no-show pravidel v Luxartu: 4 h / 100 Kč / 100 Kč.
+8. Finální potvrzení pozdního storna, no-show, možnosti pozdního online storna a Reformeru; bezplatný běžný cutoff je `00:00 Europe/Prague` na začátku dne lekce.
 
 ## 10. Krátký verdikt
 
-Historická session pomáhá hlavně s business pravidly a implementačním rozsahem: potvrzuje storno 4 h, pozdní storno 100 Kč, no-show 100 Kč a to, že Stripe klíče ještě nebyly dodané. Nepomáhá ale s hlavním technickým blokátorem: stále chybí aktuální `/Help` dokumentace a přístup na Zone4You API na portu `9759`.
+Historická session uváděla storno 4 h, pozdní storno 100 Kč a no-show 100 Kč. Novější rozhodnutí klienta 30. 8. 2026 čtyřhodinový cutoff nahrazuje bezplatným stornem do půlnoci, pracovně `00:00 Europe/Prague` na začátku dne lekce. Částky 100 Kč / 100 Kč zůstávají pouze historické a pro pilot nepotvrzené. Pro aktuální port `9191` stále chybí přesná URL a potvrzení aktivního testovacího přístupu.
 
-Luxart API je podle komunikace připravené jako testovací backend, ale současný repozitář na něj není napojený. Nejbližší smysluplná práce je integrační spike proti reálné `/Help` dokumentaci na portu `9759`, poté migrace statického prototypu na aplikaci se serverovou integrační vrstvou.
+Luxart API je podle komunikace připravené jako testovací backend a aplikace už obsahuje serverovou integrační vrstvu i fail-closed launch gate. Nejbližší bezpečný krok je read-only spike proti přesné Zone4You `/Help` URL na portu `9191`; živé zápisy se nezapnou bez UAT, ledgeru, rollbacku a schválení.

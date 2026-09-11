@@ -1,0 +1,84 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import type { Lesson, LuxartAdapter, User } from "../src/lib/domain";
+import { validateLuxartEvidence } from "../scripts/verify-pilot-release";
+import {
+  loadLuxartTestCredentials,
+  runLuxartReadonlyVerification,
+} from "../scripts/verify-luxart-readonly";
+
+const now = new Date("2026-09-05T08:00:00.000Z");
+const target = "https://luxart-test.example.com:9759";
+const environment = {
+  LUXART_MOCK: "false",
+  LUXART_API_BASE_URL: `${target}/`,
+  LUXART_API_AUTH_MODE: "none",
+  LUXART_TEST_LOGIN: "release-test-user",
+  LUXART_TEST_PASSWORD: "release-test-password",
+} satisfies Record<string, string | undefined>;
+
+test("release-grade Luxart verification requires a complete test login by default", () => {
+  assert.throws(() => loadLuxartTestCredentials({}), /required for release-grade/i);
+  assert.throws(
+    () => loadLuxartTestCredentials({ LUXART_TEST_MEMBER_CARD_NUMBER: "123" }),
+    /must be supplied together/i,
+  );
+  assert.equal(
+    loadLuxartTestCredentials({ LUXART_REQUIRE_AUTHENTICATED_PROBE: "false" }),
+    undefined,
+  );
+});
+
+test("real Luxart evidence producer satisfies the final release artifact contract", async () => {
+  const user: User = {
+    id: "42",
+    login: "release-test-user",
+    fullName: "Release Test User",
+    email: "release-test@example.invalid",
+    creditBalanceKc: 500,
+  };
+  const lesson = (locale: "cs" | "en"): Lesson => ({
+    id: "luxart:1:4:321:2026-09-05T10:00:00.000Z",
+    luxartRoomNumber: 4,
+    name: locale === "cs" ? "Reformer základy" : "Reformer Basics",
+    description: "",
+    startsAt: "2026-09-05T10:00:00.000Z",
+    endsAt: "2026-09-05T11:00:00.000Z",
+    durationMinutes: 60,
+    instructorName: "Test Instructor",
+    instructorSpecialization: "Pilates",
+    roomName: "Reformer",
+    category: "Reformer",
+    capacity: 8,
+    occupiedCount: 2,
+    priceKc: 200,
+    waitlistEnabled: false,
+  });
+  const adapterFactory = ({ userId, locale }: { userId?: string; locale: "cs" | "en" }) => {
+    const unused = async () => { throw new Error("Unexpected adapter mutation in read-only verification test."); };
+    return {
+      getLessons: async () => [lesson(locale)],
+      login: async () => ({ user }),
+      logout: async () => undefined,
+      getCurrentUser: async () => userId === user.id ? user : null,
+      getReservations: async () => [],
+      getWaitlist: async () => [],
+      getCreditTransactions: async () => [],
+      createReservation: unused,
+      cancelReservation: unused,
+      joinWaitlist: unused,
+      leaveWaitlist: async () => undefined,
+      createTopup: unused,
+    } satisfies LuxartAdapter;
+  };
+
+  const evidence = await runLuxartReadonlyVerification({ environment, now, adapterFactory });
+  validateLuxartEvidence(evidence, target, new Map([["4", 204]]), "none");
+
+  assert.equal(evidence.ok, true);
+  assert.equal(evidence.authenticated.checked, true);
+  assert.equal(evidence.czech.count, 1);
+  assert.equal(evidence.czech.reformer, 1);
+  assert.equal(evidence.czech.occurrenceSetSha256, evidence.english.occurrenceSetSha256);
+  assert.equal(JSON.stringify(evidence).includes("release-test-password"), false);
+});

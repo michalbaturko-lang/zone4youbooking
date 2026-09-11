@@ -1,12 +1,15 @@
 import { fail, ok } from "@/lib/apiResponse";
-import { getLuxartAdapter } from "@/lib/adapterProvider";
+import { getRequestLuxartAdapter } from "@/lib/adapterProvider";
 import { readJsonWithDemoState, withDemoState } from "@/lib/demoStateTransport";
+import { assertBookingMutationsEnabled, assertTrustedMutation } from "@/lib/requestSecurity";
+import { assertRateLimit, rateLimitRules } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const waitlist = await getLuxartAdapter().getWaitlist();
+    await assertRateLimit(request, rateLimitRules.accountRead);
+    const waitlist = await getRequestLuxartAdapter(request).getWaitlist();
     return ok(withDemoState({ waitlist }));
   } catch (error) {
     return fail(error);
@@ -15,9 +18,12 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    assertTrustedMutation(request);
+    assertBookingMutationsEnabled();
     const body = await readJsonWithDemoState<{ lessonId?: string }>(request);
     if (!body.lessonId) throw new Error("Missing lessonId.");
-    const waitlistEntry = await getLuxartAdapter().joinWaitlist({ lessonId: body.lessonId });
+    await assertRateLimit(request, rateLimitRules.waitlistJoin, body.lessonId);
+    const waitlistEntry = await getRequestLuxartAdapter(request).joinWaitlist({ lessonId: body.lessonId });
     return ok(withDemoState({ waitlistEntry }), { status: 201 });
   } catch (error) {
     return fail(error);
@@ -26,11 +32,14 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    assertTrustedMutation(request);
+    assertBookingMutationsEnabled();
     await readJsonWithDemoState(request);
     const url = new URL(request.url);
     const waitlistEntryId = url.searchParams.get("waitlistEntryId") ?? undefined;
     const lessonId = url.searchParams.get("lessonId") ?? undefined;
-    await getLuxartAdapter().leaveWaitlist({ waitlistEntryId, lessonId });
+    await assertRateLimit(request, rateLimitRules.waitlistLeave, waitlistEntryId ?? lessonId ?? "unknown");
+    await getRequestLuxartAdapter(request).leaveWaitlist({ waitlistEntryId, lessonId });
     return ok(withDemoState({ ok: true }));
   } catch (error) {
     return fail(error);

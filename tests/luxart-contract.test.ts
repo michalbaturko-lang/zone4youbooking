@@ -1,0 +1,191 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import {
+  mapLuxartCreditHistory,
+  buildLuxartCreditPaymentInsert,
+  buildLuxartReservationInsert,
+  buildLuxartWatchdogInsert,
+  mapLuxartLesson,
+  mapLuxartReservation,
+  mapLuxartUser,
+  mapLuxartWatchdog,
+  mapLuxartCreditPayment,
+  parseLuxartWatchdogId,
+  type LuxartLessonData,
+} from "../src/lib/luxartContract";
+
+const baseLesson: LuxartLessonData = {
+  resort: 1,
+  kategorie: 12,
+  date_time: "2026-09-01T16:30:00+02:00",
+  id_staff: 44,
+  osloveni: "Lenka",
+  id_service: 321,
+  delka: 50,
+  cena: 180,
+  nazev: "HEAT easy",
+  popis: "Kondiční lekce",
+  kapacita: 14,
+  obsazeno: 9,
+  volno: 5,
+  cislo_salu: 2,
+  typ_lekce: 8,
+};
+
+test("maps every Luxart lesson occurrence without a fixed room union", () => {
+  const lesson = mapLuxartLesson(baseLesson, {
+    roomNames: { "2": "Cycling sál" },
+    lessonTypeNames: { "8": "Cardio" },
+  });
+
+  assert.equal(lesson.roomName, "Cycling sál");
+  assert.equal(lesson.category, "Cardio");
+  assert.equal(lesson.capacity, 14);
+  assert.equal(lesson.occupiedCount, 9);
+  assert.equal(lesson.serviceId, "321");
+  assert.equal(lesson.luxartCategoryId, 12);
+  assert.equal(lesson.endsAt, "2026-09-01T15:20:00.000Z");
+  assert.match(lesson.id, /^luxart:1:12:321:/);
+});
+
+test("keeps unknown rooms and lesson types visible with safe fallbacks", () => {
+  const lesson = mapLuxartLesson({
+    ...baseLesson,
+    cislo_salu: 9,
+    typ_lekce: 999,
+    nazev: "Nová lekce",
+  });
+
+  assert.equal(lesson.roomName, "Sál 9");
+  assert.equal(lesson.category, "Ostatní");
+});
+
+test("maps Luxart user credit without exposing password data", () => {
+  const user = mapLuxartUser({
+    user_id: 42,
+    login: "test@example.invalid",
+    email: "test@example.invalid",
+    name: "Test",
+    surname: "Klient",
+    current_balance: 1250,
+  });
+
+  assert.equal(user.id, "42");
+  assert.equal(user.fullName, "Test Klient");
+  assert.equal(user.creditBalanceKc, 1250);
+});
+
+test("maps an active reservation back to the same Luxart lesson occurrence", () => {
+  const reservation = mapLuxartReservation(
+    {
+      resort: 1,
+      id_rezervace: 987,
+      id_kategorie: 12,
+      datum: "2026-09-01T16:30:00+02:00",
+      id_service: 321,
+      delka: 50,
+      id_resource: 2,
+      price: 180,
+      status: 1,
+      uuid: "test-uuid",
+    },
+    "42",
+  );
+
+  assert.equal(reservation.id, "987");
+  assert.equal(reservation.lessonId, "luxart:1:12:321:2026-09-01T14:30:00.000Z");
+  assert.equal(reservation.luxartUuid, "test-uuid");
+});
+
+test("derives running credit balances from newest Luxart history entry", () => {
+  const transactions = mapLuxartCreditHistory(
+    [
+      {
+        resort: 1,
+        datum: "2026-08-29T08:00:00Z",
+        castka: 500,
+        cdd: 10,
+        text: "Dobití kreditu",
+        sportoviste: 1010,
+      },
+      {
+        resort: 1,
+        datum: "2026-08-28T08:00:00Z",
+        castka: -100,
+        cdd: 9,
+        text: "Rezervace lekce",
+        sportoviste: 1,
+      },
+    ],
+    "42",
+    1_400,
+  );
+
+  assert.equal(transactions[0].type, "topup");
+  assert.equal(transactions[0].balanceAfterKc, 1_400);
+  assert.equal(transactions[1].type, "reservation_charge");
+  assert.equal(transactions[1].balanceAfterKc, 900);
+});
+
+test("builds the documented reservation payload only with an explicit resource mapping", () => {
+  const lesson = mapLuxartLesson(baseLesson);
+  const payload = buildLuxartReservationInsert(lesson, "42", 207);
+
+  assert.equal(payload.resort, 1);
+  assert.equal(payload.id_kategorie, 12);
+  assert.equal(payload.user_id, 42);
+  assert.equal(payload.id_service_1, 321);
+  assert.equal(payload.id_resource_1, 207);
+  assert.equal(payload.zpusob_uhrady, 0);
+  assert.throws(() => buildLuxartReservationInsert(lesson, "42", 0), /resource mapping/i);
+});
+
+test("maps the documented Luxart watchdog as a seat alert without inventing a queue position", () => {
+  const lesson = mapLuxartLesson(baseLesson);
+  const payload = buildLuxartWatchdogInsert(lesson, "42", 207, "en");
+  assert.equal(payload.id_kategorie, 12);
+  assert.equal(payload.id_service_1, 321);
+  assert.equal(payload.id_resource_1, 207);
+  assert.equal(payload.language, "en");
+  assert.equal(payload.id_watchdog, 0);
+
+  const entry = mapLuxartWatchdog(
+    {
+      ...payload,
+      id_watchdog: 777,
+    },
+    "42",
+    [lesson],
+  );
+  assert.equal(entry?.id, "watchdog:777");
+  assert.equal(entry?.lessonId, lesson.id);
+  assert.equal(entry?.position, 0);
+  assert.equal(parseLuxartWatchdogId("watchdog:777"), 777);
+  assert.equal(parseLuxartWatchdogId("wl-777"), null);
+  assert.throws(() => buildLuxartWatchdogInsert(lesson, "42", 0, "cz"), /resource mapping/i);
+});
+
+test("maps a verified Stripe top-up to the documented Luxart credit payment payload", () => {
+  const input = {
+    amountKc: 500,
+    provider: "stripe" as const,
+    idempotencyKey: "evt_1",
+    providerSessionId: "cs_test_zone4you",
+    providerPaymentIntentId: "pi_zone4you",
+  };
+  const payload = buildLuxartCreditPaymentInsert(input, "42", 3);
+  assert.deepEqual(payload, {
+    uuid: ["KREDIT"],
+    user_id: 42,
+    amount: 500,
+    id_payment_shop: "cs_test_zone4you",
+    id_payment_pp_1: "pi_zone4you",
+    id_payment_pp_2: "evt_1",
+    zpusob_uhrady: 3,
+    zpusob_odeslani: 0,
+  });
+  const topup = mapLuxartCreditPayment({ success: 1, id_mp: 901 }, input, "42");
+  assert.equal(topup.id, "luxart-payment:901");
+  assert.equal(topup.status, "succeeded");
+  assert.throws(() => buildLuxartCreditPaymentInsert(input, "42", 0), /payment method mapping/i);
+});

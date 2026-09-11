@@ -15,6 +15,8 @@ async function request(path, init) {
       ...init?.headers,
     },
   });
+  const requestId = response.headers.get("x-request-id");
+  if (!requestId) throw new Error(`${init?.method ?? "GET"} ${path} did not return X-Request-ID.`);
   const json = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(`${init?.method ?? "GET"} ${path} failed: ${response.status} ${JSON.stringify(json)}`);
@@ -36,7 +38,7 @@ function findReservableLesson(lessons, reservations, rules) {
       !activeLessonIds.has(lesson.id) &&
       lesson.occupiedCount < lesson.capacity &&
       start > now &&
-      start - now >= rules.freeCancellationHours * 60 * 60 * 1000 &&
+      start - now >= 12 * 60 * 60 * 1000 &&
       start - now <= rules.reservationWindowHours * 60 * 60 * 1000
     );
   });
@@ -47,6 +49,12 @@ function findFullLesson(lessons) {
 }
 
 async function main() {
+  const health = await request("/api/health");
+  const readiness = await request("/api/readiness");
+  if (health.status !== "ok" || readiness.status !== "ready") {
+    throw new Error("Health or readiness endpoint is not ready in demo mode.");
+  }
+
   await request("/api/demo/reset", { method: "POST" });
   const login = await request("/api/auth/login", {
     method: "POST",
@@ -61,14 +69,24 @@ async function main() {
     body: bodyWithDemoState(),
   });
   if (snapshot.rules.scheduleDays !== 7) throw new Error(`Unexpected scheduleDays: ${snapshot.rules.scheduleDays}`);
+  if (snapshot.rules.minimumCreditForReservationKc !== 200) {
+    throw new Error(`Unexpected minimumCreditForReservationKc: ${snapshot.rules.minimumCreditForReservationKc}`);
+  }
   if (snapshot.rules.reservationHoldKc !== 100) {
     throw new Error(`Unexpected reservationHoldKc: ${snapshot.rules.reservationHoldKc}`);
+  }
+  if (!snapshot.capabilities?.topupsEnabled || snapshot.capabilities.topupMode !== "demo") {
+    throw new Error(`Unexpected demo top-up capability: ${JSON.stringify(snapshot.capabilities)}`);
+  }
+  if (!snapshot.capabilities.reservationsEnabled || !snapshot.capabilities.waitlistEnabled) {
+    throw new Error(`Unexpected demo booking capabilities: ${JSON.stringify(snapshot.capabilities)}`);
   }
   const reservable = findReservableLesson(snapshot.lessons, snapshot.reservations, snapshot.rules);
   if (!reservable) throw new Error("No reservable lesson found in snapshot.");
 
   const created = await request("/api/reservations", {
     method: "POST",
+    headers: { "Idempotency-Key": `reserve:smoke:${Date.now()}` },
     body: bodyWithDemoState({ lessonId: reservable.id }),
   });
   if (created.reservation.holdAmountKc !== snapshot.rules.reservationHoldKc) {
@@ -77,6 +95,7 @@ async function main() {
 
   await request(`/api/reservations/${created.reservation.id}`, {
     method: "DELETE",
+    headers: { "Idempotency-Key": `cancel:smoke:${Date.now()}` },
     body: bodyWithDemoState(),
   });
 

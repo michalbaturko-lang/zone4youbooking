@@ -1,0 +1,81 @@
+# Zone4You IT — příjem a vyhodnocení odpovědi
+
+Aktualizace: 2026-09-11
+
+Tento checklist slouží pouze k vyhodnocení technické odpovědi. Není souhlasem s deployem, DNS změnou ani živou Luxart mutací. Hesla, tokeny, privátní klíče a klientské přihlašovací údaje se do tohoto souboru ani do repozitáře nevkládají.
+
+## 1. Záznam odpovědi bez tajných hodnot
+
+| Položka | Přijatá odpověď | Stav |
+|---|---|---|
+| Datum a technický kontakt | 11. 9. 2026, odpověď Zone4You IT | přijato |
+| API root a `/Help` URL | potvrzen pouze port `9191`; host, schéma a cesta chybí | blokuje test |
+| Testovací databáze potvrzena | v odpovědi neuvedeno | nepotvrzeno |
+| Síťová cesta | „s Luxartem je domluveno zveřejnění portu 9191“; není potvrzeno, zda je už otevřený ani odkud | částečné |
+| Gateway autentizace | v odpovědi neuvedena; nelze z toho odvodit režim `none` | nepotvrzeno |
+| Bezpečný kanál pro secrets | secret store / jiný schválený kanál | čeká se |
+| Read-only test povolen | výslovně neuvedeno | nepotvrzeno |
+| Jedna rezervace a storno povoleny | port je určen „kvůli rezervacím“, ale testovací mutace ani storno nejsou výslovně povoleny | nepotvrzeno |
+| `cislo_salu` → `id_resource` | vlastník nebo úplná tabulka | čeká se |
+| Watchdog a Luxart notifikace | endpointy a aktivní šablony potvrzeny / nepotvrzeny | čeká se |
+| DNS vlastník | jméno/role, ne přístupové údaje | čeká se |
+| Staging hostname | dostupný / návrh / nedostupný | čeká se |
+
+## 2. Automatické rozhodnutí o dalším kroku
+
+### Vyhodnocení odpovědi z 11. 9. 2026
+
+- Je potvrzená dohoda Luxart ↔ Zone4You IT o zveřejnění nového portu `9191` pro rezervace.
+- Historický port `9759` proto nelze dál automaticky považovat za externí vstupní port.
+- Je možné, že `9191` bude jen veřejný překlad na interní `9759`, ale jde pouze o hypotézu; konfigurace ji nesmí předpokládat.
+- Formulace „zveřejnění portu“ neprokazuje, že je port už otevřený, že používá HTTPS, že vede na testovací databázi ani že nevyžaduje gateway autentizaci.
+- Neexistuje ještě sestavitelná URL. Bez hostname/IP a schématu nelze bezpečně provést ani `/Help` probe.
+
+### A — lze spustit read-only Luxart ověření
+
+Musí být současně známé:
+
+- přesná API a `/Help` URL;
+- bezpečná síťová cesta;
+- explicitní gateway auth režim;
+- potvrzení testovací databáze;
+- výslovné povolení read-only testu;
+- případné credentials jsou vložené mimo e-mail a repozitář.
+
+Poté lze spustit pouze `verify:luxart-gateway-config` a `verify:luxart-readonly`. Výstup smí obsahovat jen agregované počty, rozsah dat, čísla sálů a hashe množiny výskytů — nikdy osobní data nebo syrové odpovědi.
+
+### B — lze připravit řízené rezervační UAT
+
+K podmínkám A musí navíc existovat:
+
+- výslovné povolení jedné testovací rezervace a jejího storna;
+- určený testovací klient a bezpečná testovací lekce předané schváleným kanálem;
+- úplné mapování každého pozorovaného `cislo_salu` na `id_resource`;
+- potvrzená business pravidla a jejich schválený profil;
+- PostgreSQL booking ledger a rate limiter na stagingu;
+- připravený návrat testovacího klienta do původního stavu.
+
+Dokud kterákoli podmínka chybí, booking mutace zůstávají vypnuté.
+
+### C — odpověď není dostatečná
+
+Read-only test se nespouští, pokud chybí síťová cesta, gateway režim, potvrzení test DB nebo read-only povolení. Nezabezpečený veřejný HTTP endpoint není produkční řešení; lze jej výslovně přijmout pouze pro dočasný stagingový test.
+
+## 3. Co po přijetí odpovědi ověřit
+
+1. Zkontrolovat, že URL neobsahuje username, heslo ani token.
+2. Ověřit `/Help` a gateway konfiguraci bez klientského loginu.
+3. Spustit český a anglický read-only feed pro přesně sedm pražských kalendářních dnů.
+4. Porovnat počet a hash všech výskytů, sály a Reformer; neznámý sál se nesmí zahodit.
+5. Získat úplné mapování všech skutečně pozorovaných čísel sálů.
+6. Teprve po samostatné autoritě připravit staging, alert, rollback a jedno řízené UAT.
+7. Produkční deploy, DNS a cutover zůstávají samostatně schvalované akce.
+
+## 4. Výsledek vyhodnocení
+
+- Read-only integrace: `NEPOVOLENA` — chybí úplná URL, stav portu, test DB a auth režim
+- Rezervační UAT: `NEPOVOLENO` — chybí read-only důkaz, explicitní testovací autorita, mapování sálů a úplná business pravidla
+- Deployment: vždy `NEAUTORIZOVÁN`, dokud nevznikne samostatné schválení
+- DNS/cutover: vždy `NEAUTORIZOVÁN`, dokud nevznikne samostatné schválení
+- Nejbližší bezpečný krok: získat od IT jedinou přesnou URL `http(s)://<host>:9191/Help` a potvrzení, že je dostupná nyní; následně provést pouze read-only probe.
+- Chybějící položky a vlastník: host/schéma/stav portu/test DB/auth — Zone4You IT + Luxart; mutační UAT a pravidla — Zone4You + Luxart.

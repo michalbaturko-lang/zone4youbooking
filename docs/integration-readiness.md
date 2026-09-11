@@ -1,4 +1,6 @@
-# Zone4You Booking - integracni pripravenost
+# Zone4You Booking - integracni pripravenost (historický snapshot)
+
+> Tento dokument zachycuje stav z 18. 6. 2026 a není release autorita. Reálný adapter už není skeleton; aktuální stav, blokery a brány jsou v `docs/launch-plan.md`, živé důkazy uzavírá `npm run verify:pilot-release`.
 
 Datum: 2026-06-18
 
@@ -20,7 +22,7 @@ Aplikace ma oddeleny doménovy model, mock Luxart adapter a serverove API routy.
 
 ```bash
 LUXART_MOCK=true
-LUXART_API_BASE_URL=http://zone4you-api-host:9759
+LUXART_API_BASE_URL=https://zone4you-api-host:9191
 LUXART_RESORT_ID=1
 LUXART_TIMEOUT_MS=12000
 ```

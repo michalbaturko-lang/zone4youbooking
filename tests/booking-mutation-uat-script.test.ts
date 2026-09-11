@@ -1,0 +1,176 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import type { BookingCapabilities, BookingRules, Lesson, Reservation, User } from "../src/lib/domain";
+import {
+  loadBookingMutationUatConfig,
+  redactUatSecrets,
+  runBookingMutationUat,
+} from "../scripts/verify-booking-mutations";
+import { validateBookingUatEvidence } from "../scripts/verify-pilot-release";
+
+const target = "https://staging.booking.zone4you.cz/";
+const baseEnvironment = {
+  ZONE4YOU_UAT_APP_URL: target,
+  ZONE4YOU_UAT_MUTATION_CONFIRMATION: "ZONE4YOU_TEST_DB_ONLY:https://staging.booking.zone4you.cz",
+  ZONE4YOU_UAT_LOGIN: "approved-test-user",
+  ZONE4YOU_UAT_PASSWORD: "test-secret",
+  ZONE4YOU_UAT_EXPECTED_USER_ID: "42",
+  ZONE4YOU_UAT_LESSON_ID: "luxart:1:12:321:2026-09-01T14:30:00.000Z",
+  ZONE4YOU_UAT_EXPECTED_CANCELLATION_FEE_KC: "0",
+  ZONE4YOU_UAT_MIN_HOURS_BEFORE_START: "4",
+} satisfies Record<string, string | undefined>;
+
+test("mutation UAT configuration refuses production and stale confirmations", () => {
+  assert.throws(
+    () => loadBookingMutationUatConfig({ ...baseEnvironment, ZONE4YOU_UAT_APP_URL: "https://booking.zone4you.cz/" }),
+    /production/i,
+  );
+  assert.throws(
+    () => loadBookingMutationUatConfig({ ...baseEnvironment, ZONE4YOU_UAT_MUTATION_CONFIRMATION: "YES" }),
+    /exactly equal/i,
+  );
+  assert.throws(
+    () => loadBookingMutationUatConfig({
+      ...baseEnvironment,
+      ZONE4YOU_UAT_APP_URL: "https://example.com/",
+      ZONE4YOU_UAT_MUTATION_CONFIRMATION: "ZONE4YOU_TEST_DB_ONLY:https://example.com",
+    }),
+    /staging-named/i,
+  );
+  assert.equal(loadBookingMutationUatConfig(baseEnvironment).target.origin, "https://staging.booking.zone4you.cz");
+});
+
+test("mutation UAT error evidence redacts test credentials", () => {
+  assert.equal(
+    redactUatSecrets("approved-test-user failed with test-secret", baseEnvironment),
+    "[redacted] failed with [redacted]",
+  );
+});
+
+test("guarded UAT proves replay, concurrency and restored state without exposing credentials", async () => {
+  const config = loadBookingMutationUatConfig(baseEnvironment);
+  const user: User = {
+    id: "42",
+    login: "approved-test-user",
+    fullName: "Approved Test User",
+    email: "test@example.invalid",
+    creditBalanceKc: 1000,
+  };
+  const lesson: Lesson = {
+    id: config.lessonId,
+    name: "UAT lesson",
+    description: "",
+    startsAt: new Date(Date.now() + 12 * 3_600_000).toISOString(),
+    endsAt: new Date(Date.now() + 13 * 3_600_000).toISOString(),
+    durationMinutes: 60,
+    instructorName: "Test",
+    instructorSpecialization: "Test",
+    roomName: "Sál 1",
+    category: "Test",
+    capacity: 10,
+    occupiedCount: 2,
+    priceKc: 180,
+    waitlistEnabled: false,
+  };
+  const rules: BookingRules = {
+    resortId: 1,
+    scheduleDays: 7,
+    freeCancellationCutoff: {
+      mode: "lesson_day_midnight",
+      timeZone: "Europe/Prague",
+    },
+    lateCancelFeeKc: 100,
+    noShowFeeKc: 100,
+    minimumCreditForReservationKc: 200,
+    reservationHoldKc: 100,
+    reservationWindowHours: 48,
+    topupAmounts: [500],
+  };
+  const capabilities: BookingCapabilities = {
+    reservationsEnabled: true,
+    waitlistEnabled: false,
+    topupsEnabled: false,
+    topupMode: "disabled",
+    businessRulesStatus: "confirmed",
+    favoritesSync: "device",
+    forgotPasswordEnabled: false,
+    englishEnabled: true,
+  };
+  let reservations: Reservation[] = [];
+  let createWrites = 0;
+  let cancelWrites = 0;
+  let cancelledReservation: Reservation | undefined;
+  let sequence = 0;
+  const idempotentResponses = new Map<string, Reservation>();
+
+  const response = (body: unknown, status = 200, extraHeaders: HeadersInit = {}) => new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json", "X-Request-ID": `req-${sequence += 1}`, ...extraHeaders },
+  });
+  const fakeFetch: typeof fetch = async (input, init) => {
+    const url = new URL(typeof input === "string" ? input : input instanceof URL ? input : input.url);
+    const headers = new Headers(init?.headers);
+    if (url.pathname === "/api/readiness") {
+      return response({ status: "ready", mode: "live", booking: "ready", capabilities });
+    }
+    if (url.pathname === "/api/auth/login") {
+      const rawBody = String(init?.body ?? "");
+      assert.ok(rawBody.includes("test-secret"));
+      return response({ user }, 200, { "Set-Cookie": "z4y_booking_session=test-cookie; HttpOnly; Path=/" });
+    }
+    assert.equal(headers.get("cookie"), "z4y_booking_session=test-cookie");
+    if (url.pathname === "/api/booking/snapshot") {
+      return response({ user, lessons: [lesson], reservations, rules, capabilities });
+    }
+    if (url.pathname === "/api/reservations" && init?.method === "POST") {
+      const key = headers.get("idempotency-key")!;
+      const stored = idempotentResponses.get(key) ?? reservations[0];
+      if (stored) {
+        idempotentResponses.set(key, stored);
+        return response({ reservation: stored });
+      }
+      createWrites += 1;
+      const created: Reservation = {
+        id: "987",
+        userId: user.id,
+        lessonId: lesson.id,
+        status: "active",
+        reservedAt: new Date().toISOString(),
+        priceKc: lesson.priceKc,
+      };
+      reservations = [created];
+      idempotentResponses.set(key, created);
+      return response({ reservation: created }, 201);
+    }
+    if (url.pathname === "/api/reservations/987" && init?.method === "DELETE") {
+      const key = headers.get("idempotency-key")!;
+      const stored = idempotentResponses.get(key);
+      if (stored?.status === "cancelled") return response({ reservation: stored });
+      if (cancelledReservation) {
+        idempotentResponses.set(key, cancelledReservation);
+        return response({ reservation: cancelledReservation });
+      }
+      cancelWrites += 1;
+      const cancelled: Reservation = {
+        ...(reservations[0] ?? { id: "987", userId: user.id, lessonId: lesson.id, reservedAt: new Date().toISOString(), priceKc: 180 }),
+        status: "cancelled",
+        cancelledAt: new Date().toISOString(),
+        cancellationFeeKc: 0,
+      };
+      reservations = [];
+      cancelledReservation = cancelled;
+      idempotentResponses.set(key, cancelled);
+      return response({ reservation: cancelled });
+    }
+    return response({ code: "NOT_FOUND", error: "not found" }, 404);
+  };
+
+  const evidence = await runBookingMutationUat(config, fakeFetch);
+  validateBookingUatEvidence(evidence, config.target.origin);
+  assert.equal(evidence.ok, true);
+  assert.equal(evidence.finalStateRestored, true);
+  assert.equal(createWrites, 1);
+  assert.equal(cancelWrites, 1);
+  assert.equal(JSON.stringify(evidence).includes("test-secret"), false);
+  assert.equal(JSON.stringify(evidence).includes("approved-test-user"), false);
+});

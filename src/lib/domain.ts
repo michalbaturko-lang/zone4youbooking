@@ -28,6 +28,9 @@ export interface Lesson {
   id: ID;
   luxartLessonId?: string;
   serviceId?: string;
+  luxartCategoryId?: number;
+  luxartRoomNumber?: number;
+  luxartGender?: string;
   name: string;
   description: string;
   startsAt: ISODateTime;
@@ -37,8 +40,8 @@ export interface Lesson {
   substituteInstructorName?: string;
   instructorPhoto?: string;
   instructorSpecialization: string;
-  roomName: "Sál 1" | "Sál 2" | "Sál 3" | "Reformer";
-  category: "Síla" | "Cardio" | "Body & Mind" | "Reformer" | "Zdraví";
+  roomName: string;
+  category: string;
   capacity: number;
   occupiedCount: number;
   priceKc: number;
@@ -59,6 +62,8 @@ export interface Reservation {
   holdAmountKc?: number;
   cancellationFeeKc?: number;
   creditTransactionId?: ID;
+  luxartUuid?: string;
+  luxartCategoryId?: number;
 }
 
 export interface WaitlistEntry {
@@ -67,7 +72,7 @@ export interface WaitlistEntry {
   lessonId: ID;
   position: number;
   status: WaitlistStatus;
-  joinedAt: ISODateTime;
+  joinedAt?: ISODateTime;
   promotedAt?: ISODateTime;
 }
 
@@ -105,7 +110,6 @@ export interface LoginInput {
 
 export interface LoginResult {
   user: User;
-  sessionToken: string;
 }
 
 export interface LessonQuery {
@@ -148,10 +152,24 @@ export interface BookingSnapshot {
   transactions: CreditTransaction[];
 }
 
+export interface BookingCapabilities {
+  reservationsEnabled: boolean;
+  waitlistEnabled: boolean;
+  topupsEnabled: boolean;
+  topupMode: "demo" | "stripe" | "disabled";
+  businessRulesStatus: "demo" | "confirmed" | "unconfirmed";
+  favoritesSync: "device";
+  forgotPasswordEnabled: false;
+  englishEnabled: true;
+}
+
 export interface BookingRules {
   resortId: number;
   scheduleDays: number;
-  freeCancellationHours: number;
+  freeCancellationCutoff: {
+    mode: "lesson_day_midnight";
+    timeZone: "Europe/Prague";
+  };
   lateCancelFeeKc: number;
   noShowFeeKc: number;
   minimumCreditForReservationKc: number;

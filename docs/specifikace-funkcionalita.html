@@ -149,6 +149,8 @@
 
 <div class="container">
 
+  <div class="notes"><strong>Historický podklad:</strong> Pro pilot 5. 9. je autoritou aktuální launch plán. Novější rozhodnutí ruší reset zapomenutého hesla, přesouvají standardní emaily na Luxart a neslibují automatickou rezervaci ani pořadí watchdogu. Částky dobití v oddílu 2 zůstávají potvrzené.</div>
+
   <!-- 1. Přihlášení -->
   <div class="section">
     <h2>1. Přihlášení a registrace</h2>
@@ -206,8 +208,8 @@
         <tr><td>Strhávání kreditu</td><td class="status-yes">Při rezervaci — vrací se při včasném zrušení</td></tr>
         <tr><td>Ceny lekcí — zobrazovat u každé lekce</td><td class="status-yes">ANO</td></tr>
         <tr><td>Maximální počet rezervací najednou</td><td>Není pevný limit — omezeno zůstatkem kreditu</td></tr>
-        <tr><td>Časový horizont rezervací</td><td class="status-yes">48 hodin dopředu max</td></tr>
-        <tr><td>Zrušení bez sankce</td><td class="status-yes">Min. 4 hodiny před lekcí</td></tr>
+        <tr><td>Časový horizont rezervací</td><td>Čeká na potvrzení</td></tr>
+        <tr><td>Zrušení bez sankce</td><td class="status-yes">Do 00:00 na začátku dne lekce (Europe/Prague)</td></tr>
         <tr><td>Storno poplatek za pozdní zrušení</td><td class="status-yes">100 Kč</td></tr>
         <tr><td>Vrácení kreditu při včasném zrušení</td><td class="status-yes">ANO — plné vrácení</td></tr>
         <tr><td>No-show (nedostavení se)</td><td class="status-yes">100 Kč</td></tr>
@@ -217,7 +219,7 @@
       <strong>Poznámky k implementaci:</strong>
       <ul>
         <li>Flow: Rezervace → stržení kreditu → pokud klient zruší min. 4 h předem → kredit zpět</li>
-        <li>Pokud klient zruší méně než 4 h předem → poplatek 100 Kč</li>
+        <li>Pozdní storno, no-show a Reformer → částky a pravidla čekají na potvrzení</li>
         <li>No-show → poplatek 100 Kč</li>
         <li>Není limit na počet rezervací, ale klient musí mít dostatečný zůstatek kreditu</li>
       </ul>
@@ -362,7 +364,7 @@
     <h3 class="critical">Kritické (blokují vývoj)</h3>
     <ol>
       <li><strong>Stripe přístupy</strong> — čekáme na API klíče od klienta</li>
-      <li><strong>Luxart API přístup a dokumentace</strong> — čekáme na aktuální /Help pro port 9759</li>
+      <li><strong>Luxart API přístup a dokumentace</strong> — port 9191 je domluvený ke zveřejnění; čekáme na přesnou /Help URL a potvrzení aktivního testovacího přístupu</li>
     </ol>
 
     <h3 class="important">Důležité (potřebné brzy)</h3>

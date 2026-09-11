@@ -1,0 +1,145 @@
+# Zone4You Booking — provozní a rollback runbook
+
+Aktualizace: 2026-08-30
+
+Tento runbook neuděluje oprávnění k deployi, DNS změně ani živé mutaci. Každý cutover a rollback provádí oprávněný správce až po výslovném rozhodnutí Zone4You.
+
+## Provozní režimy
+
+| Režim | `ZONE4YOU_DEPLOYMENT_PHASE` | `BOOKING_MUTATIONS_ENABLED` | `BOOKING_RULES_CONFIRMED` | `PAYMENT_MUTATIONS_ENABLED` | Chování |
+|---|---|---:|---:|---:|---|
+| Demo | nepoužije se | nepoužije se | nepoužije se | nepoužije se | lokální testování se simulovaným top-upem, bez Luxart produkce |
+| Read-only fallback | `read_only` | `false` | může být `false` | `false` | rozvrh, přihlášení a kredit lze číst; rezervace, storno, watchdog a live top-up se bezpečně odmítnou |
+| Booking pilot bez plateb | `booking_without_payments` | `true` | `true` | `false` | rezervace/storno po zelené E3 a písemném potvrzení pravidel; kredit dobíjí recepce |
+| Pilot včetně Stripe | `booking_with_stripe` | `true` | `true` | `true` | pouze po zelené E3 i E5, aplikované migraci a výslovném cutover souhlasu |
+
+Výchozí a rollback hodnoty jsou `BOOKING_MUTATIONS_ENABLED=false`, `BOOKING_RULES_CONFIRMED=false` a `PAYMENT_MUTATIONS_ENABLED=false`. `BOOKING_RULES_CONFIRMED=true` není technický bypass: profil `config/business-rules-profile.json` už zaznamenává bezplatné běžné storno do `00:00 Europe/Prague` na začátku dne lekce, ale musí být doplněn o pozdní/no-show částky, možnost pozdního online storna, Reformer, rezervační okno a kreditní mechaniku. Teprve potom se změní na `confirmed`, musí odpovídat implementaci a jeho přesný výstup `npm run inspect:business-rules` musí být schválen v `BOOKING_RULES_PROFILE_SHA256`. Jakákoli změna obsahu SHA zneplatní. Každé zapnutí je samostatná cutover akce, nikoli běžná konfigurace.
+
+## Povinné předstartovní důkazy
+
+1. `npm run quality` je zelené.
+2. Přesný build projde `npm run verify:deployment-preflight` podle matice v `docs/deployment-preflight.md`; výstup je uložený jako ne-secret důkaz.
+3. IT potvrdilo gateway auth režim, případné hodnoty jsou v secret store a `npm run verify:luxart-gateway-config` projde bez vypsání credentials. Režim `none` musí být stejně explicitní jako Basic/Bearer/`X-*`.
+4. `npm run verify:luxart-readonly` projde proti schválenému test endpointu s vyhrazeným testovacím loginem; výchozí release-grade režim bez `LUXART_TEST_LOGIN` a `LUXART_TEST_PASSWORD` fail-closed skončí. `LUXART_REQUIRE_AUTHENTICATED_PROBE=false` je dovoleno pouze pro diagnostiku veřejného feedu a takový výstup finální dossier nepřijme. JSON důkaz neobsahuje credentials, osobní data ani syrový payload a zaznamená pouze bezpečný název gateway auth režimu.
+5. `npm run check:launch` nemá žádný automatický `FAIL` relevantní pro zvolený režim.
+6. `APP_BASE_URL=<schválený staging/produkční origin> npm run probe:runtime` projde, readiness vrátí přesný `phase`, `commit`, systémový region `fra1`, `schedule=ready`, `booking` a `payments`, česká i anglická `/api/lessons` route vrátí stejnou úplnou množinu výskytů a uloží se celý JSON výstup.
+7. E0–E9 v prováděcím plánu jsou vyhodnocené; vypnutá funkce má doložený fallback.
+8. UAT checklist nemá otevřený P0/P1.
+9. Je známý support kontakt, pilotní skupina a osoba oprávněná rozhodnout rollback.
+10. Starý Memberzone je dostupný a jeho odkaz je připravený jako fallback.
+11. Pro multi-instance/serverless hosting je přes schválený migrační proces aplikovaný `migrations/003_rate_limit.sql`, `npm run test:rate-limit-postgres` prošel proti staging databázi a readiness hlásí `rateLimit=postgres`. Paměťová alternativa vyžaduje doložený jediný proces a `RATE_LIMIT_SINGLE_INSTANCE=true`.
+12. Pro E3 je přes schválený migrační proces aplikovaný `migrations/002_booking_mutation_ledger.sql`, `npm run test:booking-postgres` prošel proti staging databázi a readiness hlásí `booking=ready`.
+13. Pro E5 je přes schválený migrační proces aplikovaný `migrations/001_payment_ledger.sql`, `npm run test:payments-postgres` prošel proti staging databázi a readiness hlásí `payments=ready`.
+14. Platební produktový profil odpovídá schváleným částkám 500 / 1 000 / 2 000 / 5 000 / 10 000 Kč; aktivace vyžaduje `PAYMENT_PRODUCT_CONFIRMED=true` a přesný hash z `npm run inspect:payment-product` v `PAYMENT_PRODUCT_PROFILE_SHA256`.
+15. Finální `npm run verify:pilot-release` projde pro přesný commit a aktivní launch okno. Validátor porovná SHA-256 uložených Luxart/runtime/UAT/rollback/alert důkazů, vyžádá totožný interval přesně sedmi kalendářních dnů v `Europe/Prague` bez výskytu mimo rozsah, mapování každého živě pozorovaného sálu, shodu rate-limit režimu, fázi, commit i runtime capabilities, nulové P0/P1, ručně potvrzený alert event, dostupný Memberzone fallback a výslovný cutover souhlas. Současný omezený dossier vyžaduje `waitlistEnabled=false`; zapnutí watchdogu potřebuje samostatný živý důkaz a rozšíření release validátoru.
+
+`probe:runtime` odmítne živý paměťový limiter, pokud není společně s doloženou single-instance topologií výslovně nastaveno `PROBE_ALLOW_SINGLE_INSTANCE=true`. Pro Vercel/serverless se používá `rateLimit=postgres`.
+
+Ve fázi `booking_without_payments` vypíše `check:launch` čtyři Stripe infrastrukturní kontroly jako `SKIP` a nezahrne je do jmenovatele. Nejde o jejich splnění: gate současně vyžaduje `PAYMENT_MUTATIONS_ENABLED=false`, runtime capability skryje top-up a release dossier nesmí obsahovat Stripe launch mode. Ve fázi `booking_with_stripe` není žádná z těchto kontrol přeskočena.
+
+### Finální release dossier
+
+Do schváleného evidence úložiště mimo repozitář uložte nezměněné JSON výstupy `verify:luxart-readonly`, `probe:runtime`, `verify:booking-mutations`, `verify:readonly-rollback` a `verify:alert-delivery`. Jejich cesty, přesný commit, staging/Luxart HTTPS origin a launch okno předejte jednorázovému operátorskému příkazu `npm run prepare:pilot-release`. Příkaz přijme jen pravidelné úspěšné JSON soubory, vypočítá jejich celé SHA-256, odmítne přepsat existující dossier a nový soubor uloží s oprávněním pouze pro vlastníka.
+
+Vygenerovaný dossier je záměrně `draft: true`, `UAT=NO-GO`, alert receipt nepotvrzený, Memberzone fallback nedostupný a cutover neschválený. Není launch autoritou. Až oprávněné osoby skutečně uzavřou UAT, potvrdí stejné alert event ID, fallback a cutover, doplní své jméno/roli a aktuální čas, lze nastavit `draft: false`. Řetězec `pending-human-approval` finální validátor odmítá. Poté se znovu spočítá SHA celého dossieru, nastaví `ZONE4YOU_RELEASE_DOSSIER_PATH`, `ZONE4YOU_RELEASE_COMMIT` a přesná potvrzovací fráze `VERIFY_ZONE4YOU_RELEASE_DOSSIER:<sha256-dossieru>`. Bez těchto živých lidských kroků `verify:pilot-release` vždy skončí NO-GO.
+
+Validátor přijme pouze autentizovaný Luxart důkaz, unikátní korelační request ID z booking UAT a rollbacku a alert od skutečně nakonfigurovaného support vlastníka se správným UUID/fingerprintem. Bezpečná ruční kostra zůstává v `config/pilot-release-dossier.template.json`, ale i ta je povinně draft.
+
+Režim `booking_without_payments` dovoluje bezpečný booking pilot se skrytým Stripe. Režim `booking_with_stripe` navíc povinně vyžaduje samostatný end-to-end Stripe UAT artefakt dokazující právě jedno připsání, ignorovaný duplicitní webhook, bezezměnný kredit po neúspěchu a uzavřenou reconciliation. Samotné vyplnění šablony nestačí: validátor odmítá změněný hash, starý důkaz, jiné prostředí, chybějící sál, launch mimo okno i neudělený cutover souhlas.
+
+### Dvě oddělené cutover brány
+
+Zelený `verify:pilot-release` je předcutoverový důkaz a pouze autorizuje oprávněného správce k přesně naplánované změně DNS. Sám nic nepřepíná. Po změně DNS a vydání platného certifikátu, ale ještě před pozváním pilotní skupiny, musí během sledovaného launch okna projít druhá read-only brána:
+
+```bash
+ZONE4YOU_PRODUCTION_APP_URL=https://booking.zone4you.cz/ \
+ZONE4YOU_PRODUCTION_EXPECTED_COMMIT="$ZONE4YOU_APPROVED_COMMIT" \
+ZONE4YOU_PRODUCTION_EXPECTED_PHASE=booking_without_payments \
+ZONE4YOU_PRODUCTION_CUTOVER_CONFIRMATION="VERIFY_ZONE4YOU_PRODUCTION_CUTOVER:$ZONE4YOU_APPROVED_COMMIT" \
+npm run verify:production-cutover
+```
+
+`ZONE4YOU_APPROVED_COMMIT` je celý 40znakový lowercase SHA přesně stejného commitu jako v release dossieru. Operátorské hodnoty jsou CLI-only a nesmějí se vložit do runtime prostředí aplikace. Skript neprovádí deploy, DNS změnu, login ani Luxart mutaci. Z veřejné produkční domény ověří DNS odpověď bez vypsání IP, bezpečnostní hlavičky, health/readiness, přesný commit, fázi a region `fra1`, živý Luxart, PostgreSQL rate limit, připravený booking, očekávaný platební stav a shodný CS/EN sedmidenní feed včetně Reformeru.
+
+Pilot je veřejně otevřený až po zeleném JSON výsledku uloženém v chráněném evidence úložišti. Jakákoli chyba, odlišný commit/fáze, neplatný certifikát, prázdný či rozdílný feed nebo překročení 60 sekund znamená neotevírat pilotní skupinu a okamžitě vrátit předem zaznamenané původní DNS hodnoty. Poté se ověří starý Memberzone a incident se uzavře podle části „Incident a rollback“. Opakovaný cutover vyžaduje nový aktuální release dossier a nové výslovné schválení.
+
+### Řízený transakční UAT
+
+`npm run verify:booking-mutations` se smí spustit až po výslovném povolení mutací v testovací databázi. Skript odmítá `https://booking.zone4you.cz`, vyžaduje přesný staging origin v potvrzovací frázi `ZONE4YOU_TEST_DB_ONLY:<origin>`, přesné ID testovacího klienta a lekce, bezpečný časový odstup a očekávaný storno poplatek. Přihlašovací údaje zůstávají pouze v environmentu a výstup obsahuje jen hash ID a booleovské důkazy.
+
+Skript ověří jeden zápis, tři replaye stejného klíče, dva paralelní klíče, jeden storno zápis, tři replaye storna, replay s jiným klíčem a návrat aktivních rezervací i kreditu do výchozího stavu. Po nejasném výsledku mutaci slepě neopakuje; booking se vypne a provede se reconciliation podle této příručky.
+
+## Monitoring pilotu
+
+| Signál | Varování | P1 / zásah |
+|---|---:|---:|
+| `/api/health` | 1 neúspěch | 2 po sobě jdoucí neúspěchy během 2 minut |
+| `/api/readiness` | 1 neúspěch, `schedule` jiné než `ready` nebo Luxart pomalejší než 3 s | 2 neúspěchy během 2 minut |
+| HTTP 5xx | více než 1 % za 5 minut | více než 3 % za 5 minut |
+| Luxart timeout | 1 za 5 minut | 3 za 5 minut nebo 2 po sobě |
+| Rezervace/storno | 1 `BOOKING_ALREADY_PROCESSING` nebo `BOOKING_RECONCILIATION_REQUIRED` | jakýkoli nejistý výsledek, 3 selhání nebo falešný úspěch |
+| Stripe | jakýkoli neověřený podpis | jakýkoli nejistý nebo duplicitní kredit |
+| Logout | — | důvěryhodný požadavek nevrátí 200 nebo nesmaže lokální session cookie |
+
+Logy smějí obsahovat pouze čas, typ události, stav, bezpečný chybový kód a `X-Request-ID`. Nesmějí obsahovat heslo, cookie, Stripe secret, celé Luxart payloady ani neomezené osobní údaje.
+
+Logout je lokální bezpečnostní operace: po ověření Originu nesmí čekat na Luxart ani na rate-limit databázi. Jeho selhání je P1, protože klient nesmí zůstat přihlášený kvůli výpadku pomocné infrastruktury. Cizí nebo chybějící Origin se naopak odmítne bez změny cookie.
+
+### Ověření doručení alertu
+
+Po výběru alert kanálu a support vlastníka nejprve zjistěte bezpečný fingerprint cíle z chybové instrukce `verify:alert-delivery`, nastavte přesnou frázi `SEND_ZONE4YOU_TEST_ALERT:<fingerprint>` a spusťte test. Příklad proměnných bez skutečné adresy:
+
+```bash
+ZONE4YOU_ALERT_APP_URL=https://staging.booking.zone4you.cz/ \
+ZONE4YOU_ALERT_WEBHOOK_URL=<HTTPS webhook ze secret store> \
+ZONE4YOU_ALERT_SUPPORT_OWNER=<role nebo jméno podpory> \
+ZONE4YOU_ALERT_CONFIRMATION=SEND_ZONE4YOU_TEST_ALERT:<fingerprint> \
+npm run verify:alert-delivery
+```
+
+Skript odešle právě jednu událost se závažností `test`, bez klientských údajů, hesel a cookies. Výstup neobsahuje webhook URL ani bearer token, pouze fingerprint, stav a event ID. HTTP 2xx dokládá přijetí webhookem, nikoli doručení člověku: support vlastník musí ručně potvrdit stejný event ID. Teprve poté lze v release konfiguraci nastavit `ZONE4YOU_ALERT_DELIVERY_CONFIRMED=true`. Samotný skript ani tato proměnná nenahrazují průběžný monitor hostingu.
+
+## Incident a rollback
+
+1. Zapište čas, symptom, prostředí a `X-Request-ID`; neurčujte příčinu bez důkazu.
+2. Při platebním P0 okamžitě nastavte `PAYMENT_MUTATIONS_ENABLED=false`; při booking P0 nastavte také `BOOKING_MUTATIONS_ENABLED=false`. Ověřte snapshot capability a readiness.
+3. Při P1 vypněte transakce, pokud příčinu nelze během 10 minut bezpečně odstranit a znovu ověřit.
+4. Spusťte read-only runtime probe. Rozvrh musí zůstat dostupný; jinak přesměrujte pilot na starý Memberzone podle schváleného DNS/hosting postupu.
+5. Ověřte, že poslední živá rezervace/storno odpovídá Luxart test/produkční autoritě. Nikdy neopakujte nejistou mutaci naslepo.
+6. U platby v nejistém stavu kredit automaticky neopakujte. Zastavte Stripe top-up a proveďte ruční reconciliation podle Stripe session ID, event ID a Luxart reference.
+7. Obnovení transakcí vyžaduje opravu, opakování relevantních testů, runtime probe a nové výslovné schválení.
+
+## Reconciliation rezervace nebo storna
+
+1. Nastavte `BOOKING_MUTATIONS_ENABLED=false`; nejistou akci nikdy neposílejte znovu naslepo.
+2. Podle `X-Request-ID`, času a klienta najděte řádek `zone4you_booking_mutations` ve stavu `uncertain`. Ledger neobsahuje heslo ani session cookie.
+3. V Luxart autoritě ověřte před/po stav cílové lekce nebo rezervace, včetně kreditu a případného storno poplatku.
+4. Pokud Luxart změnu provedl, uzavřete ledger pouze schváleným jednorázovým provozním postupem jako `applied` se skutečným výsledkem. Pokud ji prokazatelně neprovedl, uzavřete ji jako `rejected`; při nejednoznačnosti ponechte `uncertain`.
+5. Teprve po druhé kontrole lze vytvořit nový požadavek s novým `Idempotency-Key`. Každá ruční změna ledgeru musí mít čas, důkaz a schvalující osobu.
+
+Konkrétní opravný SQL příkaz není záměrně součástí automatického běhu: musí vzniknout až pro přesně identifikovaný řádek a projít schválením, aby nehrozilo hromadné nebo chybné přepsání auditu.
+
+Čerstvá potvrzená rezervace se po dobu dvou minut bezpečně přehrává i pro jiný browserový klíč; storno stejného ID se přehrává trvale. Potvrzené storno v ledgeru ochranu lekce uvolní, takže ji lze znovu rezervovat. Zrušení provedené mimo nový booking je proto před opakovanou rezervací potřeba nechat propsat do Luxartu a po uplynutí krátkého ochranného okna načíst nový stav.
+
+## Časovaný rollback drill
+
+Před pilotem proveďte na stagingu:
+
+1. začátek měření;
+2. `BOOKING_MUTATIONS_ENABLED=false`;
+3. `PAYMENT_MUTATIONS_ENABLED=false`;
+4. potvrzení, že lekce se načítají, ale rezervace/storno vrací `BOOKING_READ_ONLY` a Checkout `PAYMENTS_DISABLED`;
+5. potvrzení dostupnosti starého Memberzone;
+6. ukončení měření a záznam výsledku.
+
+GO práh: bezpečný read-only stav do 5 minut, žádná nechtěná Luxart mutace a zdokumentovaný vlastník dalšího kroku.
+
+Po přepnutí a novém deployi spusťte bez přihlašovacích údajů:
+
+```bash
+ZONE4YOU_ROLLBACK_APP_URL=https://staging.booking.zone4you.cz/ \
+ZONE4YOU_ROLLBACK_CONFIRMATION=READ_ONLY_ROLLBACK:https://staging.booking.zone4you.cz \
+npm run verify:readonly-rollback
+```
+
+Příkaz vyžaduje přesnou potvrzovací frázi pro cílový origin. Ověří `health`, živé read-only `readiness`, neprázdný rozvrh a bezpečné odmítnutí vytvoření rezervace, storna, watchdogu a Stripe Checkout. Nepoužívá login, cookie ani reálné ID lekce/rezervace; záměrně posílá sentinelové hodnoty, které musí být odmítnuty dříve, než se zavolá Luxart nebo Stripe. Celý privacy-safe JSON výstup s `X-Request-ID` uložte jako časovaný rollback důkaz. Skript skončí chybou, pokud cílový stav není read-only nebo trvá déle než pět minut.

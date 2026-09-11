@@ -1,0 +1,10 @@
+{
+  "profileId": "zone4you-payment-product-2026-08-30",
+  "status": "confirmed",
+  "currency": "CZK",
+  "allowedTopupAmountsKc": [500, 1000, 2000, 5000, 10000],
+  "decisionSources": [
+    "docs/specifikace-funkcionalita.md#2-kredit-a-platby",
+    "docs/scope-of-work.md#modul-5-kredit-a-platby-stripe"
+  ]
+}

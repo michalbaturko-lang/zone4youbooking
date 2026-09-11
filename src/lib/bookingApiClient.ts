@@ -1,14 +1,29 @@
-import type { BookingRules, BookingSnapshot, LoginInput, PaymentTopup, Reservation, WaitlistEntry } from "./domain";
+import type { BookingCapabilities, BookingRules, BookingSnapshot, LoginInput, PaymentTopup, Reservation, WaitlistEntry } from "./domain";
 import type { MockLuxartState } from "./mockLuxart";
+import type { Locale } from "./i18n";
 
 export interface BookingSnapshotResponse extends BookingSnapshot {
   rules: BookingRules;
+  capabilities: BookingCapabilities;
 }
 
 const demoStateStorageKey = "zone4youbooking.demoState";
 
 interface StatefulResponse {
   demoState?: MockLuxartState;
+}
+
+export class BookingApiClientError extends Error {
+  readonly name = "BookingApiClientError";
+
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+    readonly requestId?: string,
+  ) {
+    super(message);
+  }
 }
 
 function readStoredDemoState() {
@@ -36,22 +51,53 @@ function bodyWithDemoState<T extends object>(body?: T) {
   return JSON.stringify(demoState ? { ...body, demoState } : { ...body });
 }
 
-async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+function bookingMutationKey(operation: "reserve" | "cancel") {
+  const uuid = globalThis.crypto?.randomUUID?.();
+  if (uuid) return `${operation}:${uuid}`;
+  return `${operation}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+}
+
+const englishApiErrors: Record<string, string> = {
+  AUTH_INVALID: "Sign-in failed. Check your details and try again.",
+  INVALID_LOGIN_INPUT: "Enter valid sign-in details.",
+  AUTH_REQUIRED: "Please sign in to continue.",
+  SESSION_INVALID: "Your session has expired. Please sign in again.",
+  INSUFFICIENT_CREDIT: "You do not have enough credit for this booking.",
+  RESERVATION_NOT_OPEN: "Booking for this class is not open yet.",
+  RESERVATION_CLOSED: "This class can no longer be booked.",
+  LESSON_FULL: "This class is full.",
+  BOOKING_READ_ONLY: "Booking is temporarily read-only. Reception can help you.",
+  RESERVATION_NOT_FOUND: "The booking could not be found.",
+  CANCELLATION_REJECTED: "This booking could not be cancelled.",
+  BOOKING_RECONCILIATION_REQUIRED: "The result could not be confirmed safely. Do not repeat the action; contact reception.",
+  WATCHDOG_DISABLED: "Seat alerts are temporarily unavailable.",
+};
+
+export function localizedApiErrorMessage(locale: Locale, code?: string, serverMessage?: string) {
+  if (locale === "cs") return serverMessage || "Akce se nepodařila.";
+  return (code && englishApiErrors[code]) || "The request could not be completed. Please try again.";
+}
+
+async function apiRequest<T>(path: string, init?: RequestInit, locale: Locale = "cs"): Promise<T> {
   const response = await fetch(path, {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      "X-Zone4You-Locale": locale,
       ...init?.headers,
     },
   });
   const json = (await response.json().catch(() => ({}))) as unknown;
 
   if (!response.ok) {
-    const message =
-      typeof json === "object" && json !== null && "error" in json && typeof json.error === "string"
-        ? json.error
-        : "Akce se nepodařila.";
-    throw new Error(message);
+    const payload = typeof json === "object" && json !== null ? json as Record<string, unknown> : {};
+    const code = typeof payload.code === "string" ? payload.code : undefined;
+    const serverMessage = typeof payload.error === "string" ? payload.error : undefined;
+    const message = localizedApiErrorMessage(locale, code, serverMessage);
+    const requestId = typeof payload.requestId === "string"
+      ? payload.requestId
+      : response.headers.get("x-request-id") ?? undefined;
+    throw new BookingApiClientError(message, response.status, code, requestId);
   }
 
   writeStoredDemoState(json);
@@ -59,64 +105,71 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const bookingApiClient = {
-  snapshot() {
+  snapshot(locale: Locale = "cs") {
     return apiRequest<BookingSnapshotResponse>("/api/booking/snapshot", {
       method: "POST",
       body: bodyWithDemoState(),
-    });
+    }, locale);
   },
 
-  login(input: LoginInput) {
+  login(input: LoginInput, locale: Locale = "cs") {
     return apiRequest("/api/auth/login", {
       method: "POST",
       body: bodyWithDemoState(input),
-    });
+    }, locale);
   },
 
-  logout() {
+  logout(locale: Locale = "cs") {
     return apiRequest("/api/auth/logout", {
       method: "POST",
       body: bodyWithDemoState(),
-    });
+    }, locale);
   },
 
-  createReservation(lessonId: string) {
+  createReservation(lessonId: string, locale: Locale = "cs") {
     return apiRequest<{ reservation: Reservation }>("/api/reservations", {
       method: "POST",
+      headers: { "Idempotency-Key": bookingMutationKey("reserve") },
       body: bodyWithDemoState({ lessonId }),
-    });
+    }, locale);
   },
 
-  cancelReservation(reservationId: string) {
+  cancelReservation(reservationId: string, locale: Locale = "cs") {
     return apiRequest<{ reservation: Reservation }>(`/api/reservations/${encodeURIComponent(reservationId)}`, {
       method: "DELETE",
+      headers: { "Idempotency-Key": bookingMutationKey("cancel") },
       body: bodyWithDemoState(),
-    });
+    }, locale);
   },
 
-  joinWaitlist(lessonId: string) {
+  joinWaitlist(lessonId: string, locale: Locale = "cs") {
     return apiRequest<{ waitlistEntry: WaitlistEntry }>("/api/waitlist", {
       method: "POST",
       body: bodyWithDemoState({ lessonId }),
-    });
+    }, locale);
   },
 
-  leaveWaitlist(waitlistEntryId: string) {
+  leaveWaitlist(waitlistEntryId: string, locale: Locale = "cs") {
     return apiRequest(`/api/waitlist/${encodeURIComponent(waitlistEntryId)}`, {
       method: "DELETE",
       body: bodyWithDemoState(),
-    });
+    }, locale);
   },
 
-  createTopup(amountKc: number) {
+  createTopup(amountKc: number, locale: Locale = "cs") {
     return apiRequest<{ topup: PaymentTopup }>("/api/topups", {
       method: "POST",
       body: bodyWithDemoState({
         amountKc,
-        provider: "stripe",
-        idempotencyKey: `demo-${amountKc}-${Date.now()}`,
       }),
-    });
+    }, locale);
+  },
+
+  createStripeCheckout(amountKc: number, locale: Locale = "cs") {
+    return apiRequest<{ checkoutSessionId: string; url: string }>("/api/payments/checkout", {
+      method: "POST",
+      body: JSON.stringify({ amountKc }),
+    }, locale);
   },
 
   resetDemo() {

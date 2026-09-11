@@ -1,13 +1,16 @@
 import { fail, ok } from "@/lib/apiResponse";
-import { getLuxartAdapter } from "@/lib/adapterProvider";
-import { queryFromRequest } from "@/lib/bookingService";
+import { getRequestLuxartAdapter } from "@/lib/adapterProvider";
+import { assertLessonFeedWithinQuery, queryFromRequest } from "@/lib/bookingService";
 import { withDemoState } from "@/lib/demoStateTransport";
+import { assertRateLimit, rateLimitRules } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
-    const lessons = await getLuxartAdapter().getLessons(queryFromRequest(request));
+    await assertRateLimit(request, rateLimitRules.scheduleRead);
+    const query = queryFromRequest(request);
+    const lessons = assertLessonFeedWithinQuery(await getRequestLuxartAdapter(request).getLessons(query), query);
     return ok(withDemoState({ lessons }));
   } catch (error) {
     return fail(error);
