@@ -6,6 +6,7 @@ Tento záznam je pouze neosobní read-only evidence veřejné referenční dokum
 
 - Referenční `http://api.memberzone.online:9295/Help` odpovědělo HTTP 200.
 - Neautentizovaný `GET /api/Lesson` odpověděl 401; žádné přihlašovací údaje ani osobní data nebyly odeslány.
+- Ve 21:04 CEST byl proti stejnému referenčnímu originu spuštěn i skutečný projektový read-only adapter v explicitním staging diagnostickém režimu. Anonymní CZ/EN načtení skončilo očekávaným `401`; tím je ověřeno, že veřejný kontrakt sice odpovídá implementaci, ale datová cesta vyžaduje autentizaci. Testovací login nebyl přes HTTP odeslán a ověřovač nyní takový pokus technicky odmítne ještě před vytvořením adapteru nebo síťovým požadavkem.
 - Dokumentace uvádí potřebné kontrakty pro login, všechny `Lesson` položky, seznam/vytvoření/storno rezervace a watchdog.
 - Automatický `verify:luxart-public-contract` ověřuje 11 používaných endpointů podle jejich HTTP metody, přesného titulku a povinných polí. Výstup je vždy `referenceOnly=true`, `launchAuthority=false` a neobsahuje cílový hostname ani syrové HTML.
 - Aktuální dokumentace rozlišuje dvě podoby členské karty: odpověď `POST api/Login` uvádí `member_card`, zatímco `GET api/User` uvádí také `member_card_number`. Adaptér přijímá obě varianty a při jejich současné přítomnosti dává přednost `member_card_number`.

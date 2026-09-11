@@ -115,6 +115,9 @@ export async function runLuxartReadonlyVerification({
   const target = requireSafeConfiguration(environment);
   const gatewayAuth = loadLuxartGatewayAuthConfig(environment);
   const authentication = loadLuxartTestCredentials(environment);
+  if (authentication && target.protocol !== "https:") {
+    throw new Error("Authenticated Luxart verification requires HTTPS; test credentials will not be sent over HTTP.");
+  }
   const query = {
     ...zone4YouScheduleRange(now, bookingRules.scheduleDays),
     resortId: bookingRules.resortId,

@@ -30,6 +30,26 @@ test("release-grade Luxart verification requires a complete test login by defaul
   );
 });
 
+test("authenticated Luxart verification never sends test credentials over HTTP", async () => {
+  let adapterCreated = false;
+  await assert.rejects(
+    runLuxartReadonlyVerification({
+      environment: {
+        ...environment,
+        LUXART_API_BASE_URL: "http://luxart-test.example.com:9295/",
+        LUXART_ALLOW_INSECURE_TEST_HTTP: "true",
+      },
+      now,
+      adapterFactory: () => {
+        adapterCreated = true;
+        throw new Error("The adapter must not be created for authenticated HTTP verification.");
+      },
+    }),
+    /requires HTTPS/i,
+  );
+  assert.equal(adapterCreated, false);
+});
+
 test("standalone Luxart evidence remains diagnostic while D1-attested evidence satisfies the release contract", async () => {
   const user: User = {
     id: "42",
