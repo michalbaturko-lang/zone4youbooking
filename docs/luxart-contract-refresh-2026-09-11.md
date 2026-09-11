@@ -11,6 +11,7 @@ Tento záznam je pouze neosobní read-only evidence veřejné referenční dokum
 - `Lesson_data` obsahuje mimo jiné datum a čas, službu, cenu, název, popis, kapacity/obsazenost, `cislo_salu`, instruktora a příznak rezervovatelnosti. To odpovídá pilotnímu rozsahu všech lekcí, všech sálů a Reformeru.
 - Nový automatický `probe:luxart-help` na referenčním portu `9295` v 12:43 CEST prošel s HTTP 200 a klasifikací `ready`; bezpečný výstup neobsahuje hostname ani credentials.
 - Stejný probe na zjevné veřejné Zone4You variantě s portem `9191` skončil connect timeoutem. Host ale nebyl IT potvrzen, proto jde pouze o negativní kandidátní pozorování, nikoli o definitivní stav portu.
+- Samostatný kandidátní test stejného Luxart hostname na portu `9191` ve 15:17 CEST dosáhl HTTP služby, ale `/Help` vrátilo 404, HTTPS nebylo podporováno a kořen byl pouze obecný HTML index. Současný referenční `:9295/Help` přitom znovu prošel s HTTP 200 a klasifikací `ready`. `api.memberzone.online:9191` proto není doložený ani použitelný Zone4You API root.
 
 ## SHA-256 uložené odpovědi
 

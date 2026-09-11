@@ -35,7 +35,7 @@ Přepnutí fáze je release změna. Samotné nastavení boolean přepínače nes
 | Veřejné prostředí | `NEXT_PUBLIC_APP_ENV` musí přesně odpovídat cíli; žádný jiný `NEXT_PUBLIC_*` secret |
 | Luxart | live režim, resort `1`, timeout 1–30 s, potvrzený gateway auth a HTTPS; testovací HTTP je možné pouze na stagingu s explicitní výjimkou |
 | Session | samostatný serverový secret nejméně 32 znaků, nerecyklovaný jako gateway nebo Stripe secret |
-| Rate limit | PostgreSQL s TLS, nebo pouze u doložené single-instance topologie paměťový režim s výslovným potvrzením |
+| Rate limit | PostgreSQL s TLS, nebo pouze u doložené single-instance topologie paměťový režim s výslovným potvrzením; na Vercelu se identita klienta bere pouze z validní platformní `x-vercel-forwarded-for` |
 | Notifikace | `NOTIFICATION_PROVIDER=luxart`; aplikace standardní Luxart e-maily neduplikuje |
 | Watchdog | `LUXART_WAITLIST_ENABLED` musí být explicitní; při zapnutí je povolen pouze potvrzený `watchdog_III` |
 

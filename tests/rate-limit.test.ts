@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { InMemoryFixedWindowRateLimiter, rateLimitConfigurationProblems } from "../src/lib/rateLimit";
+import {
+  clientAddress,
+  InMemoryFixedWindowRateLimiter,
+  rateLimitConfigurationProblems,
+} from "../src/lib/rateLimit";
 
 test("rate limiter rejects requests over the limit and resets at the next window", () => {
   const limiter = new InMemoryFixedWindowRateLimiter();
@@ -43,4 +47,25 @@ test("live rate limiting requires either a confirmed single instance or TLS Post
     RATE_LIMIT_MODE: "postgres",
     RATE_LIMIT_DATABASE_URL: "postgresql://localhost/zone4you",
   }), ["RATE_LIMIT_DATABASE_URL"]);
+});
+
+test("Vercel rate-limit identity trusts only the validated platform client IP", () => {
+  const request = new Request("https://booking.zone4you.cz/api/lessons", {
+    headers: {
+      "x-vercel-forwarded-for": "203.0.113.10",
+      "x-forwarded-for": "198.51.100.20",
+      "x-real-ip": "198.51.100.30",
+    },
+  });
+  assert.equal(clientAddress(request, { VERCEL: "1" }), "203.0.113.10");
+  assert.equal(clientAddress(request, {}), "198.51.100.20");
+
+  const spoofOnly = new Request("https://booking.zone4you.cz/api/lessons", {
+    headers: {
+      "x-vercel-forwarded-for": "not-an-ip",
+      "x-forwarded-for": "198.51.100.20",
+      "x-real-ip": "198.51.100.30",
+    },
+  });
+  assert.equal(clientAddress(spoofOnly, { VERCEL_ENV: "production" }), "unknown");
 });

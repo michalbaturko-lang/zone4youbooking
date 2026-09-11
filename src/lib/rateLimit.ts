@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { isIP } from "node:net";
 import { Pool } from "pg";
 import { BookingApiError } from "./errors";
 import { validTlsPostgresUrl } from "./paymentConfig";
@@ -156,10 +157,22 @@ export const rateLimitRules = {
   topup: { scope: "topup-create", limit: 5, windowMs: 10 * 60_000 },
 } satisfies Record<string, RateLimitRule>;
 
-function clientAddress(request: Request) {
-  const realIp = request.headers.get("x-real-ip")?.trim();
-  if (realIp) return realIp;
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+function validForwardedAddress(value: string | null) {
+  const candidate = value?.split(",", 1)[0]?.trim();
+  return candidate && isIP(candidate) !== 0 ? candidate : undefined;
+}
+
+export function clientAddress(
+  request: Request,
+  environment: Record<string, string | undefined> = process.env,
+) {
+  const vercelRuntime = environment.VERCEL === "1" || Boolean(environment.VERCEL_ENV);
+  if (vercelRuntime) {
+    return validForwardedAddress(request.headers.get("x-vercel-forwarded-for")) ?? "unknown";
+  }
+  return validForwardedAddress(request.headers.get("x-forwarded-for")) ??
+    validForwardedAddress(request.headers.get("x-real-ip")) ??
+    "unknown";
 }
 
 function rateLimitKey(request: Request, rule: RateLimitRule, discriminator = "") {
