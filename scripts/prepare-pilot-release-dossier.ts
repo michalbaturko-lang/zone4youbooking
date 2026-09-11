@@ -87,6 +87,11 @@ export function buildPilotReleaseDossier(environment: Environment = process.env)
   );
   if (stagingTarget === productionTarget) throw new Error("ZONE4YOU_STAGING_APP_ORIGIN must not be production.");
   const luxartOrigin = cleanHttpsOrigin(required(environment, "LUXART_API_BASE_URL"), "LUXART_API_BASE_URL");
+  const luxartUrl = new URL(luxartOrigin);
+  const luxartPort = luxartUrl.port || "443";
+  if (luxartPort !== "9191") {
+    throw new Error("LUXART_API_BASE_URL must use the approved Zone4You port 9191 for release evidence.");
+  }
   const startsAt = timestamp(required(environment, "ZONE4YOU_RELEASE_WINDOW_STARTS_AT"), "ZONE4YOU_RELEASE_WINDOW_STARTS_AT");
   const endsAt = timestamp(required(environment, "ZONE4YOU_RELEASE_WINDOW_ENDS_AT"), "ZONE4YOU_RELEASE_WINDOW_ENDS_AT");
   if (endsAt <= startsAt || endsAt.getTime() - startsAt.getTime() > 24 * 3_600_000) {
@@ -120,7 +125,7 @@ export function buildPilotReleaseDossier(environment: Environment = process.env)
   const pendingAt = startsAt.toISOString();
 
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     draft: true,
     releaseId: required(environment, "ZONE4YOU_RELEASE_ID"),
     target: `${productionTarget}/`,

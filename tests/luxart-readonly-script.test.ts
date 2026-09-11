@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import type { Lesson, LuxartAdapter, User } from "../src/lib/domain";
 import { validateLuxartEvidence } from "../scripts/verify-pilot-release";
@@ -8,7 +9,7 @@ import {
 } from "../scripts/verify-luxart-readonly";
 
 const now = new Date("2026-09-05T08:00:00.000Z");
-const target = "https://luxart-test.example.com:9759";
+const target = "https://luxart-test.example.com:9191";
 const environment = {
   LUXART_MOCK: "false",
   LUXART_API_BASE_URL: `${target}/`,
@@ -29,7 +30,7 @@ test("release-grade Luxart verification requires a complete test login by defaul
   );
 });
 
-test("real Luxart evidence producer satisfies the final release artifact contract", async () => {
+test("standalone Luxart evidence remains diagnostic while D1-attested evidence satisfies the release contract", async () => {
   const user: User = {
     id: "42",
     login: "release-test-user",
@@ -74,7 +75,27 @@ test("real Luxart evidence producer satisfies the final release artifact contrac
   };
 
   const evidence = await runLuxartReadonlyVerification({ environment, now, adapterFactory });
-  validateLuxartEvidence(evidence, target, new Map([["4", 204]]), "none");
+  assert.throws(
+    () => validateLuxartEvidence(evidence, target, new Map([["4", 204]]), "none"),
+    /luxartReadOnly\.d1 must be a JSON object/i,
+  );
+  validateLuxartEvidence({
+    ...evidence,
+    d1: {
+      schemaVersion: 1,
+      checkedAt: now.toISOString(),
+      targetFingerprintSha256: createHash("sha256").update(target).digest("hex"),
+      helpClassification: "ready",
+      helpTransport: "https",
+      helpPort: "9191",
+      helpHttpStatus: 200,
+      helpBodySha256: "b".repeat(64),
+      gatewayAuthMode: "none",
+      approvedOriginFingerprintVerified: true,
+      authenticatedReadOnlyVerified: true,
+      personalizedLessonSetVerified: true,
+    },
+  }, target, new Map([["4", 204]]), "none");
 
   assert.equal(evidence.ok, true);
   assert.equal(evidence.authenticated.checked, true);

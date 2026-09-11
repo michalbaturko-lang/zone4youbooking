@@ -211,6 +211,47 @@ export function validateLuxartEvidence(
   resourceMap: Map<string, number>,
   gatewayAuthMode: LuxartGatewayAuthMode,
 ) {
+  const expectedOrigin = new URL(expectedLuxartOrigin);
+  const expectedPort = expectedOrigin.port || (expectedOrigin.protocol === "https:" ? "443" : "80");
+  if (expectedPort !== "9191") {
+    throw new Error("The release Luxart origin must use the approved Zone4You port 9191.");
+  }
+  const expectedFingerprint = createHash("sha256").update(expectedOrigin.origin).digest("hex");
+  const d1 = objectValue(evidence.d1, "artifacts.luxartReadOnly.d1");
+  if (d1.schemaVersion !== 1) {
+    throw new Error("artifacts.luxartReadOnly.d1.schemaVersion must be 1.");
+  }
+  exactString(
+    stringValue(d1.checkedAt, "Luxart D1 checkedAt"),
+    stringValue(evidence.checkedAt, "Luxart evidence checkedAt"),
+    "Luxart D1 checkedAt",
+  );
+  exactString(
+    d1.targetFingerprintSha256,
+    expectedFingerprint,
+    "Luxart D1 targetFingerprintSha256",
+  );
+  exactString(d1.helpTransport, "https", "Luxart D1 helpTransport");
+  exactString(d1.helpPort, "9191", "Luxart D1 helpPort");
+  exactString(d1.gatewayAuthMode, gatewayAuthMode, "Luxart D1 gatewayAuthMode");
+  trueValue(d1.approvedOriginFingerprintVerified, "Luxart D1 approvedOriginFingerprintVerified");
+  trueValue(d1.authenticatedReadOnlyVerified, "Luxart D1 authenticatedReadOnlyVerified");
+  trueValue(d1.personalizedLessonSetVerified, "Luxart D1 personalizedLessonSetVerified");
+  const helpClassification = stringValue(d1.helpClassification, "Luxart D1 helpClassification");
+  const helpStatus = integerValue(d1.helpHttpStatus, "Luxart D1 helpHttpStatus", 1);
+  if (helpClassification === "ready") {
+    if (helpStatus !== 200) throw new Error("A ready Luxart D1 Help probe must contain HTTP 200.");
+    if (!/^[a-f0-9]{64}$/.test(stringValue(d1.helpBodySha256, "Luxart D1 helpBodySha256"))) {
+      throw new Error("Luxart D1 helpBodySha256 must be a full lowercase SHA-256 digest.");
+    }
+  } else if (helpClassification === "authentication_required") {
+    if (![401, 403].includes(helpStatus) || gatewayAuthMode === "none") {
+      throw new Error("A challenged Luxart D1 Help probe requires HTTP 401/403 and confirmed gateway authentication.");
+    }
+  } else {
+    throw new Error("Luxart D1 helpClassification must prove documentation or a confirmed gateway challenge.");
+  }
+
   exactString(cleanHttpsOrigin(evidence.target, "artifacts.luxartReadOnly.target"), expectedLuxartOrigin, "Luxart evidence target");
   exactString(evidence.gatewayAuthMode, gatewayAuthMode, "Luxart evidence gatewayAuthMode");
   const range = validateScheduleRange(evidence, "artifacts.luxartReadOnly");
@@ -448,7 +489,7 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
   }
 
   const dossier = dossierFile.data;
-  if (dossier.schemaVersion !== 2) throw new Error("release dossier schemaVersion must be 2.");
+  if (dossier.schemaVersion !== 3) throw new Error("release dossier schemaVersion must be 3.");
   falseValue(dossier.draft, "release dossier draft");
   const releaseId = stringValue(dossier.releaseId, "releaseId");
   const target = cleanHttpsOrigin(dossier.target, "target");

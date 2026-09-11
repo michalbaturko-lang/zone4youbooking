@@ -150,6 +150,20 @@ export async function runLuxartD1Verification({
   ) {
     throw new Error("Luxart Help evidence does not match the approved HTTPS origin and port.");
   }
+  const helpHttpStatus = "httpStatus" in help ? help.httpStatus : undefined;
+  const helpBodySha256 = "bodySha256" in help ? help.bodySha256 : undefined;
+  if (
+    help.classification === "ready" &&
+    (help.ok !== true || help.reached !== true || helpHttpStatus !== 200 || !/^[a-f0-9]{64}$/.test(helpBodySha256 ?? ""))
+  ) {
+    throw new Error("Luxart Help ready evidence is internally inconsistent.");
+  }
+  if (
+    help.classification === "authentication_required" &&
+    (help.ok !== false || help.reached !== true || ![401, 403].includes(helpHttpStatus ?? 0))
+  ) {
+    throw new Error("Luxart Help authentication challenge evidence is internally inconsistent.");
+  }
   if (!helpAccepted(help, gateway)) {
     throw new Error(`Luxart Help transport check did not pass safely (${help.classification}).`);
   }
@@ -168,7 +182,24 @@ export async function runLuxartD1Verification({
     throw new Error("Luxart read-only evidence does not verify personalized lesson eligibility.");
   }
 
-  const body = `${JSON.stringify(evidence, null, 2)}\n`;
+  const d1Evidence = {
+    ...evidence,
+    d1: {
+      schemaVersion: 1,
+      checkedAt: help.checkedAt,
+      targetFingerprintSha256: configuration.targetFingerprintSha256,
+      helpClassification: help.classification,
+      helpTransport: help.transport,
+      helpPort: help.port,
+      helpHttpStatus,
+      ...(help.classification === "ready" ? { helpBodySha256 } : {}),
+      gatewayAuthMode: gateway.gatewayAuthMode,
+      approvedOriginFingerprintVerified: true,
+      authenticatedReadOnlyVerified: true,
+      personalizedLessonSetVerified: true,
+    },
+  };
+  const body = `${JSON.stringify(d1Evidence, null, 2)}\n`;
   writeFileSync(configuration.outputPath, body, { encoding: "utf8", flag: "wx", mode: 0o600 });
   const storedBytes = readFileSync(configuration.outputPath);
   const storedMode = lstatSync(configuration.outputPath).mode & 0o777;

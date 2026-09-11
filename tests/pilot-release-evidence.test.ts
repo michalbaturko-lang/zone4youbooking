@@ -9,7 +9,8 @@ import { verifyPilotReleaseEvidence } from "../scripts/verify-pilot-release";
 const now = new Date("2026-09-05T08:00:00.000Z");
 const commit = "1234567890abcdef1234567890abcdef12345678";
 const stagingTarget = "https://staging.booking.zone4you.cz";
-const luxartTarget = "https://luxart-test.example.com:9759";
+const luxartTarget = "https://luxart-test.example.com:9191";
+const luxartTargetFingerprint = createHash("sha256").update(luxartTarget).digest("hex");
 const occurrenceSetSha256 = "a".repeat(64);
 
 function writeJson(path: string, value: unknown) {
@@ -27,6 +28,20 @@ function validFixture() {
       checkedAt,
       target: luxartTarget,
       gatewayAuthMode: "none",
+      d1: {
+        schemaVersion: 1,
+        checkedAt,
+        targetFingerprintSha256: luxartTargetFingerprint,
+        helpClassification: "ready",
+        helpTransport: "https",
+        helpPort: "9191",
+        helpHttpStatus: 200,
+        helpBodySha256: "b".repeat(64),
+        gatewayAuthMode: "none",
+        approvedOriginFingerprintVerified: true,
+        authenticatedReadOnlyVerified: true,
+        personalizedLessonSetVerified: true,
+      },
       range: {
         from: "2026-09-05T00:00:00.000Z",
         to: "2026-09-12T00:00:00.000Z",
@@ -193,7 +208,7 @@ function validFixture() {
   );
   chmodSync(artifacts.dnsRollbackBaseline.path, 0o600);
   const dossier = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     draft: false,
     releaseId: "zone4you-pilot-2026-09-05",
     target: "https://booking.zone4you.cz/",
@@ -270,6 +285,20 @@ test("pilot release dossier binds live Luxart, UAT, application and DNS rollback
 
 test("pilot release dossier rejects evidence that cannot come from the real guarded producers", () => {
   for (const [artifactName, mutate, expectedError] of [
+    [
+      "luxartReadOnly",
+      (artifact: Record<string, unknown>) => {
+        delete artifact.d1;
+      },
+      /luxartReadOnly\.d1 must be a JSON object/i,
+    ],
+    [
+      "luxartReadOnly",
+      (artifact: Record<string, unknown>) => {
+        (artifact.d1 as Record<string, unknown>).targetFingerprintSha256 = "c".repeat(64);
+      },
+      /D1 targetFingerprintSha256 must exactly equal/i,
+    ],
     [
       "luxartReadOnly",
       (artifact: Record<string, unknown>) => {

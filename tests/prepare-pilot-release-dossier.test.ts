@@ -37,7 +37,7 @@ function fixture() {
     ZONE4YOU_RELEASE_COMMIT: "1234567890abcdef1234567890abcdef12345678",
     ZONE4YOU_DEPLOYMENT_PHASE: "booking_without_payments",
     ZONE4YOU_STAGING_APP_ORIGIN: "https://staging.booking.zone4you.cz/",
-    LUXART_API_BASE_URL: "https://luxart-test.example.com:9759/",
+    LUXART_API_BASE_URL: "https://luxart-test.example.com:9191/",
     ZONE4YOU_RELEASE_WINDOW_STARTS_AT: "2026-09-05T08:00:00.000Z",
     ZONE4YOU_RELEASE_WINDOW_ENDS_AT: "2026-09-05T12:00:00.000Z",
     ZONE4YOU_LUXART_EVIDENCE_PATH: evidencePaths.luxart,
@@ -55,6 +55,7 @@ test("dossier preparation hashes real evidence but remains an explicit human-app
   const result = writePilotReleaseDossier(environment);
   const body = readFileSync(outputPath, "utf8");
   const dossier = JSON.parse(body) as {
+    schemaVersion: number;
     draft: boolean;
     artifacts: Record<string, { path: string; sha256: string }>;
     approvals: {
@@ -68,6 +69,7 @@ test("dossier preparation hashes real evidence but remains an explicit human-app
   assert.equal(result.draft, true);
   assert.equal(result.artifactCount, 6);
   assert.equal(result.dossierSha256, createHash("sha256").update(body).digest("hex"));
+  assert.equal(dossier.schemaVersion, 3);
   assert.equal(dossier.draft, true);
   assert.equal(dossier.approvals.uat.decision, "NO-GO");
   assert.equal(dossier.approvals.uat.approvedBy, "pending-human-approval");
@@ -94,5 +96,14 @@ test("dossier preparation refuses failed evidence and unsafe origins", () => {
       ZONE4YOU_STAGING_APP_ORIGIN: "https://booking.zone4you.cz/",
     }),
     /must not be production/i,
+  );
+
+  const wrongLuxartPort = fixture();
+  assert.throws(
+    () => buildPilotReleaseDossier({
+      ...wrongLuxartPort.environment,
+      LUXART_API_BASE_URL: "https://luxart-test.example.com:9759/",
+    }),
+    /must use the approved Zone4You port 9191/i,
   );
 });

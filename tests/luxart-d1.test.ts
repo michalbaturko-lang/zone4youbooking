@@ -165,7 +165,24 @@ test("D1 performs only transport, gateway and authenticated read-only checks bef
     assert.equal(lstatSync(outputPath).mode & 0o777, 0o600);
     const stored = readFileSync(outputPath, "utf8");
     assert.doesNotMatch(stored, /not-printed|test-client/);
-    assert.deepEqual(JSON.parse(stored), readonlyEvidence());
+    const parsed = JSON.parse(stored) as Record<string, unknown>;
+    const d1 = parsed.d1;
+    delete parsed.d1;
+    assert.deepEqual(parsed, readonlyEvidence());
+    assert.deepEqual(d1, {
+      schemaVersion: 1,
+      checkedAt: now.toISOString(),
+      targetFingerprintSha256: approvedOriginFingerprint,
+      helpClassification: "ready",
+      helpTransport: "https",
+      helpPort: "9191",
+      helpHttpStatus: 200,
+      helpBodySha256: "c".repeat(64),
+      gatewayAuthMode: "none",
+      approvedOriginFingerprintVerified: true,
+      authenticatedReadOnlyVerified: true,
+      personalizedLessonSetVerified: true,
+    });
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -205,6 +222,48 @@ test("D1 rejects Help evidence from a different origin before the authenticated 
         },
       }),
       /does not match the approved HTTPS origin and port/i,
+    );
+    assert.equal(readonlyCalls, 0);
+    assert.equal(existsSync(outputPath), false);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("D1 rejects internally inconsistent Help success before the authenticated read-only request", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "zone4you-d1-"));
+  try {
+    const outputPath = join(directory, "luxart.json");
+    let readonlyCalls = 0;
+    await assert.rejects(
+      runLuxartD1Verification({
+        environment: environment(outputPath),
+        now,
+        repositoryRoot: "/repository",
+        gatewayVerifier: () => ({
+          ok: true,
+          checkedAt: now.toISOString(),
+          gatewayAuthMode: "none",
+          authorizationHeaderConfigured: false,
+          gatewayDecisionConfirmed: true,
+        }),
+        helpProbe: async () => ({
+          ok: true,
+          checkedAt: now.toISOString(),
+          targetFingerprintSha256: approvedOriginFingerprint,
+          transport: "https",
+          port: "9191",
+          reached: true,
+          httpStatus: 204,
+          classification: "ready",
+          bodySha256: "c".repeat(64),
+        }),
+        readonlyVerifier: async () => {
+          readonlyCalls += 1;
+          return readonlyEvidence();
+        },
+      }),
+      /ready evidence is internally inconsistent/i,
     );
     assert.equal(readonlyCalls, 0);
     assert.equal(existsSync(outputPath), false);

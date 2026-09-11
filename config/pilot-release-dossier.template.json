@@ -1,10 +1,10 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "draft": true,
   "releaseId": "zone4you-pilot-2026-09-05",
   "target": "https://booking.zone4you.cz/",
   "stagingTarget": "https://staging.booking.zone4you.cz/",
-  "luxartOrigin": "https://replace-with-approved-luxart-test-origin.example/",
+  "luxartOrigin": "https://replace-with-approved-luxart-test-origin.example:9191/",
   "commit": "0000000000000000000000000000000000000000",
   "launchMode": "booking_without_payments",
   "maximumEvidenceAgeHours": 72,
@@ -14,7 +14,7 @@
   },
   "artifacts": {
     "luxartReadOnly": {
-      "path": "/secure/release-evidence/luxart-readonly.json",
+      "path": "/secure/release-evidence/luxart-d1.json",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
     },
     "runtimeProbe": {
