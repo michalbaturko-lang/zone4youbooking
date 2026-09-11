@@ -516,10 +516,10 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
       }
       const mapping = mappingFromEnvironment(context.locale);
       const waitlistEnabled = process.env.LUXART_WAITLIST_ENABLED === "true";
-      return lessons.map((lesson) => ({
+      return assertUniqueResponseIds(lessons.map((lesson) => ({
         ...mapValidatedLuxartLesson(lesson, mapping),
         waitlistEnabled,
-      }));
+      })));
     },
 
     async getReservations(): Promise<Reservation[]> {

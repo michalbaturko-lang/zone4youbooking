@@ -19,7 +19,7 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
   let watchdogDeleted = false;
   let delayReservationPost = false;
   let redirectFollowed = false;
-  let malformedRead: "lessons" | "reservations" | "watchdog" | "credit" | undefined;
+  let malformedRead: "lessons" | "duplicate-lessons" | "reservations" | "watchdog" | "credit" | undefined;
   let malformedMutation:
     | "reservation-create"
     | "reservation-cancel"
@@ -129,6 +129,10 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
       assert.equal(url.searchParams.get("id_service"), "0");
       if (malformedRead === "lessons") {
         response.end(JSON.stringify({ unexpected: true }));
+        return;
+      }
+      if (malformedRead === "duplicate-lessons") {
+        response.end(JSON.stringify([lesson, { ...lesson, cislo_salu: 3 }]));
         return;
       }
       response.end(JSON.stringify([
@@ -340,6 +344,17 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
   assert.equal(lessons.length, 1);
   assert.equal(lessons[0].roomName, "Sál 2");
   assert.equal(lessons[0].availableCount, 5);
+
+  malformedRead = "duplicate-lessons";
+  const postsBeforeDuplicateLesson = reservationPostCount;
+  await assert.rejects(
+    adapter.createReservation({ lessonId: lessons[0].id }),
+    (error: unknown) => error instanceof BookingApiError &&
+      error.status === 502 &&
+      error.code === "LUXART_RESPONSE_INVALID",
+  );
+  assert.equal(reservationPostCount, postsBeforeDuplicateLesson);
+  malformedRead = undefined;
 
   for (const endpoint of ["lessons", "reservations", "watchdog", "credit"] as const) {
     malformedRead = endpoint;
