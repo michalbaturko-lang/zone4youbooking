@@ -9,7 +9,7 @@ Každý bod označte `PASS`, `FAIL` nebo `N/A — funkce bezpečně vypnutá`. K
 ## Rozvrh a jazyky
 
 - [ ] Všechny položky aktuální sedmidenní odpovědi `api/Lesson` jsou dohledatelné v UI.
-- [ ] Přihlášený testovací klient obdrží u každé lekce binární `user_posible`; povolená lekce lze rezervovat a nepovolená zůstane viditelná, ale nevytvoří žádný Luxart POST.
+- [ ] Přihlášený testovací klient obdrží u každé lekce binární `user_posible`; jeho CS i EN rozvrh má stejný počet a hash výskytů jako anonymní feed, povolená lekce lze rezervovat a nepovolená zůstane viditelná, ale nevytvoří žádný Luxart POST.
 - [ ] Privacy-safe request evidence potvrzuje `date_start` dnešního pražského dne, `pocet_dni_dopredu=7`, `id_kategorie=0`, `id_service=0` a resort 1.
 - [ ] Výskyt s duplicitním occurrence ID, chybějícím zobrazovaným polem, neplatným časovým intervalem nebo na osmém pražském dni vyvolá bezpečný stav nedostupnosti; nesmí se potichu zobrazit ani zahodit jako údajně úplný feed.
 - [ ] Čas bez explicitního `Z` / UTC offsetu a neexistující kalendářní datum v lekci, rezervaci, kreditu nebo watchdogu vyvolají bezpečný stav nedostupnosti; desktop, mobil ani hostingová časová zóna je nesmí interpretovat rozdílně.

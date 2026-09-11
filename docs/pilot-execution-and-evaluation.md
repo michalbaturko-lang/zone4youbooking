@@ -64,7 +64,7 @@ Kritický externí deadline je přístup k Zone4You testovacímu API do konce D1
 | Kritérium | GO práh | Povinný důkaz |
 |---|---|---|
 | Úplnost `api/Lesson` | 100 % položek sedmidenní odpovědi resortu 1 je buď zobrazena, nebo explicitně označena jako nevalidní; žádný whitelist ani klientský override rozsahu/resortu | kontraktní test přímo ověří `date_start`, `pocet_dni_dopredu=7`, `id_kategorie=0` a `id_service=0` přes jarní i podzimní změnu času; živý důkaz porovná počet/ID proti anonymizované fixture |
-| Personalizovaná rezervovatelnost | `user_posible=0` lekci neschová, ale zablokuje rezervaci; chybějící nebo nebinární hodnota v přihlášené mutační cestě nevytvoří Luxart POST | živá dvojice povolená/nepovolená lekce + request evidence |
+| Personalizovaná rezervovatelnost | přihlášený CS i EN feed má shodný počet/hash jako anonymní feed; `user_posible=0` lekci neschová, ale zablokuje rezervaci; chybějící nebo nebinární hodnota nevytvoří Luxart POST | agregovaný `verify:luxart-d1` důkaz + živá dvojice povolená/nepovolená lekce + request evidence |
 | Sály a Reformer | známé mapování je správné; neznámý sál nesmí položku zahodit | test známého i neznámého `cislo_salu`, browser filtr |
 | Scope mimo Lessons | Squash/masáže/stolní tenis nejsou omylem vydávány za lekce | scope checklist a UI kontrola |
 

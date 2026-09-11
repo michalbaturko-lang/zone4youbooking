@@ -250,6 +250,31 @@ export function validateLuxartEvidence(
   const authentication = objectValue(evidence.authenticated, "artifacts.luxartReadOnly.authenticated");
   trueValue(authentication.checked, "artifacts.luxartReadOnly.authenticated.checked");
   trueValue(authentication.userLoaded, "artifacts.luxartReadOnly.authenticated.userLoaded");
+  const personalized = objectValue(evidence.personalized, "artifacts.luxartReadOnly.personalized");
+  trueValue(personalized.checked, "artifacts.luxartReadOnly.personalized.checked");
+  let expectedEligible: number | undefined;
+  let expectedIneligible: number | undefined;
+  for (const [language, label] of [["czech", "Czech"], ["english", "English"]] as const) {
+    const localized = objectValue(personalized[language], `artifacts.luxartReadOnly.personalized.${language}`);
+    if (integerValue(localized.count, `Luxart personalized ${label} count`, 1) !== count) {
+      throw new Error(`The personalized ${label} Luxart feed does not contain every anonymous lesson.`);
+    }
+    exactString(
+      localized.occurrenceSetSha256,
+      occurrenceSha,
+      `Luxart personalized ${label} occurrence digest`,
+    );
+    const eligible = integerValue(localized.eligible, `Luxart personalized ${label} eligible count`);
+    const ineligible = integerValue(localized.ineligible, `Luxart personalized ${label} ineligible count`);
+    if (eligible + ineligible !== count) {
+      throw new Error(`Every personalized ${label} Luxart lesson must have known binary eligibility.`);
+    }
+    if (expectedEligible !== undefined && (eligible !== expectedEligible || ineligible !== expectedIneligible)) {
+      throw new Error("Czech and English personalized Luxart eligibility counts differ.");
+    }
+    expectedEligible = eligible;
+    expectedIneligible = ineligible;
+  }
   return { count, reformer, occurrenceSha, observedRooms, range, lessonRange: czechRange };
 }
 
@@ -492,6 +517,7 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
       liveLuxartVerified: true,
       allObservedRoomsMapped: true,
       fullLessonFeedMatched: true,
+      personalizedEligibilityVerified: true,
       exactSevenDayPragueRangeVerified: true,
       bookingMutationUatPassed: true,
       rollbackUnderFiveMinutes: true,

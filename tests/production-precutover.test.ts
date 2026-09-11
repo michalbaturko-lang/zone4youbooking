@@ -26,6 +26,7 @@ function releaseEvidence() {
       liveLuxartVerified: true,
       allObservedRoomsMapped: true,
       fullLessonFeedMatched: true,
+      personalizedEligibilityVerified: true,
       exactSevenDayPragueRangeVerified: true,
       bookingMutationUatPassed: true,
       rollbackUnderFiveMinutes: true,

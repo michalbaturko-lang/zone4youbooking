@@ -51,6 +51,7 @@ test("real Luxart evidence producer satisfies the final release artifact contrac
     category: "Reformer",
     capacity: 8,
     occupiedCount: 2,
+    canCurrentUserReserve: true,
     priceKc: 200,
     waitlistEnabled: false,
   });
@@ -80,5 +81,34 @@ test("real Luxart evidence producer satisfies the final release artifact contrac
   assert.equal(evidence.czech.count, 1);
   assert.equal(evidence.czech.reformer, 1);
   assert.equal(evidence.czech.occurrenceSetSha256, evidence.english.occurrenceSetSha256);
+  assert.equal(evidence.personalized.checked, true);
+  if (evidence.personalized.checked) {
+    assert.equal(evidence.personalized.czech.count, 1);
+    assert.equal(evidence.personalized.czech.eligible, 1);
+    assert.equal(evidence.personalized.czech.ineligible, 0);
+    assert.equal(evidence.personalized.czech.occurrenceSetSha256, evidence.czech.occurrenceSetSha256);
+    assert.equal(evidence.personalized.english.eligible, evidence.personalized.czech.eligible);
+  }
   assert.equal(JSON.stringify(evidence).includes("release-test-password"), false);
+
+  const missingEligibilityFactory = (context: { userId?: string; locale: "cs" | "en" }) => ({
+    ...adapterFactory(context),
+    getLessons: async () => [{
+      ...lesson(context.locale),
+      canCurrentUserReserve: context.userId ? undefined : true,
+    }],
+  } satisfies LuxartAdapter);
+  await assert.rejects(
+    runLuxartReadonlyVerification({ environment, now, adapterFactory: missingEligibilityFactory }),
+    /authenticated Luxart lesson did not provide a binary user_posible/i,
+  );
+
+  const hiddenPersonalizedLessonFactory = (context: { userId?: string; locale: "cs" | "en" }) => ({
+    ...adapterFactory(context),
+    getLessons: async () => context.userId ? [] : [lesson(context.locale)],
+  } satisfies LuxartAdapter);
+  await assert.rejects(
+    runLuxartReadonlyVerification({ environment, now, adapterFactory: hiddenPersonalizedLessonFactory }),
+    /does not contain the complete anonymous Luxart lesson set/i,
+  );
 });

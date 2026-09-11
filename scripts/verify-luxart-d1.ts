@@ -146,6 +146,9 @@ export async function runLuxartD1Verification({
   if (!evidence.authenticated || evidence.authenticated.checked !== true) {
     throw new Error("Luxart read-only evidence is not authenticated.");
   }
+  if (!evidence.personalized || evidence.personalized.checked !== true) {
+    throw new Error("Luxart read-only evidence does not verify personalized lesson eligibility.");
+  }
 
   const body = `${JSON.stringify(evidence, null, 2)}\n`;
   writeFileSync(configuration.outputPath, body, { encoding: "utf8", flag: "wx", mode: 0o600 });
@@ -166,6 +169,9 @@ export async function runLuxartD1Verification({
     englishLessonCount: evidence.english.count,
     reformerCount: evidence.czech.reformer,
     observedRoomNumbers: evidence.czech.roomNumbers,
+    eligibleLessonCount: evidence.personalized.czech.eligible,
+    ineligibleLessonCount: evidence.personalized.czech.ineligible,
+    personalizedLessonSetMatched: true,
     evidenceSha256: createHash("sha256").update(storedBytes).digest("hex"),
     evidenceStoredOwnerOnly: true,
   };

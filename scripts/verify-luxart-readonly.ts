@@ -64,6 +64,29 @@ function lessonEvidence(lessons: Lesson[], range: { from: string; to: string }) 
   };
 }
 
+function personalizedLessonEvidence(lessons: Lesson[], range: { from: string; to: string }) {
+  let eligible = 0;
+  let ineligible = 0;
+  for (const lesson of lessons) {
+    if (lesson.canCurrentUserReserve === true) eligible += 1;
+    else if (lesson.canCurrentUserReserve === false) ineligible += 1;
+    else {
+      throw new Error("An authenticated Luxart lesson did not provide a binary user_posible value.");
+    }
+  }
+  return { ...lessonEvidence(lessons, range), eligible, ineligible };
+}
+
+function assertSameLessonOccurrences(
+  actual: { count: number; occurrenceSetSha256: string },
+  expected: { count: number; occurrenceSetSha256: string },
+  label: string,
+) {
+  if (actual.count !== expected.count || actual.occurrenceSetSha256 !== expected.occurrenceSetSha256) {
+    throw new Error(`${label} does not contain the complete anonymous Luxart lesson set.`);
+  }
+}
+
 export function loadLuxartTestCredentials(environment: Environment = process.env) {
   const login = environment.LUXART_TEST_LOGIN?.trim();
   const password = environment.LUXART_TEST_PASSWORD;
@@ -111,20 +134,45 @@ export async function runLuxartReadonlyVerification({
   }
 
   let authenticatedEvidence: Record<string, unknown> = { checked: false, reason: "test credentials not configured" };
+  let personalizedEvidence:
+    | { checked: false; reason: string }
+    | {
+      checked: true;
+      czech: ReturnType<typeof personalizedLessonEvidence>;
+      english: ReturnType<typeof personalizedLessonEvidence>;
+    } = { checked: false, reason: "test credentials not configured" };
   if (authentication) {
     const loginResult = await adapterFactory({ locale: "cs" }).login(authentication);
-    const authenticatedAdapter = adapterFactory({ userId: loginResult.user.id, locale: "cs" });
-    const [user, reservations, transactions] = await Promise.all([
-      authenticatedAdapter.getCurrentUser(),
-      authenticatedAdapter.getReservations(),
-      authenticatedAdapter.getCreditTransactions(),
+    const authenticatedCzechAdapter = adapterFactory({ userId: loginResult.user.id, locale: "cs" });
+    const authenticatedEnglishAdapter = adapterFactory({ userId: loginResult.user.id, locale: "en" });
+    const [user, reservations, transactions, personalizedCzechLessons, personalizedEnglishLessons] = await Promise.all([
+      authenticatedCzechAdapter.getCurrentUser(),
+      authenticatedCzechAdapter.getReservations(),
+      authenticatedCzechAdapter.getCreditTransactions(),
+      authenticatedCzechAdapter.getLessons(query),
+      authenticatedEnglishAdapter.getLessons(query),
     ]);
     if (!user) throw new Error("Luxart login succeeded but User could not be loaded.");
+    const personalizedCzech = personalizedLessonEvidence(personalizedCzechLessons, query);
+    const personalizedEnglish = personalizedLessonEvidence(personalizedEnglishLessons, query);
+    assertSameLessonOccurrences(personalizedCzech, czech, "The authenticated Czech feed");
+    assertSameLessonOccurrences(personalizedEnglish, english, "The authenticated English feed");
+    if (
+      personalizedCzech.eligible !== personalizedEnglish.eligible ||
+      personalizedCzech.ineligible !== personalizedEnglish.ineligible
+    ) {
+      throw new Error("Czech and English authenticated feeds disagree on personalized lesson eligibility.");
+    }
     authenticatedEvidence = {
       checked: true,
       userLoaded: true,
       reservations: reservations.length,
       creditTransactions: transactions.length,
+    };
+    personalizedEvidence = {
+      checked: true,
+      czech: personalizedCzech,
+      english: personalizedEnglish,
     };
   }
 
@@ -142,6 +190,7 @@ export async function runLuxartReadonlyVerification({
     czech,
     english,
     authenticated: authenticatedEvidence,
+    personalized: personalizedEvidence,
   };
 }
 

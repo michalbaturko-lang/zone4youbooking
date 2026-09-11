@@ -65,8 +65,8 @@ Read-only test se nespouští, pokud chybí síťová cesta, gateway režim, pot
 
 1. Zkontrolovat, že URL neobsahuje username, heslo ani token.
 2. Ověřit `/Help` a gateway konfiguraci bez klientského loginu.
-3. Spustit český a anglický read-only feed pro přesně sedm pražských kalendářních dnů.
-4. Porovnat počet a hash všech výskytů, sály a Reformer; neznámý sál se nesmí zahodit.
+3. Spustit anonymní i přihlášený český a anglický read-only feed pro přesně sedm pražských kalendářních dnů.
+4. Porovnat počet a hash všech anonymních i personalizovaných výskytů, sály a Reformer; neznámý sál ani `user_posible=0` nesmí položku zahodit a každá přihlášená položka musí mít binární rezervovatelnost.
 5. Získat úplné mapování všech skutečně pozorovaných čísel sálů.
 6. Teprve po samostatné autoritě připravit staging, alert, rollback a jedno řízené UAT.
 7. Produkční deploy, DNS a cutover zůstávají samostatně schvalované akce.

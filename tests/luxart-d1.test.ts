@@ -58,6 +58,11 @@ function readonlyEvidence(gatewayAuthMode: "none" | "basic" = "none") {
       reservations: 0,
       creditTransactions: 1,
     },
+    personalized: {
+      checked: true as const,
+      czech: { ...feed, eligible: 18, ineligible: 6 },
+      english: { ...feed, eligible: 18, ineligible: 6 },
+    },
   };
 }
 
@@ -134,6 +139,9 @@ test("D1 performs only transport, gateway and authenticated read-only checks bef
     assert.equal(receipt.ok, true);
     assert.equal(receipt.czechLessonCount, 24);
     assert.equal(receipt.reformerCount, 3);
+    assert.equal(receipt.eligibleLessonCount, 18);
+    assert.equal(receipt.ineligibleLessonCount, 6);
+    assert.equal(receipt.personalizedLessonSetMatched, true);
     assert.equal(receipt.evidenceStoredOwnerOnly, true);
     assert.match(receipt.evidenceSha256, /^[a-f0-9]{64}$/);
     assert.equal(lstatSync(outputPath).mode & 0o777, 0o600);

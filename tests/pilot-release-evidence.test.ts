@@ -54,6 +54,11 @@ function validFixture() {
         dateKeys: ["2026-09-05", "2026-09-11"],
       },
       authenticated: { checked: true, userLoaded: true, reservations: 0, creditTransactions: 2 },
+      personalized: {
+        checked: true,
+        czech: { count: 24, occurrenceSetSha256, eligible: 22, ineligible: 2 },
+        english: { count: 24, occurrenceSetSha256, eligible: 22, ineligible: 2 },
+      },
     },
     runtimeProbe: {
       ok: true,
@@ -233,6 +238,7 @@ test("pilot release dossier binds live Luxart, UAT, application and DNS rollback
   const result = verifyPilotReleaseEvidence(fixture.environment, now);
   assert.equal(result.ok, true);
   assert.equal(result.conditions.fullLessonFeedMatched, true);
+  assert.equal(result.conditions.personalizedEligibilityVerified, true);
   assert.equal(result.conditions.exactSevenDayPragueRangeVerified, true);
   assert.equal(result.conditions.dnsRollbackBaselineReady, true);
   assert.equal(result.conditions.explicitCutoverApproval, true);
@@ -249,6 +255,15 @@ test("pilot release dossier binds live Luxart, UAT, application and DNS rollback
 
 test("pilot release dossier rejects evidence that cannot come from the real guarded producers", () => {
   for (const [artifactName, mutate, expectedError] of [
+    [
+      "luxartReadOnly",
+      (artifact: Record<string, unknown>) => {
+        const personalized = artifact.personalized as { english: Record<string, unknown> };
+        personalized.english.eligible = 23;
+        personalized.english.ineligible = 1;
+      },
+      /Czech and English personalized Luxart eligibility counts differ/i,
+    ],
     [
       "bookingMutationUat",
       (artifact: Record<string, unknown>) => {
