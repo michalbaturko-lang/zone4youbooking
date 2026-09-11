@@ -21,6 +21,7 @@ import {
   mapLuxartReservation,
   mapLuxartUser,
   mapLuxartWatchdog,
+  parseExplicitLuxartDateTime,
   parseLuxartLessonId,
   parseLuxartWatchdogId,
   type LuxartLessonData,
@@ -239,10 +240,24 @@ function mappingFromEnvironment(locale: Locale = "cs"): LuxartLessonMapping {
 }
 
 function scheduleDays(query: LessonQuery) {
-  const from = new Date(query.from).getTime();
-  const to = new Date(query.to).getTime();
-  if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) return 7;
-  return Math.min(31, Math.max(1, Math.ceil((to - from) / 86_400_000)));
+  const from = parseExplicitLuxartDateTime(query.from);
+  const to = parseExplicitLuxartDateTime(query.to);
+  const fromDay = /^(\d{4}-\d{2}-\d{2})T/.exec(query.from)?.[1];
+  const toDay = /^(\d{4}-\d{2}-\d{2})T/.exec(query.to)?.[1];
+  if (!from || !to || to <= from || !fromDay || !toDay) {
+    throw new BookingApiError(400, "INVALID_LESSON_RANGE", "Rozsah rozvrhu není platný.");
+  }
+
+  // Luxart expects a count of calendar dates beginning at date_start, not a
+  // count of elapsed 24-hour periods. The latter becomes 8 across Prague's
+  // 25-hour autumn daylight-saving transition.
+  const days = (
+    Date.parse(`${toDay}T00:00:00.000Z`) - Date.parse(`${fromDay}T00:00:00.000Z`)
+  ) / 86_400_000;
+  if (!Number.isSafeInteger(days) || days < 1 || days > 31) {
+    throw new BookingApiError(400, "INVALID_LESSON_RANGE", "Rozsah rozvrhu není platný.");
+  }
+  return days;
 }
 
 function assertWatchdogEnabled() {

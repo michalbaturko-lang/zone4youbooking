@@ -371,6 +371,27 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
     assert.equal(query?.get("pocet_dni_dopredu"), "7");
   }
 
+  for (const range of [
+    { from: "2026-03-29T00:00:00+01:00", to: "2026-04-05T00:00:00+02:00" },
+    { from: "2026-10-25T00:00:00+02:00", to: "2026-11-01T00:00:00+01:00" },
+  ]) {
+    await adapter.getLessons({ ...range, resortId: 1 });
+    const query = capturedLessonQueries.at(-1);
+    assert.equal(query?.get("date_start"), range.from.slice(0, 10));
+    assert.equal(query?.get("pocet_dni_dopredu"), "7");
+  }
+
+  for (const invalidRange of [
+    { from: "not-a-date", to: "2026-09-02T00:00:00Z" },
+    { from: "2026-09-02T00:00:00Z", to: "2026-09-01T00:00:00Z" },
+    { from: "2026-09-01T00:00:00Z", to: "2026-10-03T00:00:00Z" },
+  ]) {
+    await assert.rejects(
+      adapter.getLessons({ ...invalidRange, resortId: 1 }),
+      (error: unknown) => error instanceof BookingApiError && error.code === "INVALID_LESSON_RANGE",
+    );
+  }
+
   await assert.rejects(
     adapter.getLessons({
       from: "2026-09-01T00:00:00Z",
