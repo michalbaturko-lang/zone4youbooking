@@ -95,6 +95,18 @@ test("runtime feed rejects ambiguous or structurally invalid Luxart occurrences"
     () => assertLessonFeedWithinQuery([{ ...valid, endsAt: valid.startsAt }], query),
     /neplatným časem/i,
   );
+  for (const invalid of [
+    { durationMinutes: 0 },
+    { capacity: -1 },
+    { occupiedCount: -1 },
+    { priceKc: Number.NaN },
+    { waitlistEnabled: undefined },
+  ]) {
+    assert.throws(
+      () => assertLessonFeedWithinQuery([{ ...valid, ...invalid } as Lesson], query),
+      /neplatné hodnoty lekce/i,
+    );
+  }
 });
 
 test("snapshot path fails closed before presenting an invalid Luxart feed", async () => {

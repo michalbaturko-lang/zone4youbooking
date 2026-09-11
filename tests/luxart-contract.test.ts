@@ -60,6 +60,25 @@ test("keeps unknown rooms and lesson types visible with safe fallbacks", () => {
   assert.equal(lesson.category, "Ostatní");
 });
 
+test("rejects malformed required Luxart lesson values instead of coercing them to zero", () => {
+  for (const invalid of [
+    { resort: 0 },
+    { id_service: 0 },
+    { kategorie: 0 },
+    { delka: 0 },
+    { cena: Number.NaN },
+    { cena: -1 },
+    { kapacita: -1 },
+    { obsazeno: -1 },
+    { cislo_salu: -1 },
+  ]) {
+    assert.throws(
+      () => mapLuxartLesson({ ...baseLesson, ...invalid }),
+      /invalid required numeric fields/i,
+    );
+  }
+});
+
 test("maps Luxart user credit without exposing password data", () => {
   const user = mapLuxartUser({
     user_id: 42,

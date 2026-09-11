@@ -120,7 +120,11 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
       assert.equal(url.searchParams.get("id_kategorie"), "0");
       assert.equal(url.searchParams.get("id_service"), "0");
       response.end(JSON.stringify([
-        url.searchParams.get("date_start") === "2026-09-03" ? { ...lesson, resort: 2 } : lesson,
+        url.searchParams.get("date_start") === "2026-09-03"
+          ? { ...lesson, resort: 2 }
+          : url.searchParams.get("date_start") === "2026-09-04"
+            ? { ...lesson, id_service: 0 }
+            : lesson,
       ]));
       return;
     }
@@ -308,6 +312,16 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
       resortId: 1,
     }),
     /mimo Zone4You resort/i,
+  );
+  await assert.rejects(
+    adapter.getLessons({
+      from: "2026-09-04T00:00:00Z",
+      to: "2026-09-05T00:00:00Z",
+      resortId: 1,
+    }),
+    (error: unknown) => error instanceof BookingApiError &&
+      error.status === 502 &&
+      error.code === "LUXART_RESPONSE_INVALID",
   );
   await assert.rejects(
     adapter.createReservation({ lessonId: lessons[0].id.replace("luxart:1:", "luxart:999:") }),

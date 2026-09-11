@@ -265,6 +265,14 @@ function mapValidatedLuxartUser(data: LuxartUserData) {
   }
 }
 
+function mapValidatedLuxartLesson(data: LuxartLessonData, mapping: LuxartLessonMapping) {
+  try {
+    return mapLuxartLesson(data, mapping);
+  } catch {
+    throw new BookingApiError(502, "LUXART_RESPONSE_INVALID", "Luxart vrátil neplatná data lekce.");
+  }
+}
+
 export function assertReservationPreconditions(lesson: Lesson, user: User, now = new Date()) {
   const nowTime = now.getTime();
   const startTime = new Date(lesson.startsAt).getTime();
@@ -392,7 +400,7 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
       const mapping = mappingFromEnvironment(context.locale);
       const waitlistEnabled = process.env.LUXART_WAITLIST_ENABLED === "true";
       return lessons.map((lesson) => ({
-        ...mapLuxartLesson(lesson, mapping),
+        ...mapValidatedLuxartLesson(lesson, mapping),
         waitlistEnabled,
       }));
     },

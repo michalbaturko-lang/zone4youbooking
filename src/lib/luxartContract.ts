@@ -233,38 +233,59 @@ export function mapLuxartUser(data: LuxartUserData): User {
 }
 
 export function mapLuxartLesson(data: LuxartLessonData, mapping: LuxartLessonMapping = {}): Lesson {
-  const startsAtDate = new Date(data.date_time);
+  const resort = requiredNumber(data?.resort);
+  const categoryId = requiredNumber(data?.kategorie);
+  const serviceId = requiredNumber(data?.id_service);
+  const durationMinutes = requiredNumber(data?.delka);
+  const priceKc = requiredNumber(data?.cena);
+  const capacity = requiredNumber(data?.kapacita);
+  const occupiedCount = requiredNumber(data?.obsazeno);
+  const roomNumber = requiredNumber(data?.cislo_salu);
+  if (
+    !Number.isInteger(resort) || resort <= 0 ||
+    !Number.isInteger(categoryId) || categoryId <= 0 ||
+    !Number.isInteger(serviceId) || serviceId <= 0 ||
+    !Number.isInteger(durationMinutes) || durationMinutes <= 0 ||
+    !Number.isFinite(priceKc) || priceKc < 0 ||
+    !Number.isInteger(capacity) || capacity < 0 ||
+    !Number.isInteger(occupiedCount) || occupiedCount < 0 ||
+    !Number.isInteger(roomNumber) || roomNumber < 0
+  ) {
+    throw new Error("Luxart lesson contains invalid required numeric fields.");
+  }
+
+  const startsAtValue = typeof data?.date_time === "string" ? data.date_time.trim() : "";
+  const startsAtDate = new Date(startsAtValue);
   if (Number.isNaN(startsAtDate.getTime())) {
     throw new Error("Luxart lesson contains an invalid date_time value.");
   }
 
-  const durationMinutes = Math.max(0, number(data.delka));
   const startsAt = startsAtDate.toISOString();
   const endsAt = new Date(startsAtDate.getTime() + durationMinutes * 60_000).toISOString();
-  const name = text(data.nazev, `Lekce ${data.id_service}`);
-  const roomFromConfig = mapping.roomNames?.[String(data.cislo_salu)];
+  const name = text(data.nazev, `Lekce ${serviceId}`);
+  const roomFromConfig = mapping.roomNames?.[String(roomNumber)];
   const roomName =
     roomFromConfig ??
     (name.toUpperCase().includes("REFORMER")
       ? "Reformer"
-      : data.cislo_salu > 0
-        ? `Sál ${data.cislo_salu}`
+      : roomNumber > 0
+        ? `Sál ${roomNumber}`
         : "Sál neuveden");
   const category =
     mapping.lessonTypeNames?.[String(data.typ_lekce ?? "")] ?? inferredLessonType(name);
   const occurrenceId = luxartLessonOccurrenceId({
-    resort: data.resort,
-    categoryId: data.kategorie,
-    serviceId: data.id_service,
+    resort,
+    categoryId,
+    serviceId,
     startsAt,
   });
 
   return {
     id: `luxart:${occurrenceId}`,
     luxartLessonId: occurrenceId,
-    serviceId: String(data.id_service),
-    luxartCategoryId: number(data.kategorie),
-    luxartRoomNumber: number(data.cislo_salu),
+    serviceId: String(serviceId),
+    luxartCategoryId: categoryId,
+    luxartRoomNumber: roomNumber,
     luxartGender: text(data.pohlavi, "") || undefined,
     name,
     description: text(data.popis, ""),
@@ -275,9 +296,9 @@ export function mapLuxartLesson(data: LuxartLessonData, mapping: LuxartLessonMap
     instructorSpecialization: "Instruktor lekce",
     roomName,
     category,
-    capacity: Math.max(0, number(data.kapacita)),
-    occupiedCount: Math.max(0, number(data.obsazeno)),
-    priceKc: Math.max(0, number(data.cena)),
+    capacity,
+    occupiedCount,
+    priceKc,
     waitlistEnabled: true,
   };
 }

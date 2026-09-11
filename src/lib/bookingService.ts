@@ -24,14 +24,18 @@ export function assertLessonFeedWithinQuery(lessons: Lesson[], query: LessonQuer
   const occurrenceIds = new Set<string>();
 
   for (const lesson of lessons) {
-    if (
-      !lesson.id.trim() ||
-      !lesson.name.trim() ||
-      !lesson.roomName.trim() ||
-      !lesson.instructorName.trim() ||
-      !lesson.category.trim()
-    ) {
+    const requiredText = [lesson.id, lesson.name, lesson.roomName, lesson.instructorName, lesson.category];
+    if (requiredText.some((value) => typeof value !== "string" || !value.trim())) {
       throw new BookingApiError(502, "LUXART_RESPONSE_INVALID", "Luxart vrátil neúplnou lekci.");
+    }
+    if (
+      !Number.isInteger(lesson.durationMinutes) || lesson.durationMinutes <= 0 ||
+      !Number.isInteger(lesson.capacity) || lesson.capacity < 0 ||
+      !Number.isInteger(lesson.occupiedCount) || lesson.occupiedCount < 0 ||
+      !Number.isFinite(lesson.priceKc) || lesson.priceKc < 0 ||
+      typeof lesson.waitlistEnabled !== "boolean"
+    ) {
+      throw new BookingApiError(502, "LUXART_RESPONSE_INVALID", "Luxart vrátil neplatné hodnoty lekce.");
     }
     if (occurrenceIds.has(lesson.id)) {
       throw new BookingApiError(
