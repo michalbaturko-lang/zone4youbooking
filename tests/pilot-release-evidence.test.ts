@@ -143,10 +143,12 @@ function validFixture() {
       sameKeyCancellationReplays: 3,
       crossKeyCancellationReplay: true,
       oneActiveReservationObserved: true,
+      cancellationStateVerified: true,
+      snapshotRequestIdsRecorded: true,
       preExistingActiveReservationsPreserved: true,
       finalStateRestored: true,
       cancellationFeeMatched: true,
-      requestIds: Array.from({ length: 12 }, (_, index) => `request-${index}`),
+      requestIds: Array.from({ length: 16 }, (_, index) => `request-${index}`),
     },
     rollback: {
       ok: true,
@@ -294,7 +296,7 @@ test("pilot release dossier rejects evidence that cannot come from the real guar
     [
       "bookingMutationUat",
       (artifact: Record<string, unknown>) => {
-        artifact.requestIds = Array.from({ length: 12 }, () => "reused-request-id");
+        artifact.requestIds = Array.from({ length: 16 }, () => "reused-request-id");
       },
       /booking UAT evidence request IDs must be unique/i,
     ],

@@ -383,11 +383,13 @@ export function validateBookingUatEvidence(
   integerValue(evidence.sameKeyCancellationReplays, "booking UAT sameKeyCancellationReplays", 3);
   trueValue(evidence.crossKeyCancellationReplay, "booking UAT crossKeyCancellationReplay");
   trueValue(evidence.oneActiveReservationObserved, "booking UAT oneActiveReservationObserved");
+  trueValue(evidence.cancellationStateVerified, "booking UAT cancellationStateVerified");
+  trueValue(evidence.snapshotRequestIdsRecorded, "booking UAT snapshotRequestIdsRecorded");
   trueValue(evidence.preExistingActiveReservationsPreserved, "booking UAT preExistingActiveReservationsPreserved");
   trueValue(evidence.finalStateRestored, "booking UAT finalStateRestored");
   trueValue(evidence.cancellationFeeMatched, "booking UAT cancellationFeeMatched");
   const requestIds = stringArray(evidence.requestIds, "booking UAT requestIds");
-  if (requestIds.length < 8) {
+  if (requestIds.length < 16) {
     throw new Error("Booking UAT evidence contains too few correlated request IDs.");
   }
   if (new Set(requestIds).size !== requestIds.length) {

@@ -171,11 +171,11 @@ async function api<T>(
 }
 
 async function authenticatedSnapshot(config: BookingMutationUatConfig, fetchImpl: FetchLike, cookie: string) {
-  return (await api<Snapshot>(config, fetchImpl, "/api/booking/snapshot", {
+  return api<Snapshot>(config, fetchImpl, "/api/booking/snapshot", {
     method: "POST",
     headers: { Cookie: cookie },
     body: "{}",
-  })).body;
+  });
 }
 
 function exactActiveReservation(snapshot: Snapshot, lessonId: string) {
@@ -242,10 +242,13 @@ async function waitForSnapshot(
   config: BookingMutationUatConfig,
   fetchImpl: FetchLike,
   cookie: string,
+  requestIds: string[],
   predicate: (snapshot: Snapshot) => boolean,
 ) {
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    const snapshot = await authenticatedSnapshot(config, fetchImpl, cookie);
+    const result = await authenticatedSnapshot(config, fetchImpl, cookie);
+    requestIds.push(result.requestId);
+    const snapshot = result.body;
     if (predicate(snapshot)) return snapshot;
     if (attempt < 4) await new Promise((resolve) => setTimeout(resolve, 500));
   }
@@ -304,7 +307,9 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
     throw new Error("Login returned a different user than ZONE4YOU_UAT_EXPECTED_USER_ID.");
   }
   const cookie = cookieFromSetCookie(login.setCookie);
-  const before = await authenticatedSnapshot(config, fetchImpl, cookie);
+  const beforeResult = await authenticatedSnapshot(config, fetchImpl, cookie);
+  const requestIds: string[] = [readiness.requestId, login.requestId, beforeResult.requestId];
+  const before = beforeResult.body;
   if (before.user?.id !== config.expectedUserId) throw new Error("Authenticated snapshot user does not match the approved test user.");
   const beforeActiveReservations = activeReservationIdentitySet(before);
   const lesson = before.lessons.find((candidate) => candidate.id === config.lessonId);
@@ -366,8 +371,7 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
 
   const createKey = `uat:create:${randomUUID()}`;
   let verifiedReservation: Reservation | undefined;
-  let cancelled = false;
-  const requestIds: string[] = [readiness.requestId, login.requestId];
+  let cancellationStateVerified = false;
   try {
     const created = await reservationRequest(config, fetchImpl, cookie, createKey);
     requestIds.push(created.requestId);
@@ -404,6 +408,7 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
       config,
       fetchImpl,
       cookie,
+      requestIds,
       (snapshot) => exactActiveReservation(snapshot, config.lessonId).length === 1,
     );
 
@@ -414,7 +419,6 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
     if (Number(cancellation.body.reservation.cancellationFeeKc ?? 0) !== config.expectedCancellationFeeKc) {
       throw new Error("Cancellation fee does not match ZONE4YOU_UAT_EXPECTED_CANCELLATION_FEE_KC.");
     }
-    cancelled = true;
     for (let replay = 0; replay < 3; replay += 1) {
       const repeated = await cancellationRequest(config, fetchImpl, cookie, verifiedReservation.id, cancelKey);
       requestIds.push(repeated.requestId);
@@ -434,10 +438,12 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
       config,
       fetchImpl,
       cookie,
+      requestIds,
       (snapshot) =>
         exactActiveReservation(snapshot, config.lessonId).length === 0 &&
         snapshot.user.creditBalanceKc === before.user.creditBalanceKc - config.expectedCancellationFeeKc,
     );
+    cancellationStateVerified = true;
     if (JSON.stringify(activeReservationIdentitySet(after)) !== JSON.stringify(beforeActiveReservations)) {
       throw new Error("Final active reservation identity set does not match the pre-test state.");
     }
@@ -464,13 +470,15 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
       sameKeyCancellationReplays: 3,
       crossKeyCancellationReplay: true,
       oneActiveReservationObserved: true,
+      cancellationStateVerified: true,
+      snapshotRequestIdsRecorded: true,
       preExistingActiveReservationsPreserved: true,
       finalStateRestored: true,
       cancellationFeeMatched: true,
       requestIds,
     };
   } finally {
-    if (verifiedReservation && !cancelled) {
+    if (verifiedReservation && !cancellationStateVerified) {
       try {
         const cleanup = await cancellationRequest(
           config,

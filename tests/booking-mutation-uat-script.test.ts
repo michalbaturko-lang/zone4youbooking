@@ -128,6 +128,8 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
   let authoritativeAvailableCount = 8;
   let readinessCommit = commit;
   let corruptPreExistingReservation = false;
+  let failSnapshotAfterCancellation = false;
+  let cleanupRequests = 0;
   let sequence = 0;
   const idempotentResponses = new Map<string, Reservation>();
 
@@ -159,6 +161,9 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
     }
     assert.equal(headers.get("cookie"), "z4y_booking_session=test-cookie");
     if (url.pathname === "/api/booking/snapshot") {
+      if (failSnapshotAfterCancellation && cancelledReservation) {
+        return response({ code: "LUXART_UNAVAILABLE", error: "snapshot unavailable" }, 503);
+      }
       return response({
         user,
         lessons: [{
@@ -195,6 +200,7 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
     }
     if (url.pathname === "/api/reservations/987" && init?.method === "DELETE") {
       const key = headers.get("idempotency-key")!;
+      if (key.startsWith("uat:cleanup:")) cleanupRequests += 1;
       const stored = idempotentResponses.get(key);
       if (stored?.status === "cancelled") return response({ reservation: stored });
       if (cancelledReservation) {
@@ -241,8 +247,11 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
   assert.equal(evidence.onlineCancellationVerified, true);
   assert.equal(evidence.lessonRoomNumber, 1);
   assert.equal(evidence.expectedCancellationFeeKc, 0);
+  assert.equal(evidence.cancellationStateVerified, true);
+  assert.equal(evidence.snapshotRequestIdsRecorded, true);
   assert.equal(evidence.preExistingActiveReservationsPreserved, true);
   assert.equal(evidence.finalStateRestored, true);
+  assert.ok(evidence.requestIds.length >= 16);
   assert.equal(createWrites, 1);
   assert.equal(cancelWrites, 1);
   assert.equal(JSON.stringify(evidence).includes("test-secret"), false);
@@ -281,4 +290,16 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
     runBookingMutationUat(config, fakeFetch),
     /active reservation identity set does not match/i,
   );
+
+  reservations = [preExistingReservation];
+  cancelledReservation = undefined;
+  idempotentResponses.clear();
+  corruptPreExistingReservation = false;
+  failSnapshotAfterCancellation = true;
+  const cleanupRequestsBeforeFailure = cleanupRequests;
+  await assert.rejects(
+    runBookingMutationUat(config, fakeFetch),
+    /snapshot unavailable/i,
+  );
+  assert.equal(cleanupRequests, cleanupRequestsBeforeFailure + 1);
 });

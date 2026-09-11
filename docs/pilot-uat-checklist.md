@@ -39,6 +39,7 @@ Každý bod označte `PASS`, `FAIL` nebo `N/A — funkce bezpečně vypnutá`. K
 - [ ] Tři replaye stejného požadavku vrátí stejnou rezervaci a nevytvoří duplicitní aktivní rezervaci.
 - [ ] Dva souběžné požadavky skončí jedním Luxart zápisem; druhý dostane bezpečný stav „zpracovává se“ nebo stejný výsledek.
 - [ ] Storno zruší právě správnou rezervaci a UI odpovídá Luxart stavu.
+- [ ] Samostatný následný snapshot potvrdí, že stornovaná UAT rezervace už není aktivní; bez tohoto důkazu se spustí cleanup/reconciliation.
 - [ ] Po UAT se shoduje přesná množina identit všech ostatních aktivních rezervací klienta, nikoli pouze jejich počet.
 - [ ] Storno/Reformer poplatek odpovídá písemně potvrzenému pravidlu.
 - [ ] Při chybě Luxartu UI neukáže falešný úspěch.
