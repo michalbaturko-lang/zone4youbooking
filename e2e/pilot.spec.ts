@@ -27,7 +27,7 @@ function visibleWeekLessons(page: Page, projectName: string) {
     : page.locator(".week-table .week-lesson");
 }
 
-test("zobrazí všech 24 lekcí, všechny sály a Reformer bez browser chyby", async ({ page }, testInfo) => {
+test("zobrazí všech 24 lekcí, všechny sály a Reformer bez browser chyby", { tag: "@preview" }, async ({ page }, testInfo) => {
   const browserErrors = captureUnexpectedBrowserErrors(page);
   await openCleanDemo(page);
 
@@ -73,7 +73,7 @@ test("zobrazí všech 24 lekcí, všechny sály a Reformer bez browser chyby", a
   expect(browserErrors).toEqual([]);
 });
 
-test("mobile-first matice drží 44px ovládání, obsah nad navigací a bezpečný dialog", async ({ page }, testInfo) => {
+test("mobile-first matice drží 44px ovládání, obsah nad navigací a bezpečný dialog", { tag: "@preview" }, async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.startsWith("desktop"), "Mobilní ergonomie se ověřuje na dotykových projektech.");
   await openCleanDemo(page);
 
@@ -131,13 +131,18 @@ test("mobile-first matice drží 44px ovládání, obsah nad navigací a bezpeč
   expect(dialogLayout.undersizedControls).toEqual([]);
 });
 
-test("přihlášení, rezervace a storno projdou uživatelským flow", async ({ page }, testInfo) => {
+test("přihlášení, rezervace a storno projdou uživatelským flow", { tag: "@preview-auth" }, async ({ page }, testInfo) => {
+  const externalPreview = Boolean(process.env.PLAYWRIGHT_EXTERNAL_DEMO_URL?.trim());
+  test.skip(
+    externalPreview && testInfo.project.name !== "mobile-small-320x568",
+    "Ve veřejném Preview stačí jeden autentizovaný průchod; úplná matice by záměrně narazila na login rate limit.",
+  );
   const browserErrors = captureUnexpectedBrowserErrors(page);
   await openCleanDemo(page);
 
   await page.getByRole("button", { name: "Přihlásit se" }).first().click();
   const loginDialog = page.getByRole("dialog", { name: "Přihlášení" });
-  await loginDialog.getByLabel("Příjmení, e-mail nebo login").fill("Nováková");
+  await loginDialog.getByLabel("Příjmení, e-mail nebo login").fill(externalPreview ? "demo@zone4you.cz" : "Nováková");
   await loginDialog.getByLabel("Heslo", { exact: true }).fill("2048");
   await loginDialog.getByRole("button", { name: "Přihlásit se" }).click();
   await expect(page.getByRole("button", { name: "Odhlásit" })).toBeVisible();
@@ -254,7 +259,7 @@ test("session přežije reload a logout odstraní klienta i přístup k rezervac
   expect(browserErrors).toEqual([]);
 });
 
-test("rozvrh a dialogy projdou WCAG scanem i klávesnicovým focus flow", async ({ page }, testInfo) => {
+test("rozvrh a dialogy projdou WCAG scanem i klávesnicovým focus flow", { tag: "@preview" }, async ({ page }, testInfo) => {
   await openCleanDemo(page);
 
   const scheduleScan = await new AxeBuilder({ page })
@@ -314,7 +319,7 @@ test("rozvrh a dialogy projdou WCAG scanem i klávesnicovým focus flow", async 
   await expect(loginTrigger).toBeFocused();
 });
 
-test("angličtina a oblíbené lekce přežijí reload", async ({ page }, testInfo) => {
+test("angličtina a oblíbené lekce přežijí reload", { tag: "@preview" }, async ({ page }, testInfo) => {
   await openCleanDemo(page);
 
   await page.getByRole("button", { name: "EN", exact: true }).click();

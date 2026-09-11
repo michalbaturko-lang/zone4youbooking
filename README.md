@@ -24,6 +24,8 @@ Klientsky Vercel preview link je Shareable Link s tokenem v URL. Nepatri do vere
 
 ```bash
 npm run quality
+# Pouze proti izolovanému Vercel Preview, které samo prokáže demo/mock režim:
+PLAYWRIGHT_EXTERNAL_DEMO_URL=https://zone4youbooking-...vercel.app/ npm run test:e2e
 BOOKING_TEST_DATABASE_URL=postgresql:///postgres npm run test:booking-postgres
 PAYMENT_TEST_DATABASE_URL=postgresql:///postgres npm run test:payments-postgres
 RATE_LIMIT_TEST_DATABASE_URL=postgresql:///postgres npm run test:rate-limit-postgres
@@ -49,6 +51,8 @@ npm run verify:production-cutover
 `verify:deployment-preflight` ověřuje vzájemnou shodu cíle, přesného commitu, fáze `read_only` / `booking_without_payments` / `booking_with_stripe`, capability přepínačů a runtime-only konfigurace. Výstup nikdy nevypisuje secrets ani upstream/databázové URL. Přesná staging/produkční matice je v [`docs/deployment-preflight.md`](docs/deployment-preflight.md).
 
 `probe:luxart-help` je první bezpečný síťový test po získání přesné URL. Posílá jediný neautentizovaný `GET /Help`, zakazuje redirecty, omezuje čas i velikost odpovědi a do výsledku ukládá jen port, transport, HTTP stav a SHA-256 cíle/odpovědi. Rozliší nedostupnou síť, požadovanou gateway autentizaci a skutečnou Luxart dokumentaci, aniž by poslal klientské heslo.
+
+Externí Playwright regrese je fail-closed omezená na izolovaný Zone4You Vercel Preview. Před prvním browser scénářem načte pouze `/api/readiness` a pokračuje jen při přesném profilu `mode=demo`, `luxart=mock`, demo top-upech, povinné angličtině a vypnutém zapomenutém heslu. Produkční aliasy a `booking.zone4you.cz` odmítne dříve, než test odešle login nebo rezervaci. Veřejný běh je záměrně nízkoobjemový: ve všech pěti viewports ověří rozvrh, responzivitu, přístupnost, angličtinu a oblíbené lekce, ale přihlášení, rezervaci a storno provede pouze jednou na nejmenším telefonu. Plná autentizační matice zůstává lokální, aby automat sám neobcházel ani nezahltil limit pěti přihlášení za deset minut.
 
 `verify:luxart-gateway-config` bezpečně ověřuje pouze způsob serverového přístupu ke konfigurovanému Luxart API. Zone4You IT dne 11. 9. 2026 potvrdilo dohodu s Luxartem o zveřejnění portu 9191, ale stále chybí přesný host, schéma a potvrzení, že je cesta už aktivní. Podporované auth režimy jsou `none`, `basic`, `bearer` a vlastní `X-*` hlavička; hodnoty credentials zůstávají jen v secret store a výstup je nikdy nezobrazuje. Gateway credentials nejsou totéž co testovací login klienta.
 

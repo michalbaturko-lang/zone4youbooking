@@ -1,8 +1,8 @@
 # Zone4You Booking — prováděcí a evaluační plán pilotu
 
-Aktualizace: 2026-08-30
+Aktualizace: 2026-09-11
 
-Pilotní termín: 2026-09-05
+Pilotní termín: původní 2026-09-05 uplynul; nový cutover bude nejdříve D7 sedmidenního běhu zahájeného aktivním Luxart přístupem a musí jej potvrdit Zone4You
 
 Řízení: Codex
 
@@ -46,14 +46,14 @@ Codex smí samostatně upravovat projekt, přidávat testy, provádět read-only
 
 | Datum | Povinný výstup | Exit kritérium | Fallback při nesplnění |
 |---|---|---|---|
-| 29. 8. — D0 | scope, audit, IT požadavek, mapper všech lekcí, session a kontraktní simulace | E0, lokální část E1–E3 zelená | pokračovat lokálně, live brány zůstávají červené |
-| D1 integračního týdne | přesná URL a přístup na port 9191, živý login/User/Lesson, mapování sálů na `id_resource` | anonymizované fixtures a read-only live test | pokud není přístup, D7 transakční pilot je v riziku |
-| 31. 8. — D2 | kredit a všechny lekce na stagingu | 100% Lesson položek se zobrazí bez pádu mapperu | read-only demo/fallback Memberzone |
-| 1. 9. — D3 | seznam, vytvoření a storno rezervace v test DB | E3 zelená včetně opakování a konzistence | rezervace v novém UI vypnutá |
-| 2. 9. — D4 | watchdog hlídání místa; Stripe pouze s klíči a potvrzeným Payment mappingem | E4 a případně E5 zelená | watchdog/top-up skrýt, core pilot pokračuje |
-| 3. 9. — D5 | bezpečnost, výpadky, mobil/desktop, accessibility a monitoring | E6–E9 bez P0/P1 | opravy P0/P1, žádný scope navíc |
-| 4. 9. — D6 | UAT recepce a pilotní skupiny, nacvičený rollback | podepsaný UAT checklist a rollback důkaz | NO-GO / Memberzone |
-| 5. 9. — D7 | DNS/TLS, produkční secrets, smoke a omezený pilot | všechny brány + výslovný cutover souhlas | read-only nebo odklad transakcí |
+| Dokončený D0 | scope, audit, IT požadavek, mapper všech lekcí, session, kontraktní simulace a veřejný demo Preview | E0, lokální část E1–E3 a prezentační smoke zelené | live brány zůstávají červené |
+| Nový D1 | přesná URL a přístup na port 9191, živý login/User/Lesson, mapování sálů na `id_resource` | anonymizované fixtures a read-only live test | bez přístupu se sedmidenní běh nespustí |
+| D2 | kredit a všechny lekce na chráněném stagingu | 100 % Lesson položek se zobrazí bez pádu mapperu | read-only demo/fallback Memberzone |
+| D3 | seznam, vytvoření a storno rezervace v test DB | E3 zelená včetně opakování a konzistence | rezervace v novém UI vypnutá |
+| D4 | watchdog hlídání místa; Stripe pouze s klíči a potvrzeným Payment mappingem | E4 a případně E5 zelená | watchdog/top-up skrýt, core pilot pokračuje |
+| D5 | bezpečnost, výpadky, mobil/desktop, accessibility a monitoring | E6–E9 bez P0/P1 | opravy P0/P1, žádný scope navíc |
+| D6 | UAT recepce a pilotní skupiny, nacvičený rollback | podepsaný UAT checklist a rollback důkaz | NO-GO / Memberzone |
+| D7 | DNS/TLS, produkční secrets, smoke a omezený pilot | všechny brány + výslovný cutover souhlas | read-only nebo odklad transakcí |
 
 Kritický externí deadline je přístup k Zone4You testovacímu API do konce D1. Každý další den prodlení ubírá celý den živému integračnímu a UAT testování.
 
@@ -199,7 +199,7 @@ Práce se zastaví pouze před akcí, která vyžaduje novou autoritu (živá mu
 - kontrastní WCAG nálezy byly opravené bez potlačení pravidla;
 - login a detail lekce mají automaticky ověřený počáteční a navrácený focus, uzavřený Tab cyklus, zavření přes `Escape`, viditelný focus ring a samostatný WCAG A/AA scan v desktopu i mobilu;
 - login a mutace mají omezení frekvence a každá API odpověď korelační `X-Request-ID`.
-- **Aktuální plná regrese 30. 8.:** 111/111 integračních a jednotkových testů, produkční build, 49/49 provedených Playwright scénářů v pěti viewpor-tech, 1 záměrně přeskočená desktopová duplicita čistě mobilního ergonomického testu a 0 známých dependency zranitelností. Tento výsledek nahrazuje archivní počty v následujícím detailu.
+- **Aktuální plná regrese 11. 9.:** 114/114 integračních a jednotkových testů, produkční build, 49/49 provedených lokálních Playwright scénářů v pěti viewpor-tech, 1 záměrně přeskočená desktopová duplicita čistě mobilního ergonomického testu a 0 známých dependency zranitelností. Izolovaný veřejný Preview prošel 20/20 nízkoobjemovými scénáři ve stejné matici; 5 variant bylo záměrně přeskočeno kvůli login limiteru a desktopové mobilní ergonomii. Tento výsledek nahrazuje archivní počty v následujícím detailu.
 - 100/100 integračních/jednotkových testů a 16/16 Playwright běhů (osm scénářů ve dvou zobrazeních) prošlo na desktopu i mobilu včetně read-only fallbacku, serverového Stripe redirectu, třífázového deployment preflightu, fázově podmíněného launch gate, vazby runtime capabilities do release dossieru, dvojí CS/EN aplikační kontroly feedu, přesného sedmidenního pražského rozsahu, hranic pražské půlnoci, přímého Luxart parametru `pocet_dni_dopredu=7`, runtime odmítnutí osmého pražského dne, duplicitního occurrence ID, neúplné lekce a neplatného časového intervalu a readiness odmítnutí celého prázdného sedmidenního feedu, fail-closed ochrany read endpointů, produkčního post-cutover ověřovače, persistentního outage/session-expiry UI s korelačním ID a úplného session flow od nepřihlášené rezervace přes reload po logout a chráněné API `401`; runtime JSON nyní skutečně obsahuje `schedule`, `booking` a `payments`, které dossier vyžaduje. Reálný Luxart evidence producer je ověřen proti finálnímu kontraktu a výchozí release-grade běh odmítne chybějící testovací login. Booking UAT, rollback a alert producenty jsou rovněž přímo validované finálním dossierem; opakované request ID, chybějící rollback korelace nebo alert bez support vlastníka jsou NO-GO. Route test navíc dokazuje lokální live logout bez Luxartu/limiteru a odmítnutí cizího Originu bez smazání cookie. Bez zvolené launch fáze má gate 7/26 zelených kontrol a správně vrací `NO-GO`, zamýšlený pilot `booking_without_payments` má 8/22 a čtyři Stripe kontroly jsou explicitně mimo rozsah.
 - lokální runtime probe ověřil security hlavičky, health/readiness a stejnou množinu 24 unikátních lekcí přes českou i anglickou aplikační route, včetně sálů 1/2/3 a 3 Reformerů;
 - veřejná lesson a snapshot route ignorují pokusy z URL změnit resort, datum, místnost nebo typ; server vždy žádá úplný resort 1 na sedm kalendářních dnů v `Europe/Prague`, nezávisle na timezone hostingu, a adapter odmítne podvržený cizí resort i neočekávanou cizí upstream položku;
@@ -239,7 +239,7 @@ Aktuální release stav: `NO-GO`. To je očekávané a správné, dokud nejsou �
 
 ## 9. Rozhodnutí a otázky, které je nutné dodat
 
-### Blokuje živou integraci do 30. 8.
+### Blokuje zahájení nového D1
 
 1. Zone4You IT: přesná `http(s)://<host>:9191/Help` URL, potvrzení že je dostupná nyní, testovací DB, HTTPS a případná další autentizace.
 2. Zone4You IT/Luxart: tabulka `cislo_salu` → `id_resource` pro všechny sály a Reformer.
@@ -251,7 +251,7 @@ Aktuální release stav: `NO-GO`. To je očekávané a správné, dokud nejsou �
 5. **Rozhodnuto:** minimální kredit před rezervací je 200 Kč.
 6. **Částečně rozhodnuto:** běžná lekce je bez storno pokuty do půlnoci, pracovně `00:00 Europe/Prague` na začátku dne lekce. Chybí pozdní poplatek, no-show, potvrzení pozdního online storna a pravidlo Reformeru.
 7. Chybí samostatné otevření a uzavření rezervačního okna; půlnoc se týká bezplatného storna, nikoli otevření rezervací.
-8. Kdo tvoří pilotní skupinu, kdo je support kontakt recepce a jaké je launch okno 5. 9.?
+8. Kdo tvoří pilotní skupinu, kdo je support kontakt recepce a jaké je nové launch okno?
 
 ### Blokuje Stripe, ale ne core booking
 
@@ -261,7 +261,7 @@ Aktuální release stav: `NO-GO`. To je očekávané a správné, dokud nejsou �
 
 ### Doporučené scope rozhodnutí
 
-12. **Rozhodnuto:** angličtina je povinná pro pilot 5. 9.
+12. **Rozhodnuto:** angličtina je povinná pro pilot.
 13. **Rozhodnuto:** zapomenuté heslo do pilotu nepatří; perzistentní oblíbené lekce jsou povinné.
 
 ## 10. Reporting

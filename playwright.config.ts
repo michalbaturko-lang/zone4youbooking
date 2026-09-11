@@ -1,10 +1,16 @@
 import { defineConfig } from "@playwright/test";
 
 const port = 3011;
-const baseURL = `http://127.0.0.1:${port}`;
+const localBaseURL = `http://127.0.0.1:${port}`;
+const externalDemoBaseURL = process.env.PLAYWRIGHT_EXTERNAL_DEMO_URL?.trim();
+const baseURL = externalDemoBaseURL || localBaseURL;
 
 export default defineConfig({
   testDir: "./e2e",
+  // A public Preview must stay a low-volume smoke check. The full local suite
+  // intentionally exercises authentication repeatedly and would trip the
+  // production-shaped login throttle after five attempts in ten minutes.
+  grep: externalDemoBaseURL ? /@preview/ : undefined,
   outputDir: "test-results/playwright",
   fullyParallel: false,
   workers: 1,
@@ -14,6 +20,7 @@ export default defineConfig({
     ["line"],
     ["html", { outputFolder: "playwright-report", open: "never" }],
   ],
+  globalSetup: "./e2e/external-demo-guard.ts",
   use: {
     baseURL,
     locale: "cs-CZ",
@@ -66,15 +73,15 @@ export default defineConfig({
       use: { viewport: { width: 1440, height: 900 } },
     },
   ],
-  webServer: {
+  webServer: externalDemoBaseURL ? undefined : {
     command: `npm run start -- --hostname 127.0.0.1 --port ${port}`,
-    url: `${baseURL}/api/health`,
+    url: `${localBaseURL}/api/health`,
     reuseExistingServer: false,
     timeout: 120_000,
     env: {
       LUXART_MOCK: "true",
       NEXT_PUBLIC_APP_ENV: "demo",
-      APP_BASE_URL: baseURL,
+      APP_BASE_URL: localBaseURL,
     },
   },
 });

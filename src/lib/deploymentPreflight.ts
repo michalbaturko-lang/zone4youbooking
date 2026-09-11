@@ -96,6 +96,7 @@ export const deploymentCliOnlyVariables = [
   "PROBE_REQUIRE_REFORMER",
   "PROBE_TIMEOUT_MS",
   "VERCEL_PROTECTION_BYPASS",
+  "PLAYWRIGHT_EXTERNAL_DEMO_URL",
 ] as const;
 
 const secretVariables = [
