@@ -251,9 +251,13 @@ function assertWatchdogEnabled() {
   }
 }
 
-function mapValidatedLuxartUser(data: LuxartUserData) {
+function mapValidatedLuxartUser(data: LuxartUserData, expectedUserId?: string) {
   try {
-    return mapLuxartUser(data);
+    const user = mapLuxartUser(data);
+    if (expectedUserId !== undefined && user.id !== expectedUserId) {
+      throw new Error("Luxart returned a different user identity.");
+    }
+    return user;
   } catch {
     throw new BookingApiError(502, "LUXART_RESPONSE_INVALID", "Luxart vrátil neplatná data klienta.");
   }
@@ -462,7 +466,7 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
           undefined,
           "current user",
         );
-        cachedUser = mapValidatedLuxartUser(userData);
+        cachedUser = mapValidatedLuxartUser(userData, userId);
         return cachedUser;
       } catch (error) {
         if (error instanceof LuxartHttpError && error.upstreamStatus === 404) {

@@ -325,6 +325,13 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
 
   const adapter = createRealLuxartAdapter({ userId: "42", locale: "en" });
   assert.equal((await adapter.getCurrentUser())?.creditBalanceKc, 1_400);
+  user.user_id = 43;
+  const wrongIdentityAdapter = createRealLuxartAdapter({ userId: "42", locale: "en" });
+  await assert.rejects(
+    wrongIdentityAdapter.getCurrentUser(),
+    (error: unknown) => error instanceof BookingApiError && error.code === "LUXART_RESPONSE_INVALID",
+  );
+  user.user_id = 42;
   const lessons = await adapter.getLessons({
     from: "2026-09-01T00:00:00Z",
     to: "2026-09-02T00:00:00Z",
