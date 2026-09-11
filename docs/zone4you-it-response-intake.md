@@ -78,6 +78,9 @@ Read-only test se nespouští, pokud chybí síťová cesta, gateway režim, pot
 - Toto pozorování nedokazuje, že je port obecně zavřený: IT může používat jiný hostname, VPN nebo allowlist. Dokazuje pouze, že bez přesné URL není z aktuálního připojení dosažitelná žádná zjevná veřejná varianta.
 - Následný explicitní kandidátní test `api.memberzone.online:9191` ukázal jinou službu: HTTP kořen odpověděl 200 obecnou indexovou stránkou, ale `/Help` odpovědělo 404 a HTTPS selhalo, protože port mluví pouze prostým HTTP. Naproti tomu referenční `:9295/Help` ve stejném okamžiku znovu odpovědělo 200 a bylo rozpoznáno jako Luxart API dokumentace.
 - Původní Luxart zpráva označuje `api.memberzone.online:9295` za referenční testovací API a současně uvádí, že API u klienta musí veřejně zpřístupnit jeho IT. Z toho plyne, že samotné doplnění `:9191` ke stejnému Luxart hostname není potvrzená ani funkční Zone4You URL.
+- Starší přiložená zpráva Luxartu z 1. 4. 2026 výslovně uvádí, že API připojené k testovací databázi bylo spuštěno na serveru Zone4You na portu `9759`. Nejpravděpodobnější pracovní interpretace je proto veřejné přesměrování `9191` na interní `9759`; zůstává to ale hypotéza, dokud IT nepotvrdí host a vazbu portů.
+- Následná IPv4 kontrola běžných Zone4You hostname variant timeoutovala na portech `9191` i `9759` pro HTTP i HTTPS. Všechny zjištěné názvy míří na stejný veřejný okraj, ale tento výsledek nerozliší neaplikované pravidlo, jiný cílový host, VPN ani zdrojový allowlist.
+- HTTP kořen `api.memberzone.online:9191` veřejně vypisuje názvy aplikačních adresářů a konfiguračních souborů jiné služby. Žádný z těchto odkazů nebyl otevřen. Pokud server spravuje Luxart, je vhodné samostatně vypnout directory browsing; tato služba se nesmí zaměnit za Zone4You API.
 - Nebyl odeslán login, heslo, cookie ani autorizační hlavička a nebyla provedena žádná API mutace.
 
 ## 4. Výsledek vyhodnocení
@@ -86,5 +89,5 @@ Read-only test se nespouští, pokud chybí síťová cesta, gateway režim, pot
 - Rezervační UAT: `NEPOVOLENO` — chybí read-only důkaz, explicitní testovací autorita, mapování sálů a úplná business pravidla
 - Deployment: vždy `NEAUTORIZOVÁN`, dokud nevznikne samostatné schválení
 - DNS/cutover: vždy `NEAUTORIZOVÁN`, dokud nevznikne samostatné schválení
-- Nejbližší bezpečný krok: získat od IT veřejnou IP nebo DNS Zone4You, na které port `9191` skutečně zveřejnilo, spolu se schématem a potvrzením aktivního stavu; následně spustit pouze neautentizovaný `npm run probe:luxart-help`. Klientské přihlašovací údaje se použijí až po bezpečném transportním a gateway důkazu.
+- Nejbližší bezpečný krok: získat od IT veřejnou IP nebo DNS Zone4You, na které port `9191` skutečně zveřejnilo, potvrzení překladu `9191` → interní `9759`, schéma a aktivní stav; následně spustit pouze neautentizovaný `npm run probe:luxart-help`. Klientské přihlašovací údaje se použijí až po bezpečném transportním a gateway důkazu.
 - Chybějící položky a vlastník: host/schéma/stav portu/test DB/auth — Zone4You IT + Luxart; mutační UAT a pravidla — Zone4You + Luxart.

@@ -108,7 +108,7 @@ V aplikaci je tlacitko `Reset demo`, ktere vrati mock data do cisteho startovnih
 
 ## Co chybí pro live pilot
 
-- přesná `https://<host>:9191/` a `/Help` URL, potvrzení aktivního přístupu, testovací databáze a gateway režimu
+- přesná `https://<host>:9191/` a `/Help` URL, potvrzení aktivního přístupu, testovací databáze, gateway režimu a pravděpodobného překladu na interní Luxart port `9759`
 - mapování `cislo_salu` na `id_resource` a povolení bezpečných testovacích mutací
 - potvrzení login flow, pozdního storna/no-show, Reformeru, rezervačního okna a kreditní mechaniky; bezplatný běžný storno cutoff o půlnoci už je známý
 - živé ověření watchdog endpointů a Luxart notifikace
