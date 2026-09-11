@@ -32,7 +32,7 @@ import {
   type LuxartWatchdogData,
 } from "./luxartContract";
 import { createHash } from "node:crypto";
-import { bookingRules, canCancelLessonAt } from "./bookingRules";
+import { availablePlacesForLesson, bookingRules, canCancelLessonAt } from "./bookingRules";
 import { BookingApiError, BookingMutationOutcomeUnknownError } from "./errors";
 import type { Locale } from "./i18n";
 import { loadLuxartGatewayAuthConfig } from "./luxartGatewayAuth";
@@ -378,12 +378,17 @@ export function assertReservationPreconditions(lesson: Lesson, user: User, now =
     throw new BookingApiError(409, "RESERVATION_NOT_OPEN", "Rezervace této lekce ještě není otevřená.");
   }
 
+  const availableCount = availablePlacesForLesson(lesson);
   const capacityInvalidOrFull =
     !Number.isFinite(lesson.capacity) ||
     lesson.capacity <= 0 ||
     !Number.isFinite(lesson.occupiedCount) ||
     lesson.occupiedCount < 0 ||
-    lesson.occupiedCount >= lesson.capacity;
+    lesson.occupiedCount >= lesson.capacity ||
+    !Number.isInteger(availableCount) ||
+    availableCount <= 0 ||
+    availableCount > lesson.capacity ||
+    lesson.occupiedCount + availableCount > lesson.capacity;
   if (capacityInvalidOrFull) {
     throw new BookingApiError(409, "LESSON_FULL", "Lekce je plně obsazená.");
   }

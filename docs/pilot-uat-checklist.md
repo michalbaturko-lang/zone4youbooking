@@ -13,6 +13,7 @@ Každý bod označte `PASS`, `FAIL` nebo `N/A — funkce bezpečně vypnutá`. K
 - [ ] Výskyt s duplicitním occurrence ID, chybějícím zobrazovaným polem, neplatným časovým intervalem nebo na osmém pražském dni vyvolá bezpečný stav nedostupnosti; nesmí se potichu zobrazit ani zahodit jako údajně úplný feed.
 - [ ] Čas bez explicitního `Z` / UTC offsetu a neexistující kalendářní datum v lekci, rezervaci, kreditu nebo watchdogu vyvolají bezpečný stav nedostupnosti; desktop, mobil ani hostingová časová zóna je nesmí interpretovat rozdílně.
 - [ ] Všechny sály a Reformer jsou viditelné a filtrovatelné.
+- [ ] Zobrazený počet volných míst i stav plno odpovídají přímo Luxart poli `volno`; test s rozdílem mezi `volno` a prostým `kapacita - obsazeno` nesmí použít dopočítanou hodnotu.
 - [ ] Neznámý sál nebo typ lekce nezpůsobí zmizení lekce ani pád stránky.
 - [ ] CS i EN mají srozumitelný rozvrh, detail, stav míst a instrukce.
 - [ ] Oblíbená lekce přežije reload a nepřenese se k jinému klientovi na stejném zařízení.

@@ -37,6 +37,8 @@ Pilot načte bez whitelistu všechny záznamy vrácené:
 
 UI proto nesmí mít pevný seznam povolených sálů ani typů. Neznámá hodnota se musí zobrazit pod bezpečným fallbackem, ne zahodit.
 
+Počet volných míst se bere z autoritativního pole `volno`, nikoli pouhým odečtením `obsazeno` od `kapacita`. Tím se zachovají omezení členských/nečlenských kvót. Záporná hodnota, hodnota nad kapacitou nebo součet `obsazeno + volno` nad kapacitou zneplatní celý feed místo zobrazení falešné dostupnosti.
+
 Squash, stolní tenis a masáže nejsou v dokumentaci vedené jako `Lesson_data`. Používají samostatné oblasti `Courts`, `Services` a `Freetime`; nejsou automaticky součástí věty „všechny lekce“.
 
 ## Endpointy kritické pro pilot

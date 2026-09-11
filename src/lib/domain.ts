@@ -44,6 +44,7 @@ export interface Lesson {
   category: string;
   capacity: number;
   occupiedCount: number;
+  availableCount?: number;
   priceKc: number;
   reservationOpensAt?: ISODateTime;
   reservationClosesAt?: ISODateTime;

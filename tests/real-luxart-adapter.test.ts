@@ -332,6 +332,7 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
   });
   assert.equal(lessons.length, 1);
   assert.equal(lessons[0].roomName, "Sál 2");
+  assert.equal(lessons[0].availableCount, 5);
 
   for (const endpoint of ["lessons", "reservations", "watchdog", "credit"] as const) {
     malformedRead = endpoint;
@@ -602,6 +603,7 @@ test("fails closed before a reservation when credit, capacity or booking window 
   rejectsWithCode(lesson, { ...user, creditBalanceKc: 199 }, "INSUFFICIENT_CREDIT");
   rejectsWithCode({ ...lesson, occupiedCount: 10 }, user, "LESSON_FULL");
   rejectsWithCode({ ...lesson, capacity: 0, occupiedCount: 0 }, user, "LESSON_FULL");
+  rejectsWithCode({ ...lesson, availableCount: 0 }, user, "LESSON_FULL");
   rejectsWithCode({ ...lesson, startsAt: "2026-09-01T11:00:00.000Z" }, user, "RESERVATION_NOT_OPEN");
   rejectsWithCode({ ...lesson, startsAt: "2026-08-30T09:59:59.000Z" }, user, "RESERVATION_CLOSED");
 });

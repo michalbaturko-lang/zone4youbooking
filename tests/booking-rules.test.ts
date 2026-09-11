@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  availablePlacesForLesson,
   bookingRules,
   cancellationPolicyForLesson,
   canCancelLessonAt,
@@ -67,4 +68,14 @@ test("late online cancellation follows the selected lesson policy and never pass
   assert.equal(canCancelLessonAt(group, rules, new Date("2026-09-12T12:00:00.000Z")), true);
   assert.equal(canCancelLessonAt(reformer, rules, new Date("2026-09-12T12:00:00.000Z")), true);
   assert.equal(canCancelLessonAt(reformer, rules, new Date(reformer.startsAt)), false);
+});
+
+test("Luxart reported availability takes precedence over capacity arithmetic", () => {
+  const quotaRestricted = lesson({
+    capacity: 10,
+    occupiedCount: 6,
+    availableCount: 1,
+  });
+  assert.equal(availablePlacesForLesson(quotaRestricted), 1);
+  assert.equal(availablePlacesForLesson({ ...quotaRestricted, availableCount: undefined }), 4);
 });

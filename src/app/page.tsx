@@ -27,6 +27,7 @@ import {
 } from "react";
 import { BookingApiClientError, bookingApiClient } from "@/lib/bookingApiClient";
 import {
+  availablePlacesForLesson,
   bookingRules as fallbackRules,
   canCancelLessonAt,
   freeCancellationDeadlineForLesson,
@@ -195,7 +196,7 @@ function formatDateTime(value: string, locale: Locale = "cs") {
 }
 
 function occupancyState(lesson: Lesson, t: Translate) {
-  const free = Math.max(0, lesson.capacity - lesson.occupiedCount);
+  const free = Math.max(0, availablePlacesForLesson(lesson));
   if (free === 0) return { label: t("status.full"), tone: "full", free };
   if (free <= 2) return { label: t("status.last", { count: free }), tone: "few", free };
   return { label: t("status.free", { count: free }), tone: "available", free };

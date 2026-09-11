@@ -274,6 +274,7 @@ export function mapLuxartLesson(data: LuxartLessonData, mapping: LuxartLessonMap
   const priceKc = requiredNumber(data?.cena);
   const capacity = requiredNumber(data?.kapacita);
   const occupiedCount = requiredNumber(data?.obsazeno);
+  const availableCount = requiredNumber(data?.volno);
   const roomNumber = requiredNumber(data?.cislo_salu);
   if (
     !Number.isInteger(resort) || resort <= 0 ||
@@ -282,7 +283,9 @@ export function mapLuxartLesson(data: LuxartLessonData, mapping: LuxartLessonMap
     !Number.isInteger(durationMinutes) || durationMinutes <= 0 ||
     !Number.isFinite(priceKc) || priceKc < 0 ||
     !Number.isInteger(capacity) || capacity < 0 ||
-    !Number.isInteger(occupiedCount) || occupiedCount < 0 ||
+    !Number.isInteger(occupiedCount) || occupiedCount < 0 || occupiedCount > capacity ||
+    !Number.isInteger(availableCount) || availableCount < 0 ||
+    availableCount > capacity || occupiedCount + availableCount > capacity ||
     !Number.isInteger(roomNumber) || roomNumber < 0
   ) {
     throw new Error("Luxart lesson contains invalid required numeric fields.");
@@ -331,6 +334,7 @@ export function mapLuxartLesson(data: LuxartLessonData, mapping: LuxartLessonMap
     category,
     capacity,
     occupiedCount,
+    availableCount,
     priceKc,
     waitlistEnabled: true,
   };

@@ -42,6 +42,7 @@ test("maps every Luxart lesson occurrence without a fixed room union", () => {
   assert.equal(lesson.category, "Cardio");
   assert.equal(lesson.capacity, 14);
   assert.equal(lesson.occupiedCount, 9);
+  assert.equal(lesson.availableCount, 5);
   assert.equal(lesson.serviceId, "321");
   assert.equal(lesson.luxartCategoryId, 12);
   assert.equal(lesson.endsAt, "2026-09-01T15:20:00.000Z");
@@ -76,6 +77,9 @@ test("rejects malformed required Luxart lesson values instead of coercing them t
     { cena: -1 },
     { kapacita: -1 },
     { obsazeno: -1 },
+    { obsazeno: 15 },
+    { volno: -1 },
+    { volno: 6 },
     { cislo_salu: -1 },
   ]) {
     assert.throws(

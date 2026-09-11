@@ -32,6 +32,13 @@ export function assertLessonFeedWithinQuery(lessons: Lesson[], query: LessonQuer
       !Number.isInteger(lesson.durationMinutes) || lesson.durationMinutes <= 0 ||
       !Number.isInteger(lesson.capacity) || lesson.capacity < 0 ||
       !Number.isInteger(lesson.occupiedCount) || lesson.occupiedCount < 0 ||
+      lesson.occupiedCount > lesson.capacity ||
+      (lesson.availableCount !== undefined && (
+        !Number.isInteger(lesson.availableCount) ||
+        lesson.availableCount < 0 ||
+        lesson.availableCount > lesson.capacity ||
+        lesson.occupiedCount + lesson.availableCount > lesson.capacity
+      )) ||
       !Number.isFinite(lesson.priceKc) || lesson.priceKc < 0 ||
       typeof lesson.waitlistEnabled !== "boolean"
     ) {

@@ -9,6 +9,10 @@ export function isReformerLesson(lesson: Lesson) {
     .some((value) => value?.toUpperCase().includes("REFORMER"));
 }
 
+export function availablePlacesForLesson(lesson: Lesson) {
+  return lesson.availableCount ?? lesson.capacity - lesson.occupiedCount;
+}
+
 export function cancellationPolicyForLesson(
   lesson: Lesson,
   rules: BookingRules = bookingRules,

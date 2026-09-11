@@ -183,6 +183,7 @@ function lessonSeed(
     category,
     capacity,
     occupiedCount,
+    availableCount: Math.max(0, capacity - occupiedCount),
     priceKc,
     reservationOpensAt: new Date(startsAt.getTime() - RESERVATION_WINDOW_HOURS * hourMs).toISOString(),
     reservationClosesAt: startsAt.toISOString(),
@@ -294,10 +295,14 @@ function currentOccupiedCounts() {
 }
 
 function applyOccupiedCounts(counts: Record<string, number> = {}) {
-  lessons = lessons.map((lesson) => ({
-    ...lesson,
-    occupiedCount: typeof counts[lesson.id] === "number" ? counts[lesson.id] : lesson.occupiedCount,
-  }));
+  lessons = lessons.map((lesson) => {
+    const occupiedCount = typeof counts[lesson.id] === "number" ? counts[lesson.id] : lesson.occupiedCount;
+    return {
+      ...lesson,
+      occupiedCount,
+      availableCount: Math.max(0, lesson.capacity - occupiedCount),
+    };
+  });
 }
 
 export function getMockLuxartState(): MockLuxartState {
@@ -470,7 +475,9 @@ export const mockLuxartAdapter: LuxartAdapter = {
     if (!lesson) throw new Error("Lekce nebyla nalezena.");
     if (!isWithinReservationWindow(lesson)) throw new Error("Rezervace jsou otevřené maximálně 48 hodin dopředu.");
     if (activeReservationFor(lesson.id)) throw new Error("Tuto lekci už máte rezervovanou.");
-    if (lesson.occupiedCount >= lesson.capacity) throw new Error("Lekce je plná. Můžete se zapsat na čekací listinu.");
+    if ((lesson.availableCount ?? lesson.capacity - lesson.occupiedCount) <= 0) {
+      throw new Error("Lekce je plná. Můžete se zapsat na čekací listinu.");
+    }
     const requiredCreditKc = requiredCreditForNextReservation(user.id);
     if (user.creditBalanceKc < requiredCreditKc) {
       throw new Error(`Pro další rezervaci je potřeba mít kredit alespoň ${requiredCreditKc.toLocaleString("cs-CZ")} Kč.`);
@@ -495,7 +502,13 @@ export const mockLuxartAdapter: LuxartAdapter = {
     reservation.creditTransactionId = transaction.id;
     reservations = [reservation, ...reservations];
     lessons = lessons.map((item) =>
-      item.id === lesson.id ? { ...item, occupiedCount: item.occupiedCount + 1 } : item,
+      item.id === lesson.id
+        ? {
+            ...item,
+            occupiedCount: item.occupiedCount + 1,
+            availableCount: Math.max(0, (item.availableCount ?? item.capacity - item.occupiedCount) - 1),
+          }
+        : item,
     );
     return reservation;
   },
@@ -544,7 +557,13 @@ export const mockLuxartAdapter: LuxartAdapter = {
     };
     reservations = reservations.map((item) => (item.id === reservation.id ? cancelled : item));
     lessons = lessons.map((item) =>
-      item.id === lesson.id ? { ...item, occupiedCount: Math.max(0, item.occupiedCount - 1) } : item,
+      item.id === lesson.id
+        ? {
+            ...item,
+            occupiedCount: Math.max(0, item.occupiedCount - 1),
+            availableCount: Math.min(item.capacity, (item.availableCount ?? item.capacity - item.occupiedCount) + 1),
+          }
+        : item,
     );
     return cancelled;
   },
