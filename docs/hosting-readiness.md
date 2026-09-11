@@ -60,7 +60,7 @@ Oficiální podklady:
 - `BOOKING_MUTATIONS_ENABLED=false`, `PAYMENT_MUTATIONS_ENABLED=false` a `LUXART_WAITLIST_ENABLED=false` jsou výchozí i rollback hodnoty.
 - Produkční doména, DNS, secrets ani deployment se nemění bez samostatného schválení.
 - Existující A/AAAA se před cutoverem uloží mimo repozitář do nepřepisovatelného souboru s právy `0600`; release dossier vyžaduje jeho čerstvý SHA-256 a příznak připraveného rollbacku. TTL se do fingerprintu nezahrnuje, protože rekurzivní DNS resolver vrací odpočítávanou hodnotu, nikoli autoritativní konfiguraci. Bezprostředně před zásahem musí stejné záznamy i celý schválený dossier v jediném běhu potvrdit `verify:production-precutover`; současné záznamy se nyní nemění.
-- Zelený release dossier autorizuje změnu, ale nedokládá výsledek DNS. Po přepnutí musí před otevřením pilotu projít `verify:production-cutover`; při chybě se bez dalšího experimentování vrátí zaznamenané původní DNS hodnoty.
+- Zelený release dossier autorizuje změnu, ale nedokládá výsledek DNS. `verify:production-precutover` proto uloží nepřepisovatelný owner-only autorizační důkaz; po přepnutí musí před otevřením pilotu projít `verify:production-cutover` nad jeho přesným hashem, stejným dossierem, commitem a fází, nejpozději do 30 minut. Při chybě se bez dalšího experimentování vrátí zaznamenané původní DNS hodnoty.
 - Přesná matice proměnných a zákaz CLI-only hodnot v runtime prostředí je v `docs/deployment-preflight.md`.
 
 ## Bezprostřední rozhodnutí po odpovědi IT

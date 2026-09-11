@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
-import { verifyProductionPreCutover } from "../scripts/verify-production-precutover";
+import {
+  verifyProductionPreCutover,
+  writeProductionPreCutoverEvidence,
+} from "../scripts/verify-production-precutover";
 
 const now = new Date("2026-09-11T14:00:00.000Z");
 const dossierSha256 = "a".repeat(64);
@@ -108,4 +115,42 @@ test("pre-cutover gate fails when release approval or DNS baseline binding is ab
     }),
     /does not match the approved rollback baseline/i,
   );
+});
+
+test("pre-cutover gate stores one owner-only receipt outside the repository and never overwrites it", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "zone4you-precutover-"));
+  chmodSync(directory, 0o700);
+  const outputPath = join(directory, "precutover.json");
+  const outputEnvironment = {
+    ...environment,
+    ZONE4YOU_PRECUTOVER_EVIDENCE_OUTPUT_PATH: outputPath,
+  };
+
+  try {
+    const result = await writeProductionPreCutoverEvidence({
+      environment: outputEnvironment,
+      now,
+      repositoryRoot: "/repository",
+      releaseVerifier: () => releaseEvidence(),
+      dnsVerifier: async () => dnsEvidence(),
+    });
+    const stored = readFileSync(outputPath);
+    assert.equal(statSync(outputPath).mode & 0o777, 0o600);
+    assert.equal(result.evidenceStoredOwnerOnly, true);
+    assert.equal(result.evidenceSha256, createHash("sha256").update(stored).digest("hex"));
+    assert.equal(JSON.parse(stored.toString("utf8")).decision, "GO_TO_AUTHORIZED_DNS_CHANGE");
+
+    await assert.rejects(
+      writeProductionPreCutoverEvidence({
+        environment: outputEnvironment,
+        now,
+        repositoryRoot: "/repository",
+        releaseVerifier: () => releaseEvidence(),
+        dnsVerifier: async () => dnsEvidence(),
+      }),
+      /will not be overwritten/i,
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });

@@ -1,4 +1,7 @@
-import { pathToFileURL } from "node:url";
+import { createHash } from "node:crypto";
+import { existsSync, lstatSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { verifyPilotReleaseEvidence } from "./verify-pilot-release";
 import { verifyProductionDomainBaseline } from "./verify-production-domain-baseline";
 
@@ -13,10 +16,38 @@ interface PreCutoverOptions {
   dnsVerifier?: (options: { environment: Environment; now: Date }) => Promise<DnsEvidence>;
 }
 
+interface PreCutoverWriteOptions extends PreCutoverOptions {
+  repositoryRoot?: string;
+}
+
+const repositoryRootDefault = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
 function required(environment: Environment, name: string) {
   const value = environment[name]?.trim();
   if (!value) throw new Error(`${name} is required.`);
   return value;
+}
+
+function outputTarget(raw: string, repositoryRoot: string) {
+  const outputPath = resolve(raw);
+  if (!outputPath.endsWith(".json")) {
+    throw new Error("ZONE4YOU_PRECUTOVER_EVIDENCE_OUTPUT_PATH must end in .json.");
+  }
+  const fromRepository = relative(resolve(repositoryRoot), outputPath);
+  if (fromRepository === "" || (!fromRepository.startsWith("..") && !isAbsolute(fromRepository))) {
+    throw new Error("Pre-cutover evidence must be stored outside the repository.");
+  }
+  if (existsSync(outputPath)) {
+    throw new Error("Pre-cutover evidence output already exists and will not be overwritten.");
+  }
+  const parent = lstatSync(dirname(outputPath));
+  if (!parent.isDirectory() || parent.isSymbolicLink()) {
+    throw new Error("Pre-cutover evidence parent must be a real directory.");
+  }
+  if ((parent.mode & 0o077) !== 0) {
+    throw new Error("Pre-cutover evidence parent must not be accessible by group or other users.");
+  }
+  return outputPath;
 }
 
 export async function verifyProductionPreCutover({
@@ -92,9 +123,29 @@ export async function verifyProductionPreCutover({
   };
 }
 
+export async function writeProductionPreCutoverEvidence(options: PreCutoverWriteOptions = {}) {
+  const environment = options.environment ?? process.env;
+  const outputPath = outputTarget(
+    required(environment, "ZONE4YOU_PRECUTOVER_EVIDENCE_OUTPUT_PATH"),
+    options.repositoryRoot ?? repositoryRootDefault,
+  );
+  const evidence = await verifyProductionPreCutover(options);
+  const body = `${JSON.stringify(evidence, null, 2)}\n`;
+  writeFileSync(outputPath, body, { encoding: "utf8", flag: "wx", mode: 0o600 });
+  const stored = readFileSync(outputPath);
+  if ((lstatSync(outputPath).mode & 0o777) !== 0o600) {
+    throw new Error("Pre-cutover evidence file permissions are not owner-only.");
+  }
+  return {
+    ...evidence,
+    evidenceSha256: createHash("sha256").update(stored).digest("hex"),
+    evidenceStoredOwnerOnly: true,
+  };
+}
+
 const isDirectRun = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isDirectRun) {
-  verifyProductionPreCutover()
+  writeProductionPreCutoverEvidence()
     .then((receipt) => console.log(JSON.stringify(receipt, null, 2)))
     .catch((error: unknown) => {
       console.error(

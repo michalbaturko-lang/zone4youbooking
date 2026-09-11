@@ -68,10 +68,11 @@ Samostatný příkaz je diagnostický. Autoritativní poslední brána před ru�
 ```bash
 ZONE4YOU_DNS_BASELINE_EVIDENCE_PATH=/secure/release-evidence/production-dns-baseline.json \
 ZONE4YOU_PRECUTOVER_CONFIRMATION=VERIFY_ZONE4YOU_PRECUTOVER:<sha256-dossieru> \
+ZONE4YOU_PRECUTOVER_EVIDENCE_OUTPUT_PATH=/secure/release-evidence/precutover-<release-id>.json \
 npm run verify:production-precutover
 ```
 
-Příkaz přebírá ostatní proměnné finálního `verify:pilot-release`, nic nenasazuje ani nemění a jako jediný může vrátit `GO_TO_AUTHORIZED_DNS_CHANGE`. Jakákoli odchylka znamená zastavit cutover, zjistit vlastníka změny a až po novém schválení zachytit nový baseline. Soubor obsahuje veřejné DNS adresy potřebné pro přesný návrat, proto se drží owner-only mimo Git. Release validátor přijme baseline starý maximálně 24 hodin.
+Příkaz přebírá ostatní proměnné finálního `verify:pilot-release`, nic nenasazuje ani nemění a jako jediný může vrátit `GO_TO_AUTHORIZED_DNS_CHANGE`. Výsledek zapíše bez možnosti přepsání do nového JSON souboru s právy `0600` v již existujícím adresáři `0700` mimo repozitář a vypíše SHA-256 tohoto souboru. Jakákoli odchylka znamená zastavit cutover, zjistit vlastníka změny a až po novém schválení zachytit nový baseline. DNS baseline obsahuje veřejné adresy potřebné pro přesný návrat, proto se rovněž drží owner-only mimo Git. Release validátor přijme baseline starý maximálně 24 hodin.
 
 Vygenerovaný dossier je záměrně `draft: true`, `UAT=NO-GO`, alert receipt nepotvrzený, Memberzone fallback nedostupný a cutover neschválený. Není launch autoritou. Až oprávněné osoby skutečně uzavřou UAT, potvrdí stejné alert event ID, fallback a cutover, doplní své jméno/roli a aktuální čas, lze nastavit `draft: false`. Řetězec `pending-human-approval` finální validátor odmítá. Poté se znovu spočítá SHA celého dossieru, nastaví `ZONE4YOU_RELEASE_DOSSIER_PATH`, `ZONE4YOU_RELEASE_COMMIT` a přesná potvrzovací fráze `VERIFY_ZONE4YOU_RELEASE_DOSSIER:<sha256-dossieru>`. Bez těchto živých lidských kroků `verify:pilot-release` vždy skončí NO-GO.
 
@@ -87,11 +88,14 @@ Zelený `verify:pilot-release` spolu se zeleným `verify:production-precutover` 
 ZONE4YOU_PRODUCTION_APP_URL=https://booking.zone4you.cz/ \
 ZONE4YOU_PRODUCTION_EXPECTED_COMMIT="$ZONE4YOU_APPROVED_COMMIT" \
 ZONE4YOU_PRODUCTION_EXPECTED_PHASE=booking_without_payments \
-ZONE4YOU_PRODUCTION_CUTOVER_CONFIRMATION="VERIFY_ZONE4YOU_PRODUCTION_CUTOVER:$ZONE4YOU_APPROVED_COMMIT" \
+ZONE4YOU_PRECUTOVER_EVIDENCE_PATH=/secure/release-evidence/precutover-<release-id>.json \
+ZONE4YOU_PRECUTOVER_MAX_AGE_MINUTES=30 \
+ZONE4YOU_RELEASE_DOSSIER_CONFIRMATION=VERIFY_ZONE4YOU_RELEASE_DOSSIER:<sha256-dossieru> \
+ZONE4YOU_PRODUCTION_CUTOVER_CONFIRMATION=VERIFY_ZONE4YOU_PRODUCTION_CUTOVER:<sha256-precutover-souboru> \
 npm run verify:production-cutover
 ```
 
-`ZONE4YOU_APPROVED_COMMIT` je celý 40znakový lowercase SHA přesně stejného commitu jako v release dossieru. Operátorské hodnoty jsou CLI-only a nesmějí se vložit do runtime prostředí aplikace. Skript neprovádí deploy, DNS změnu, login ani Luxart mutaci. Z veřejné produkční domény ověří DNS odpověď bez vypsání IP, bezpečnostní hlavičky, health/readiness, přesný commit, fázi a region `fra1`, živý Luxart, PostgreSQL rate limit, připravený booking, očekávaný platební stav a shodný CS/EN sedmidenní feed včetně Reformeru.
+`ZONE4YOU_APPROVED_COMMIT` je celý 40znakový lowercase SHA přesně stejného commitu jako v release dossieru. Post-cutover brána přijme jen owner-only, nejvýše 30 minut starý pre-cutover soubor, jeho přesný hash v potvrzovací frázi a shodný dossier, commit i fázi; starý či změněný soubor fail-closed odmítne. Operátorské hodnoty jsou CLI-only a nesmějí se vložit do runtime prostředí aplikace. Skript neprovádí deploy, DNS změnu, login ani Luxart mutaci. Z veřejné produkční domény ověří DNS odpověď bez vypsání IP, bezpečnostní hlavičky, health/readiness, přesný commit, fázi a region `fra1`, živý Luxart, PostgreSQL rate limit, připravený booking, očekávaný platební stav a shodný CS/EN sedmidenní feed včetně Reformeru.
 
 Pilot je veřejně otevřený až po zeleném JSON výsledku uloženém v chráněném evidence úložišti. Jakákoli chyba, odlišný commit/fáze, neplatný certifikát, prázdný či rozdílný feed nebo překročení 60 sekund znamená neotevírat pilotní skupinu a okamžitě vrátit předem zaznamenané původní DNS hodnoty. Poté se ověří starý Memberzone a incident se uzavře podle části „Incident a rollback“. Opakovaný cutover vyžaduje nový aktuální release dossier a nové výslovné schválení.
 

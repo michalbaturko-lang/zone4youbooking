@@ -138,6 +138,7 @@ test("preflight report never echoes configured secrets, database URLs or Luxart 
     RATE_LIMIT_DATABASE_URL: "postgresql://fake-rate-limit-secret@example.com/zone4you?sslmode=require",
     NEXT_PUBLIC_API_TOKEN: "fake-public-token-that-must-not-be-echoed",
     ZONE4YOU_UAT_PASSWORD: "fake-uat-password-that-must-not-be-echoed",
+    ZONE4YOU_PRECUTOVER_EVIDENCE_PATH: "/secure/private-precutover-evidence.json",
   };
   const environment = readOnlyStagingEnvironment({
     ...sensitiveValues,

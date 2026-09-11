@@ -1,4 +1,8 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { chmodSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import {
   loadProductionCutoverConfig,
@@ -9,15 +13,54 @@ import { zone4YouScheduleRange } from "../src/lib/zone4YouTime";
 
 const commit = "1234567890abcdef1234567890abcdef12345678";
 const target = "https://booking.zone4you.cz/";
+const checkedAt = new Date("2026-08-30T10:00:00.000Z");
+const dossierSha256 = "a".repeat(64);
+const baselineSha256 = "b".repeat(64);
+const fixtureDirectory = mkdtempSync(join(tmpdir(), "zone4you-cutover-"));
+chmodSync(fixtureDirectory, 0o700);
+let fixtureCounter = 0;
+
+function preCutoverFixture(
+  overrides: Record<string, unknown> = {},
+  mode = 0o600,
+) {
+  const receipt = {
+    ok: true,
+    checkedAt: checkedAt.toISOString(),
+    decision: "GO_TO_AUTHORIZED_DNS_CHANGE",
+    target: "https://booking.zone4you.cz",
+    releaseId: "zone4you-pilot-2026-08-30",
+    commit,
+    launchMode: "booking_without_payments",
+    dossierSha256,
+    dns: {
+      baselineFileSha256: baselineSha256,
+      unchangedSinceCapture: true,
+      rollbackReady: true,
+    },
+    explicitCutoverApproval: true,
+    ...overrides,
+  };
+  const path = join(fixtureDirectory, `precutover-${fixtureCounter += 1}.json`);
+  const body = `${JSON.stringify(receipt, null, 2)}\n`;
+  writeFileSync(path, body, { encoding: "utf8", mode });
+  const sha256 = createHash("sha256").update(body).digest("hex");
+  return { path, receipt, sha256 };
+}
+
+const approvedPreCutover = preCutoverFixture();
 const baseEnvironment = {
   ZONE4YOU_PRODUCTION_APP_URL: target,
   ZONE4YOU_PRODUCTION_EXPECTED_COMMIT: commit,
   ZONE4YOU_PRODUCTION_EXPECTED_PHASE: "booking_without_payments",
-  ZONE4YOU_PRODUCTION_CUTOVER_CONFIRMATION: `VERIFY_ZONE4YOU_PRODUCTION_CUTOVER:${commit}`,
+  ZONE4YOU_PRECUTOVER_EVIDENCE_PATH: approvedPreCutover.path,
+  ZONE4YOU_RELEASE_DOSSIER_CONFIRMATION: `VERIFY_ZONE4YOU_RELEASE_DOSSIER:${dossierSha256}`,
+  ZONE4YOU_PRODUCTION_CUTOVER_CONFIRMATION: `VERIFY_ZONE4YOU_PRODUCTION_CUTOVER:${approvedPreCutover.sha256}`,
 } satisfies Record<string, string | undefined>;
 
-const checkedAt = new Date("2026-08-30T10:00:00.000Z");
 const range = zone4YouScheduleRange(checkedAt, 7);
+
+test.after(() => rmSync(fixtureDirectory, { recursive: true, force: true }));
 
 function lesson(id: string, startsAt = `${range.from.slice(0, 10)}T10:00:00.000Z`): Lesson {
   return {
@@ -93,27 +136,82 @@ function liveFetch(lessons = [lesson("lesson-1")]): typeof fetch {
 
 test("production cutover configuration is pinned to the exact host, commit, phase and confirmation", () => {
   assert.throws(
-    () => loadProductionCutoverConfig({ ...baseEnvironment, ZONE4YOU_PRODUCTION_APP_URL: "https://example.com/" }),
+    () => loadProductionCutoverConfig({ ...baseEnvironment, ZONE4YOU_PRODUCTION_APP_URL: "https://example.com/" }, checkedAt),
     /must exactly equal/i,
   );
   assert.throws(
-    () => loadProductionCutoverConfig({ ...baseEnvironment, ZONE4YOU_PRODUCTION_EXPECTED_COMMIT: "short" }),
+    () => loadProductionCutoverConfig({ ...baseEnvironment, ZONE4YOU_PRODUCTION_EXPECTED_COMMIT: "short" }, checkedAt),
     /40-character Git SHA/i,
   );
   assert.throws(
-    () => loadProductionCutoverConfig({ ...baseEnvironment, ZONE4YOU_PRODUCTION_EXPECTED_PHASE: "read_only" }),
+    () => loadProductionCutoverConfig({ ...baseEnvironment, ZONE4YOU_PRODUCTION_EXPECTED_PHASE: "read_only" }, checkedAt),
     /booking_without_payments or booking_with_stripe/i,
   );
   assert.throws(
-    () => loadProductionCutoverConfig({ ...baseEnvironment, ZONE4YOU_PRODUCTION_CUTOVER_CONFIRMATION: "YES" }),
+    () => loadProductionCutoverConfig({ ...baseEnvironment, ZONE4YOU_PRODUCTION_CUTOVER_CONFIRMATION: "YES" }, checkedAt),
     /must exactly equal/i,
   );
-  assert.equal(loadProductionCutoverConfig(baseEnvironment).maxDurationMs, 60_000);
+  const config = loadProductionCutoverConfig(baseEnvironment, checkedAt);
+  assert.equal(config.maxDurationMs, 60_000);
+  assert.equal(config.preCutoverEvidenceSha256, approvedPreCutover.sha256);
+  assert.equal(config.dossierSha256, dossierSha256);
+});
+
+test("production cutover configuration rejects stale, mismatched or weakly protected pre-cutover evidence", () => {
+  const stale = preCutoverFixture({ checkedAt: new Date(checkedAt.getTime() - 31 * 60_000).toISOString() });
+  assert.throws(
+    () => loadProductionCutoverConfig({
+      ...baseEnvironment,
+      ZONE4YOU_PRECUTOVER_EVIDENCE_PATH: stale.path,
+      ZONE4YOU_PRODUCTION_CUTOVER_CONFIRMATION: `VERIFY_ZONE4YOU_PRODUCTION_CUTOVER:${stale.sha256}`,
+    }, checkedAt),
+    /stale/i,
+  );
+
+  const wrongCommit = preCutoverFixture({ commit: "f".repeat(40) });
+  assert.throws(
+    () => loadProductionCutoverConfig({
+      ...baseEnvironment,
+      ZONE4YOU_PRECUTOVER_EVIDENCE_PATH: wrongCommit.path,
+      ZONE4YOU_PRODUCTION_CUTOVER_CONFIRMATION: `VERIFY_ZONE4YOU_PRODUCTION_CUTOVER:${wrongCommit.sha256}`,
+    }, checkedAt),
+    /does not match the approved production release/i,
+  );
+
+  const wrongDossier = preCutoverFixture({ dossierSha256: "c".repeat(64) });
+  assert.throws(
+    () => loadProductionCutoverConfig({
+      ...baseEnvironment,
+      ZONE4YOU_PRECUTOVER_EVIDENCE_PATH: wrongDossier.path,
+      ZONE4YOU_PRODUCTION_CUTOVER_CONFIRMATION: `VERIFY_ZONE4YOU_PRODUCTION_CUTOVER:${wrongDossier.sha256}`,
+    }, checkedAt),
+    /release_dossier_confirmation must exactly equal/i,
+  );
+
+  const insecure = preCutoverFixture({}, 0o644);
+  assert.throws(
+    () => loadProductionCutoverConfig({
+      ...baseEnvironment,
+      ZONE4YOU_PRECUTOVER_EVIDENCE_PATH: insecure.path,
+      ZONE4YOU_PRODUCTION_CUTOVER_CONFIRMATION: `VERIFY_ZONE4YOU_PRODUCTION_CUTOVER:${insecure.sha256}`,
+    }, checkedAt),
+    /permissions must be owner-only/i,
+  );
+
+  const symlinkPath = join(fixtureDirectory, "precutover-link.json");
+  symlinkSync(approvedPreCutover.path, symlinkPath);
+  assert.throws(
+    () => loadProductionCutoverConfig({
+      ...baseEnvironment,
+      ZONE4YOU_PRECUTOVER_EVIDENCE_PATH: symlinkPath,
+    }, checkedAt),
+    /non-symlink/i,
+  );
 });
 
 test("production cutover verifier proves DNS, security, runtime provenance and matching CS/EN lesson feeds", async () => {
   const evidence = await runProductionCutoverVerification(
-    loadProductionCutoverConfig(baseEnvironment),
+    loadProductionCutoverConfig(baseEnvironment, checkedAt),
     {
       fetchImpl: liveFetch(),
       resolveAnyImpl: async () => [{ type: "A", address: "203.0.113.10", ttl: 60 }],
@@ -123,6 +221,8 @@ test("production cutover verifier proves DNS, security, runtime provenance and m
 
   assert.equal(evidence.ok, true);
   assert.equal(evidence.expectedCommit, commit);
+  assert.equal(evidence.dossierSha256, dossierSha256);
+  assert.equal(evidence.preCutoverEvidenceSha256, approvedPreCutover.sha256);
   assert.equal(evidence.lessons.count, 1);
   assert.equal(evidence.lessons.reformer, 1);
   assert.equal(evidence.readiness.region, "fra1");
@@ -134,7 +234,7 @@ test("production cutover verifier proves DNS, security, runtime provenance and m
 });
 
 test("production cutover verifier fails closed on DNS, runtime or schedule divergence", async () => {
-  const config = loadProductionCutoverConfig(baseEnvironment);
+  const config = loadProductionCutoverConfig(baseEnvironment, checkedAt);
   await assert.rejects(
     runProductionCutoverVerification(config, {
       fetchImpl: liveFetch(),

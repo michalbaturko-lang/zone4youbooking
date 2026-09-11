@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import type { AnyRecord } from "node:dns";
 import { resolveAny } from "node:dns/promises";
+import { closeSync, constants, fstatSync, openSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { BookingCapabilities, Lesson } from "../src/lib/domain";
 import { zone4YouDateKey, zone4YouScheduleRange, zone4YouTimeZone } from "../src/lib/zone4YouTime";
@@ -18,6 +20,9 @@ export interface ProductionCutoverConfig {
   target: URL;
   expectedCommit: string;
   expectedPhase: ProductionPilotPhase;
+  dossierSha256: string;
+  preCutoverCheckedAt: string;
+  preCutoverEvidenceSha256: string;
   timeoutMs: number;
   maxDurationMs: number;
 }
@@ -32,6 +37,22 @@ interface ApiResult<T> {
   body: T;
   requestId: string;
   status: number;
+}
+
+interface PreCutoverReceipt {
+  ok?: unknown;
+  checkedAt?: unknown;
+  decision?: unknown;
+  target?: unknown;
+  commit?: unknown;
+  launchMode?: unknown;
+  dossierSha256?: unknown;
+  explicitCutoverApproval?: unknown;
+  dns?: {
+    baselineFileSha256?: unknown;
+    unchangedSinceCapture?: unknown;
+    rollbackReady?: unknown;
+  };
 }
 
 function required(environment: Environment, name: string) {
@@ -56,6 +77,7 @@ function boundedInteger(
 
 export function loadProductionCutoverConfig(
   environment: Environment = process.env,
+  now = new Date(),
 ): ProductionCutoverConfig {
   const target = new URL(required(environment, "ZONE4YOU_PRODUCTION_APP_URL"));
   if (
@@ -81,7 +103,96 @@ export function loadProductionCutoverConfig(
     );
   }
 
-  const expectedConfirmation = `VERIFY_ZONE4YOU_PRODUCTION_CUTOVER:${expectedCommit}`;
+  const maxAgeMinutes = boundedInteger(
+    environment,
+    "ZONE4YOU_PRECUTOVER_MAX_AGE_MINUTES",
+    30,
+    1,
+    120,
+  );
+  if (Number.isNaN(now.getTime())) throw new Error("Production cutover configuration time is invalid.");
+
+  const evidencePath = resolve(required(environment, "ZONE4YOU_PRECUTOVER_EVIDENCE_PATH"));
+  let evidenceBody: Buffer;
+  let evidenceDescriptor: number;
+  try {
+    evidenceDescriptor = openSync(evidencePath, constants.O_RDONLY | constants.O_NOFOLLOW);
+  } catch {
+    throw new Error("Pre-cutover evidence must be an existing regular non-symlink file.");
+  }
+  try {
+    const evidenceStats = fstatSync(evidenceDescriptor);
+    if (!evidenceStats.isFile()) {
+      throw new Error("Pre-cutover evidence must be a regular non-symlink file.");
+    }
+    if ((evidenceStats.mode & 0o077) !== 0) {
+      throw new Error("Pre-cutover evidence file permissions must be owner-only.");
+    }
+    if (evidenceStats.size <= 0 || evidenceStats.size > 256 * 1024) {
+      throw new Error("Pre-cutover evidence file must contain at most 256 KiB.");
+    }
+    evidenceBody = readFileSync(evidenceDescriptor);
+    if (evidenceBody.length !== evidenceStats.size) {
+      throw new Error("Pre-cutover evidence changed while it was being read.");
+    }
+  } finally {
+    closeSync(evidenceDescriptor);
+  }
+
+  const preCutoverEvidenceSha256 = createHash("sha256").update(evidenceBody).digest("hex");
+  let parsedReceipt: unknown;
+  try {
+    parsedReceipt = JSON.parse(evidenceBody.toString("utf8"));
+  } catch {
+    throw new Error("Pre-cutover evidence is not valid JSON.");
+  }
+  if (!parsedReceipt || typeof parsedReceipt !== "object" || Array.isArray(parsedReceipt)) {
+    throw new Error("Pre-cutover evidence is not a JSON object.");
+  }
+  const receipt = parsedReceipt as PreCutoverReceipt;
+
+  const dossierSha256 = receipt.dossierSha256;
+  if (
+    receipt.ok !== true ||
+    receipt.decision !== "GO_TO_AUTHORIZED_DNS_CHANGE" ||
+    receipt.target !== productionOrigin ||
+    receipt.commit !== expectedCommit ||
+    receipt.launchMode !== expectedPhase ||
+    typeof dossierSha256 !== "string" ||
+    !/^[a-f0-9]{64}$/.test(dossierSha256) ||
+    receipt.explicitCutoverApproval !== true ||
+    !receipt.dns ||
+    receipt.dns.unchangedSinceCapture !== true ||
+    receipt.dns.rollbackReady !== true ||
+    typeof receipt.dns.baselineFileSha256 !== "string" ||
+    !/^[a-f0-9]{64}$/.test(receipt.dns.baselineFileSha256)
+  ) {
+    throw new Error("Pre-cutover evidence does not match the approved production release.");
+  }
+
+  if (typeof receipt.checkedAt !== "string") {
+    throw new Error("Pre-cutover evidence checkedAt is missing or invalid.");
+  }
+  const preCutoverCheckedAt = new Date(receipt.checkedAt);
+  if (Number.isNaN(preCutoverCheckedAt.getTime())) {
+    throw new Error("Pre-cutover evidence checkedAt is missing or invalid.");
+  }
+  const ageMs = now.getTime() - preCutoverCheckedAt.getTime();
+  if (ageMs < -5 * 60_000) {
+    throw new Error("Pre-cutover evidence checkedAt is unexpectedly in the future.");
+  }
+  if (ageMs > maxAgeMinutes * 60_000) {
+    throw new Error("Pre-cutover evidence is stale and must be regenerated.");
+  }
+
+  const dossierConfirmation = `VERIFY_ZONE4YOU_RELEASE_DOSSIER:${dossierSha256}`;
+  if (environment.ZONE4YOU_RELEASE_DOSSIER_CONFIRMATION !== dossierConfirmation) {
+    throw new Error(
+      `ZONE4YOU_RELEASE_DOSSIER_CONFIRMATION must exactly equal ${dossierConfirmation}.`,
+    );
+  }
+
+  const expectedConfirmation = `VERIFY_ZONE4YOU_PRODUCTION_CUTOVER:${preCutoverEvidenceSha256}`;
   if (environment.ZONE4YOU_PRODUCTION_CUTOVER_CONFIRMATION !== expectedConfirmation) {
     throw new Error(
       `ZONE4YOU_PRODUCTION_CUTOVER_CONFIRMATION must exactly equal ${expectedConfirmation}.`,
@@ -107,6 +218,9 @@ export function loadProductionCutoverConfig(
     target,
     expectedCommit,
     expectedPhase: expectedPhase as ProductionPilotPhase,
+    dossierSha256,
+    preCutoverCheckedAt: preCutoverCheckedAt.toISOString(),
+    preCutoverEvidenceSha256,
     timeoutMs,
     maxDurationMs: maxDurationSeconds * 1_000,
   };
@@ -367,6 +481,9 @@ export async function runProductionCutoverVerification(
     target: config.target.origin,
     expectedCommit: config.expectedCommit,
     expectedPhase: config.expectedPhase,
+    dossierSha256: config.dossierSha256,
+    preCutoverCheckedAt: config.preCutoverCheckedAt,
+    preCutoverEvidenceSha256: config.preCutoverEvidenceSha256,
     durationMs,
     maximumDurationMs: config.maxDurationMs,
     dns: {
