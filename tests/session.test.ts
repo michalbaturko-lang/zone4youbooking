@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import test from "node:test";
 import { NextResponse } from "next/server";
 import {
@@ -10,6 +11,12 @@ import {
 } from "../src/lib/session";
 
 const secret = "test-session-secret-with-at-least-32-characters";
+
+function signSessionPayload(payload: unknown) {
+  const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+  const signature = createHmac("sha256", secret).update(encoded).digest("base64url");
+  return `${encoded}.${signature}`;
+}
 
 test("creates and verifies a short-lived signed booking session", () => {
   const token = createBookingSessionToken("42", secret, 1_000, 600);
@@ -26,6 +33,24 @@ test("rejects tampered and expired booking sessions", () => {
 
   assert.equal(verifyBookingSessionToken(`${payload}x.${signature}`, secret, 1_010), null);
   assert.equal(verifyBookingSessionToken(token, secret, 1_060), null);
+});
+
+test("rejects structurally invalid signed booking sessions and unsafe creation inputs", () => {
+  const base = { version: 1, userId: "42", issuedAt: 1_000, expiresAt: 1_600 };
+  for (const invalid of [
+    { ...base, userId: "not-a-luxart-id" },
+    { ...base, issuedAt: 1_000.5 },
+    { ...base, expiresAt: 1_000 },
+    { ...base, expiresAt: 1_000 + 8 * 60 * 60 + 1 },
+  ]) {
+    assert.equal(verifyBookingSessionToken(signSessionPayload(invalid), secret, 1_100), null);
+  }
+
+  assert.equal(verifyBookingSessionToken(signSessionPayload(base), "short-secret", 1_100), null);
+  assert.equal(verifyBookingSessionToken("x".repeat(2_049), secret, 1_100), null);
+  assert.throws(() => createBookingSessionToken("invalid", secret, 1_000, 600), /valid Luxart userId/i);
+  assert.throws(() => createBookingSessionToken("42", secret, 1_000, 0), /lifetime/i);
+  assert.throws(() => createBookingSessionToken("42", secret, 1_000, 8 * 60 * 60 + 1), /lifetime/i);
 });
 
 test("production session cookie is secure, readable by the server and explicitly cleared", (context) => {

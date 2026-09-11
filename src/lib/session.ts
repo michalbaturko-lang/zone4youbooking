@@ -3,6 +3,13 @@ import type { NextResponse } from "next/server";
 
 const bookingSessionCookie = "z4y_booking_session";
 const sessionTtlSeconds = 8 * 60 * 60;
+const maximumSessionTokenLength = 2_048;
+
+function validLuxartUserId(userId: unknown): userId is string {
+  return typeof userId === "string" &&
+    /^[1-9]\d*$/.test(userId) &&
+    Number.isSafeInteger(Number(userId));
+}
 
 export interface BookingSession {
   version: 1;
@@ -37,8 +44,12 @@ export function createBookingSessionToken(
   nowSeconds = Math.floor(Date.now() / 1000),
   ttlSeconds = sessionTtlSeconds,
 ) {
-  if (!userId) throw new Error("Cannot create a booking session without userId.");
+  if (!validLuxartUserId(userId)) throw new Error("Cannot create a booking session without a valid Luxart userId.");
   if (secret.length < 32) throw new Error("Session signing secret is too short.");
+  if (!Number.isSafeInteger(nowSeconds) || nowSeconds < 0) throw new Error("Session issue time is invalid.");
+  if (!Number.isSafeInteger(ttlSeconds) || ttlSeconds <= 0 || ttlSeconds > sessionTtlSeconds) {
+    throw new Error("Session lifetime is invalid.");
+  }
 
   const session: BookingSession = {
     version: 1,
@@ -55,6 +66,16 @@ export function verifyBookingSessionToken(
   secret: string,
   nowSeconds = Math.floor(Date.now() / 1000),
 ): BookingSession | null {
+  if (
+    typeof token !== "string" ||
+    token.length === 0 ||
+    token.length > maximumSessionTokenLength ||
+    secret.length < 32 ||
+    !Number.isSafeInteger(nowSeconds) ||
+    nowSeconds < 0
+  ) {
+    return null;
+  }
   const [payload, providedSignature, extra] = token.split(".");
   if (!payload || !providedSignature || extra) return null;
 
@@ -64,14 +85,20 @@ export function verifyBookingSessionToken(
 
   try {
     const session = JSON.parse(decode(payload)) as Partial<BookingSession>;
+    const issuedAt = session.issuedAt;
+    const expiresAt = session.expiresAt;
     if (
       session.version !== 1 ||
-      typeof session.userId !== "string" ||
-      !session.userId ||
-      typeof session.issuedAt !== "number" ||
-      typeof session.expiresAt !== "number" ||
-      session.issuedAt > nowSeconds + 60 ||
-      session.expiresAt <= nowSeconds
+      !validLuxartUserId(session.userId) ||
+      typeof issuedAt !== "number" ||
+      !Number.isSafeInteger(issuedAt) ||
+      issuedAt < 0 ||
+      typeof expiresAt !== "number" ||
+      !Number.isSafeInteger(expiresAt) ||
+      expiresAt <= issuedAt ||
+      expiresAt - issuedAt > sessionTtlSeconds ||
+      issuedAt > nowSeconds + 60 ||
+      expiresAt <= nowSeconds
     ) {
       return null;
     }
