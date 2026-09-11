@@ -51,7 +51,7 @@ Oficiální podklady:
 | H4 Read-only staging | nasadit přesný schválený commit s vypnutými booking/payment/watchdog mutacemi | readiness + runtime probe v `fra1` | čeká se |
 | H5 Live integrace | porovnat přímý Luxart a stagingový CS/EN feed pro stejných sedm pražských dnů | hashované důkazy | čeká se |
 | H6 Transakční staging | až po pravidlech, resource mapě a povolení test DB spustit jedno řízené UAT | obnovený stav + request ID | čeká se |
-| H7 Doména/cutover | po identifikaci vlastníka zachytit původní A/AAAA do owner-only rollback důkazu, těsně před změnou potvrdit nezměněný fingerprint, potom připojit doménu k Vercelu a vydat platný certifikát až po UAT, rollbacku, alertu, fallbacku a výslovném souhlasu; pilotní skupinu otevřít až po read-only kontrole skutečné produkční domény | `capture:production-domain-baseline` + `verify:production-domain-baseline` + zelený release dossier před změnou + zelený `verify:production-cutover` po změně | čeká se |
+| H7 Doména/cutover | po identifikaci vlastníka zachytit původní A/AAAA do owner-only rollback důkazu, těsně před změnou v jednom běhu potvrdit zelený dossier, výslovný souhlas a nezměněný fingerprint, potom připojit doménu k Vercelu a vydat platný certifikát; pilotní skupinu otevřít až po read-only kontrole skutečné produkční domény | `capture:production-domain-baseline` + `verify:production-precutover` před změnou + `verify:production-cutover` po změně | čeká se |
 
 ## Konfigurační hranice
 
@@ -59,7 +59,7 @@ Oficiální podklady:
 - Vercel/serverless se považuje za multi-instance topologii, proto používá `RATE_LIMIT_MODE=postgres`; paměťový limiter není pro tento hosting produkční varianta.
 - `BOOKING_MUTATIONS_ENABLED=false`, `PAYMENT_MUTATIONS_ENABLED=false` a `LUXART_WAITLIST_ENABLED=false` jsou výchozí i rollback hodnoty.
 - Produkční doména, DNS, secrets ani deployment se nemění bez samostatného schválení.
-- Existující A/AAAA se před cutoverem uloží mimo repozitář do nepřepisovatelného souboru s právy `0600`; release dossier vyžaduje jeho čerstvý SHA-256 a příznak připraveného rollbacku. TTL se do fingerprintu nezahrnuje, protože rekurzivní DNS resolver vrací odpočítávanou hodnotu, nikoli autoritativní konfiguraci. Bezprostředně před zásahem musí stejné záznamy potvrdit `verify:production-domain-baseline`; současné záznamy se nyní nemění.
+- Existující A/AAAA se před cutoverem uloží mimo repozitář do nepřepisovatelného souboru s právy `0600`; release dossier vyžaduje jeho čerstvý SHA-256 a příznak připraveného rollbacku. TTL se do fingerprintu nezahrnuje, protože rekurzivní DNS resolver vrací odpočítávanou hodnotu, nikoli autoritativní konfiguraci. Bezprostředně před zásahem musí stejné záznamy i celý schválený dossier v jediném běhu potvrdit `verify:production-precutover`; současné záznamy se nyní nemění.
 - Zelený release dossier autorizuje změnu, ale nedokládá výsledek DNS. Po přepnutí musí před otevřením pilotu projít `verify:production-cutover`; při chybě se bez dalšího experimentování vrátí zaznamenané původní DNS hodnoty.
 - Přesná matice proměnných a zákaz CLI-only hodnot v runtime prostředí je v `docs/deployment-preflight.md`.
 

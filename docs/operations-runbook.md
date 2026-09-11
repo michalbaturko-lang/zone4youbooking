@@ -63,7 +63,15 @@ ZONE4YOU_DNS_BASELINE_VERIFY_CONFIRMATION=VERIFY_ZONE4YOU_DNS_BASELINE:<sha256-s
 npm run verify:production-domain-baseline
 ```
 
-Jakákoli odchylka znamená zastavit cutover, zjistit vlastníka změny a až po novém schválení zachytit nový baseline. Soubor obsahuje veřejné DNS adresy potřebné pro přesný návrat, proto se drží owner-only mimo Git. Release validátor přijme baseline starý maximálně 24 hodin.
+Samostatný příkaz je diagnostický. Autoritativní poslední brána před ruční změnou DNS musí ve stejném běhu znovu ověřit celý schválený release dossier i živou shodu baseline:
+
+```bash
+ZONE4YOU_DNS_BASELINE_EVIDENCE_PATH=/secure/release-evidence/production-dns-baseline.json \
+ZONE4YOU_PRECUTOVER_CONFIRMATION=VERIFY_ZONE4YOU_PRECUTOVER:<sha256-dossieru> \
+npm run verify:production-precutover
+```
+
+Příkaz přebírá ostatní proměnné finálního `verify:pilot-release`, nic nenasazuje ani nemění a jako jediný může vrátit `GO_TO_AUTHORIZED_DNS_CHANGE`. Jakákoli odchylka znamená zastavit cutover, zjistit vlastníka změny a až po novém schválení zachytit nový baseline. Soubor obsahuje veřejné DNS adresy potřebné pro přesný návrat, proto se drží owner-only mimo Git. Release validátor přijme baseline starý maximálně 24 hodin.
 
 Vygenerovaný dossier je záměrně `draft: true`, `UAT=NO-GO`, alert receipt nepotvrzený, Memberzone fallback nedostupný a cutover neschválený. Není launch autoritou. Až oprávněné osoby skutečně uzavřou UAT, potvrdí stejné alert event ID, fallback a cutover, doplní své jméno/roli a aktuální čas, lze nastavit `draft: false`. Řetězec `pending-human-approval` finální validátor odmítá. Poté se znovu spočítá SHA celého dossieru, nastaví `ZONE4YOU_RELEASE_DOSSIER_PATH`, `ZONE4YOU_RELEASE_COMMIT` a přesná potvrzovací fráze `VERIFY_ZONE4YOU_RELEASE_DOSSIER:<sha256-dossieru>`. Bez těchto živých lidských kroků `verify:pilot-release` vždy skončí NO-GO.
 
@@ -73,7 +81,7 @@ Režim `booking_without_payments` dovoluje bezpečný booking pilot se skrytým 
 
 ### Dvě oddělené cutover brány
 
-Zelený `verify:pilot-release` je předcutoverový důkaz a pouze autorizuje oprávněného správce k přesně naplánované změně DNS. Sám nic nepřepíná. Po změně DNS a vydání platného certifikátu, ale ještě před pozváním pilotní skupiny, musí během sledovaného launch okna projít druhá read-only brána:
+Zelený `verify:pilot-release` spolu se zeleným `verify:production-precutover` je předcutoverový důkaz a pouze autorizuje oprávněného správce k přesně naplánované změně DNS. Ani jeden příkaz nic nepřepíná. Po změně DNS a vydání platného certifikátu, ale ještě před pozváním pilotní skupiny, musí během sledovaného launch okna projít druhá read-only brána:
 
 ```bash
 ZONE4YOU_PRODUCTION_APP_URL=https://booking.zone4you.cz/ \
