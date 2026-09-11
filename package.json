@@ -28,12 +28,13 @@
     "verify:pilot-release": "tsx scripts/verify-pilot-release.ts",
     "inspect:business-rules": "node scripts/inspect-business-rules.mjs",
     "inspect:payment-product": "node scripts/inspect-payment-product.mjs",
+    "scan:release-secrets": "node scripts/scan-release-secrets.mjs",
     "test": "tsx --test tests/**/*.test.ts",
     "test:booking-postgres": "tsx --test tests/booking-mutation-ledger-postgres.integration.ts",
     "test:payments-postgres": "tsx --test tests/payment-ledger-postgres.integration.ts",
     "test:rate-limit-postgres": "tsx --test tests/rate-limit-postgres.integration.ts",
     "test:e2e": "playwright test",
-    "quality": "npm test && npm run typecheck && npm run build && npm run test:e2e && npm audit --omit=dev",
+    "quality": "npm test && npm run typecheck && npm run build && npm run test:e2e && npm audit --omit=dev && npm run scan:release-secrets",
     "check:launch": "node scripts/check-launch-readiness.mjs"
   },
   "dependencies": {
