@@ -97,7 +97,7 @@ Pilot je veřejně otevřený až po zeleném JSON výsledku uloženém v chrán
 
 ### Řízený transakční UAT
 
-`npm run verify:booking-mutations` se smí spustit až po výslovném povolení mutací v testovací databázi. Skript odmítá `https://booking.zone4you.cz`, vyžaduje přesný staging origin v potvrzovací frázi `ZONE4YOU_TEST_DB_ONLY:<origin>`, přesné ID testovacího klienta a lekce, bezpečný časový odstup a očekávaný storno poplatek. Přihlašovací údaje zůstávají pouze v environmentu a výstup obsahuje jen hash ID a booleovské důkazy.
+`npm run verify:booking-mutations` se smí spustit až po výslovném povolení mutací v testovací databázi. Skript odmítá `https://booking.zone4you.cz`, vyžaduje přesný staging origin v potvrzovací frázi `ZONE4YOU_TEST_DB_ONLY:<origin>`, přesné ID testovacího klienta a lekce, bezpečný časový odstup a očekávaný storno poplatek. Před prvním POSTem musí personalizovaný snapshot potvrdit `user_posible`, autoritativní volné místo, číslo sálu, potvrzené rezervační okno, možnost online storna a shodu očekávaného poplatku s pravidlem konkrétní lekce; jinak se UAT zastaví bez mutace. Finální release validátor navíc vyžaduje, aby číslo sálu UAT lekce existovalo v úplném `LUXART_RESOURCE_MAP_JSON`. Přihlašovací údaje zůstávají pouze v environmentu a výstup obsahuje jen hash ID, číslo sálu a booleovské důkazy.
 
 Skript ověří jeden zápis, tři replaye stejného klíče, dva paralelní klíče, jeden storno zápis, tři replaye storna, replay s jiným klíčem a návrat aktivních rezervací i kreditu do výchozího stavu. Po nejasném výsledku mutaci slepě neopakuje; booking se vypne a provede se reconciliation podle této příručky.
 

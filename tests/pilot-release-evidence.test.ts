@@ -126,6 +126,11 @@ function validFixture() {
       checkedAt,
       target: stagingTarget,
       userVerified: true,
+      personalizedEligibilityVerified: true,
+      authoritativeAvailabilityVerified: true,
+      reservationWindowVerified: true,
+      onlineCancellationVerified: true,
+      lessonRoomNumber: 1,
       sameKeyCreateReplays: 3,
       parallelCreateRequests: 2,
       sameKeyCancellationReplays: 3,
@@ -263,6 +268,13 @@ test("pilot release dossier rejects evidence that cannot come from the real guar
         personalized.english.ineligible = 1;
       },
       /Czech and English personalized Luxart eligibility counts differ/i,
+    ],
+    [
+      "bookingMutationUat",
+      (artifact: Record<string, unknown>) => {
+        artifact.authoritativeAvailabilityVerified = false;
+      },
+      /booking UAT authoritativeAvailabilityVerified must be true/i,
     ],
     [
       "bookingMutationUat",

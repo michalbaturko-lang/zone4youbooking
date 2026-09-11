@@ -1,6 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import type { BookingCapabilities, BookingRules, Lesson, Reservation, User } from "../src/lib/domain";
+import {
+  availablePlacesForLesson,
+  canCancelLessonAt,
+  cancellationPolicyForLesson,
+  freeCancellationDeadlineForLesson,
+} from "../src/lib/bookingRules";
 
 type FetchLike = typeof fetch;
 type Environment = Record<string, string | undefined>;
@@ -261,11 +267,49 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
   if (exactActiveReservation(before, config.lessonId).length !== 0) {
     throw new Error("The approved UAT lesson already has an active reservation for this test user; no mutation was attempted.");
   }
-  if (lesson.occupiedCount >= lesson.capacity) throw new Error("The approved UAT lesson is full; no mutation was attempted.");
+  if (lesson.canCurrentUserReserve !== true) {
+    throw new Error("The approved UAT lesson is not explicitly eligible for this test user; no mutation was attempted.");
+  }
+  if (!Number.isSafeInteger(lesson.luxartRoomNumber) || Number(lesson.luxartRoomNumber) <= 0) {
+    throw new Error("The approved UAT lesson has no valid Luxart room number; no mutation was attempted.");
+  }
+  const availableCount = availablePlacesForLesson(lesson);
+  if (
+    !Number.isSafeInteger(lesson.capacity) ||
+    lesson.capacity <= 0 ||
+    !Number.isSafeInteger(lesson.occupiedCount) ||
+    lesson.occupiedCount < 0 ||
+    lesson.occupiedCount >= lesson.capacity ||
+    !Number.isSafeInteger(availableCount) ||
+    availableCount <= 0 ||
+    availableCount > lesson.capacity ||
+    lesson.occupiedCount + availableCount > lesson.capacity
+  ) {
+    throw new Error("The approved UAT lesson has no authoritative available place; no mutation was attempted.");
+  }
   const startsAtMs = new Date(lesson.startsAt).getTime();
-  const hoursBeforeStart = (startsAtMs - Date.now()) / 3_600_000;
+  const preflightNow = new Date();
+  const hoursBeforeStart = (startsAtMs - preflightNow.getTime()) / 3_600_000;
   if (!Number.isFinite(hoursBeforeStart) || hoursBeforeStart < config.minimumHoursBeforeStart) {
     throw new Error("The approved UAT lesson is too close to its start time for the configured cancellation safety margin.");
+  }
+  if (
+    !Number.isFinite(before.rules.reservationWindowHours) ||
+    before.rules.reservationWindowHours <= 0 ||
+    hoursBeforeStart > before.rules.reservationWindowHours
+  ) {
+    throw new Error("The approved UAT lesson is outside the confirmed reservation window; no mutation was attempted.");
+  }
+  if (!canCancelLessonAt(lesson, before.rules, preflightNow)) {
+    throw new Error("The approved UAT lesson cannot be safely cancelled online; no mutation was attempted.");
+  }
+  const cancellationPolicy = cancellationPolicyForLesson(lesson, before.rules);
+  const freeCancellationDeadline = new Date(freeCancellationDeadlineForLesson(lesson, before.rules)).getTime();
+  const expectedPolicyFee = preflightNow.getTime() < freeCancellationDeadline
+    ? 0
+    : cancellationPolicy.lateCancelFeeKc;
+  if (config.expectedCancellationFeeKc !== expectedPolicyFee) {
+    throw new Error("The configured UAT cancellation fee does not match the confirmed lesson policy; no mutation was attempted.");
   }
   if (
     !Number.isFinite(before.user.creditBalanceKc) ||
@@ -359,6 +403,11 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
       checkedAt: new Date().toISOString(),
       target: config.target.origin,
       userVerified: true,
+      personalizedEligibilityVerified: true,
+      authoritativeAvailabilityVerified: true,
+      reservationWindowVerified: true,
+      onlineCancellationVerified: true,
+      lessonRoomNumber: lesson.luxartRoomNumber,
       lessonIdSha256: shortHash(config.lessonId),
       reservationIdSha256: shortHash(verifiedReservation.id),
       sameKeyCreateReplays: 3,

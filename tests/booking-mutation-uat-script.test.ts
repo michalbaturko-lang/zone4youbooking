@@ -58,10 +58,11 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
   };
   const lesson: Lesson = {
     id: config.lessonId,
+    luxartRoomNumber: 1,
     name: "UAT lesson",
     description: "",
-    startsAt: new Date(Date.now() + 12 * 3_600_000).toISOString(),
-    endsAt: new Date(Date.now() + 13 * 3_600_000).toISOString(),
+    startsAt: new Date(Date.now() + 30 * 3_600_000).toISOString(),
+    endsAt: new Date(Date.now() + 31 * 3_600_000).toISOString(),
     durationMinutes: 60,
     instructorName: "Test",
     instructorSpecialization: "Test",
@@ -69,6 +70,8 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
     category: "Test",
     capacity: 10,
     occupiedCount: 2,
+    availableCount: 8,
+    canCurrentUserReserve: true,
     priceKc: 180,
     waitlistEnabled: false,
   };
@@ -102,6 +105,8 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
   let createWrites = 0;
   let cancelWrites = 0;
   let cancelledReservation: Reservation | undefined;
+  let personalizedEligibility = true;
+  let authoritativeAvailableCount = 8;
   let sequence = 0;
   const idempotentResponses = new Map<string, Reservation>();
 
@@ -122,7 +127,17 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
     }
     assert.equal(headers.get("cookie"), "z4y_booking_session=test-cookie");
     if (url.pathname === "/api/booking/snapshot") {
-      return response({ user, lessons: [lesson], reservations, rules, capabilities });
+      return response({
+        user,
+        lessons: [{
+          ...lesson,
+          canCurrentUserReserve: personalizedEligibility,
+          availableCount: authoritativeAvailableCount,
+        }],
+        reservations,
+        rules,
+        capabilities,
+      });
     }
     if (url.pathname === "/api/reservations" && init?.method === "POST") {
       const key = headers.get("idempotency-key")!;
@@ -168,11 +183,32 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
   };
 
   const evidence = await runBookingMutationUat(config, fakeFetch);
-  validateBookingUatEvidence(evidence, config.target.origin);
+  validateBookingUatEvidence(evidence, config.target.origin, new Map([["1", 101]]));
   assert.equal(evidence.ok, true);
+  assert.equal(evidence.personalizedEligibilityVerified, true);
+  assert.equal(evidence.authoritativeAvailabilityVerified, true);
+  assert.equal(evidence.reservationWindowVerified, true);
+  assert.equal(evidence.onlineCancellationVerified, true);
+  assert.equal(evidence.lessonRoomNumber, 1);
   assert.equal(evidence.finalStateRestored, true);
   assert.equal(createWrites, 1);
   assert.equal(cancelWrites, 1);
   assert.equal(JSON.stringify(evidence).includes("test-secret"), false);
   assert.equal(JSON.stringify(evidence).includes("approved-test-user"), false);
+
+  const writesAfterSuccessfulUat = createWrites;
+  personalizedEligibility = false;
+  await assert.rejects(
+    runBookingMutationUat(config, fakeFetch),
+    /not explicitly eligible.*no mutation was attempted/i,
+  );
+  assert.equal(createWrites, writesAfterSuccessfulUat);
+
+  personalizedEligibility = true;
+  authoritativeAvailableCount = 0;
+  await assert.rejects(
+    runBookingMutationUat(config, fakeFetch),
+    /no authoritative available place.*no mutation was attempted/i,
+  );
+  assert.equal(createWrites, writesAfterSuccessfulUat);
 });

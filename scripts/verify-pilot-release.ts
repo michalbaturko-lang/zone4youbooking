@@ -346,9 +346,21 @@ function validateRuntimeEvidence(
   }
 }
 
-export function validateBookingUatEvidence(evidence: JsonObject, stagingOrigin: string) {
+export function validateBookingUatEvidence(
+  evidence: JsonObject,
+  stagingOrigin: string,
+  resourceMap: Map<string, number>,
+) {
   exactString(cleanHttpsOrigin(evidence.target, "artifacts.bookingMutationUat.target"), stagingOrigin, "Booking UAT target");
   trueValue(evidence.userVerified, "booking UAT userVerified");
+  trueValue(evidence.personalizedEligibilityVerified, "booking UAT personalizedEligibilityVerified");
+  trueValue(evidence.authoritativeAvailabilityVerified, "booking UAT authoritativeAvailabilityVerified");
+  trueValue(evidence.reservationWindowVerified, "booking UAT reservationWindowVerified");
+  trueValue(evidence.onlineCancellationVerified, "booking UAT onlineCancellationVerified");
+  const lessonRoomNumber = integerValue(evidence.lessonRoomNumber, "booking UAT lessonRoomNumber", 1);
+  if (!resourceMap.has(String(lessonRoomNumber))) {
+    throw new Error("The booking UAT lesson room is missing from LUXART_RESOURCE_MAP_JSON.");
+  }
   integerValue(evidence.sameKeyCreateReplays, "booking UAT sameKeyCreateReplays", 3);
   integerValue(evidence.parallelCreateRequests, "booking UAT parallelCreateRequests", 2);
   integerValue(evidence.sameKeyCancellationReplays, "booking UAT sameKeyCancellationReplays", 3);
@@ -466,7 +478,8 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
   if (!rateLimitRuntimeReady({ ...environment, LUXART_MOCK: "false" })) {
     throw new Error("The configured production rate limiter is not ready for the verified pilot release.");
   }
-  const luxart = validateLuxartEvidence(load("luxartReadOnly"), luxartOrigin, roomMap(environment), gatewayAuth.mode);
+  const resources = roomMap(environment);
+  const luxart = validateLuxartEvidence(load("luxartReadOnly"), luxartOrigin, resources, gatewayAuth.mode);
   validateRuntimeEvidence(
     load("runtimeProbe"),
     stagingTarget,
@@ -475,7 +488,7 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
     expectedCommit,
     launchMode,
   );
-  validateBookingUatEvidence(load("bookingMutationUat"), stagingTarget);
+  validateBookingUatEvidence(load("bookingMutationUat"), stagingTarget, resources);
   validateRollbackEvidence(load("rollback", Math.min(24, maximumAgeHours)), stagingTarget);
   const dnsRollbackReference = objectValue(artifacts.dnsRollbackBaseline, "artifacts.dnsRollbackBaseline");
   const dnsRollbackPathValue = stringValue(dnsRollbackReference.path, "artifacts.dnsRollbackBaseline.path");

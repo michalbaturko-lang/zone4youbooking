@@ -92,6 +92,7 @@ Kritický externí deadline je přístup k Zone4You testovacímu API do konce D1
 | Scénář | GO práh | Povinný důkaz |
 |---|---|---|
 | Seznam rezervací | UI odpovídá Luxart test DB podle ID, času, stavu a ceny | před/po fixture + browser E2E |
+| Předmutací UAT | vybraná lekce je pro testovacího klienta výslovně povolená, má autoritativní volné místo a mapovaný sál, je v potvrzeném rezervačním okně a lze ji bezpečně stornovat s očekávaným poplatkem; jinak nevznikne POST | privacy-safe UAT preflight důkaz + negativní testy bez zápisu |
 | Nová rezervace | právě jedna Luxart rezervace, správný klient, lekce, kategorie a `id_resource` | test DB důkaz + request fixture |
 | Opakovaný klik/retry | nikdy nevzniknou dvě aktivní rezervace stejné lekce; stejný klíč i čerstvý druhý browser klíč vrátí uložený výsledek | nejméně 3 opakování + souběh dvou klíčů + konflikt/stejný výsledek + ledger důkaz |
 | Storno | správná rezervace je zrušena právě jednou; poplatek/kredit odpovídá pravidlu | test DB před/po + UI |
