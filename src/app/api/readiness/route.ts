@@ -20,12 +20,13 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   if (!isRealLuxartMode()) {
+    const commit = runtimeDeploymentCommit();
     return ok({
       status: "ready",
       mode: "demo",
       phase: "demo",
-      commit: "demo",
-      region: "local",
+      commit: commit ?? "unverified",
+      region: runtimeDeploymentRegion(),
       luxart: "mock",
       schedule: "mock",
       rateLimit: "memory",

@@ -7,6 +7,8 @@ interface DemoReadiness {
   status?: unknown;
   mode?: unknown;
   phase?: unknown;
+  commit?: unknown;
+  region?: unknown;
   luxart?: unknown;
   schedule?: unknown;
   capabilities?: {
@@ -50,6 +52,17 @@ export function externalDemoRequestHeaders(environment: Environment = process.en
     : {};
 }
 
+export function externalDemoExpectedCommit(environment: Environment = process.env) {
+  const origin = externalDemoOrigin(environment);
+  if (!origin) return undefined;
+
+  const commit = environment.PLAYWRIGHT_EXPECTED_DEMO_COMMIT?.trim().toLowerCase();
+  if (!commit || !/^[a-f0-9]{40}$/.test(commit)) {
+    throw new Error("PLAYWRIGHT_EXPECTED_DEMO_COMMIT must contain the exact 40-character Git commit for the Preview.");
+  }
+  return commit;
+}
+
 export function isExpectedExternalDemoConsoleNoise(
   message: string,
   environment: Environment = process.env,
@@ -60,10 +73,12 @@ export function isExpectedExternalDemoConsoleNoise(
     message.endsWith("The action has been blocked.");
 }
 
-export function assertExternalDemoReadiness(payload: DemoReadiness) {
+export function assertExternalDemoReadiness(payload: DemoReadiness, expectedCommit: string) {
   const safeDemo = payload.status === "ready" &&
     payload.mode === "demo" &&
     payload.phase === "demo" &&
+    payload.commit === expectedCommit &&
+    payload.region === "fra1" &&
     payload.luxart === "mock" &&
     payload.schedule === "mock" &&
     payload.capabilities?.reservationsEnabled === true &&
@@ -81,6 +96,8 @@ export async function verifyExternalDemoTarget(
 ) {
   const origin = externalDemoOrigin(environment);
   if (!origin) return;
+  const expectedCommit = externalDemoExpectedCommit(environment);
+  if (!expectedCommit) return;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
@@ -100,7 +117,7 @@ export async function verifyExternalDemoTarget(
       throw new Error("External browser regression refused: readiness response is unexpectedly large.");
     }
     const payload = await response.json() as DemoReadiness;
-    assertExternalDemoReadiness(payload);
+    assertExternalDemoReadiness(payload, expectedCommit);
   } finally {
     clearTimeout(timeout);
   }
