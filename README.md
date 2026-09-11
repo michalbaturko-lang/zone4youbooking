@@ -30,6 +30,7 @@ RATE_LIMIT_TEST_DATABASE_URL=postgresql:///postgres npm run test:rate-limit-post
 APP_BASE_URL=http://localhost:3007 npm run smoke:api
 npm run check:launch
 npm run verify:deployment-preflight
+npm run probe:luxart-help
 npm run verify:luxart-gateway-config
 npm run inspect:business-rules
 npm run inspect:payment-product
@@ -46,6 +47,8 @@ npm run verify:production-cutover
 `check:launch` v demo rezimu zamerne vraci `NO-GO`; produkce se nesmi spustit nad mock daty nebo nekompletnim Luxart adapterem. Ve fázi `booking_without_payments` označí čtyři infrastrukturní Stripe kontroly jako `SKIP`, ale současně vyžaduje `PAYMENT_MUTATIONS_ENABLED=false`; ve fázi `booking_with_stripe` jsou všechny platební kontroly povinné.
 
 `verify:deployment-preflight` ověřuje vzájemnou shodu cíle, přesného commitu, fáze `read_only` / `booking_without_payments` / `booking_with_stripe`, capability přepínačů a runtime-only konfigurace. Výstup nikdy nevypisuje secrets ani upstream/databázové URL. Přesná staging/produkční matice je v [`docs/deployment-preflight.md`](docs/deployment-preflight.md).
+
+`probe:luxart-help` je první bezpečný síťový test po získání přesné URL. Posílá jediný neautentizovaný `GET /Help`, zakazuje redirecty, omezuje čas i velikost odpovědi a do výsledku ukládá jen port, transport, HTTP stav a SHA-256 cíle/odpovědi. Rozliší nedostupnou síť, požadovanou gateway autentizaci a skutečnou Luxart dokumentaci, aniž by poslal klientské heslo.
 
 `verify:luxart-gateway-config` bezpečně ověřuje pouze způsob serverového přístupu ke konfigurovanému Luxart API. Zone4You IT dne 11. 9. 2026 potvrdilo dohodu s Luxartem o zveřejnění portu 9191, ale stále chybí přesný host, schéma a potvrzení, že je cesta už aktivní. Podporované auth režimy jsou `none`, `basic`, `bearer` a vlastní `X-*` hlavička; hodnoty credentials zůstávají jen v secret store a výstup je nikdy nezobrazuje. Gateway credentials nejsou totéž co testovací login klienta.
 

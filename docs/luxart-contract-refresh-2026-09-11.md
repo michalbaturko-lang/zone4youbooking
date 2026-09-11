@@ -9,6 +9,8 @@ Tento záznam je pouze neosobní read-only evidence veřejné referenční dokum
 - Dokumentace uvádí potřebné kontrakty pro login, všechny `Lesson` položky, seznam/vytvoření/storno rezervace a watchdog.
 - Storno odpověď obsahuje `storno_poplatek`; UI proto nesmí částku domýšlet a ukazuje hodnotu vrácenou Luxartem.
 - `Lesson_data` obsahuje mimo jiné datum a čas, službu, cenu, název, popis, kapacity/obsazenost, `cislo_salu`, instruktora a příznak rezervovatelnosti. To odpovídá pilotnímu rozsahu všech lekcí, všech sálů a Reformeru.
+- Nový automatický `probe:luxart-help` na referenčním portu `9295` v 12:43 CEST prošel s HTTP 200 a klasifikací `ready`; bezpečný výstup neobsahuje hostname ani credentials.
+- Stejný probe na zjevné veřejné Zone4You variantě s portem `9191` skončil connect timeoutem. Host ale nebyl IT potvrzen, proto jde pouze o negativní kandidátní pozorování, nikoli o definitivní stav portu.
 
 ## SHA-256 uložené odpovědi
 

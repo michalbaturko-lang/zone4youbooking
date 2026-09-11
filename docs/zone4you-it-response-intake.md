@@ -71,11 +71,18 @@ Read-only test se nespouští, pokud chybí síťová cesta, gateway režim, pot
 6. Teprve po samostatné autoritě připravit staging, alert, rollback a jedno řízené UAT.
 7. Produkční deploy, DNS a cutover zůstávají samostatně schvalované akce.
 
+### Síťové pozorování 11. 9. 2026
+
+- Neautentizovaný probe veřejné referenční dokumentace Luxartu na portu `9295` prošel: HTTP 200 a rozpoznaná stránka `API dokumentace`.
+- Obvyklé veřejné Zone4You hostname varianty na portu `9191` při HTTP i HTTPS z tohoto vývojového připojení timeoutovaly.
+- Toto pozorování nedokazuje, že je port obecně zavřený: IT může používat jiný hostname, VPN nebo allowlist. Dokazuje pouze, že bez přesné URL není z aktuálního připojení dosažitelná žádná zjevná veřejná varianta.
+- Nebyl odeslán login, heslo, cookie ani autorizační hlavička a nebyla provedena žádná API mutace.
+
 ## 4. Výsledek vyhodnocení
 
 - Read-only integrace: `NEPOVOLENA` — chybí úplná URL, stav portu, test DB a auth režim
 - Rezervační UAT: `NEPOVOLENO` — chybí read-only důkaz, explicitní testovací autorita, mapování sálů a úplná business pravidla
 - Deployment: vždy `NEAUTORIZOVÁN`, dokud nevznikne samostatné schválení
 - DNS/cutover: vždy `NEAUTORIZOVÁN`, dokud nevznikne samostatné schválení
-- Nejbližší bezpečný krok: získat od IT jedinou přesnou URL `http(s)://<host>:9191/Help` a potvrzení, že je dostupná nyní; následně provést pouze read-only probe.
+- Nejbližší bezpečný krok: získat od IT jedinou přesnou URL `http(s)://<host>:9191/Help` a potvrzení, že je dostupná nyní; následně spustit pouze neautentizovaný `npm run probe:luxart-help`. Klientské přihlašovací údaje se použijí až po bezpečném transportním a gateway důkazu.
 - Chybějící položky a vlastník: host/schéma/stav portu/test DB/auth — Zone4You IT + Luxart; mutační UAT a pravidla — Zone4You + Luxart.
