@@ -27,14 +27,11 @@ import {
   type LuxartLessonMapping,
   type LuxartPaymentHistory,
   type LuxartPaymentResult,
-  type LuxartReservationDeleteResult,
   type LuxartReservationData,
-  type LuxartReservationInsertResult,
   type LuxartUserData,
   type LuxartWatchdogData,
-  type LuxartWatchdogResult,
 } from "./luxartContract";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { bookingRules, canCancelLessonAt } from "./bookingRules";
 import { BookingApiError, BookingMutationOutcomeUnknownError } from "./errors";
 import type { Locale } from "./i18n";
@@ -325,6 +322,49 @@ function mapValidatedLuxartCreditHistory(
   }
 }
 
+function asMutationResult(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new BookingMutationOutcomeUnknownError();
+  }
+  return value as Record<string, unknown>;
+}
+
+function asSingleMutationResult(value: unknown): Record<string, unknown> {
+  if (Array.isArray(value)) {
+    if (value.length !== 1) throw new BookingMutationOutcomeUnknownError();
+    return asMutationResult(value[0]);
+  }
+  return asMutationResult(value);
+}
+
+function mutationSuccessCode(result: Record<string, unknown>) {
+  const success = result.success;
+  if (typeof success !== "number" || !Number.isSafeInteger(success)) {
+    throw new BookingMutationOutcomeUnknownError();
+  }
+  return success;
+}
+
+function optionalMutationIdentifier(value: unknown) {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value !== "string") throw new BookingMutationOutcomeUnknownError();
+  const identifier = value.trim();
+  if (!identifier || identifier.length > 256 || /[\u0000-\u001f\u007f]/.test(identifier)) {
+    throw new BookingMutationOutcomeUnknownError();
+  }
+  return identifier;
+}
+
+function requiredNonNegativeMutationNumber(value: unknown) {
+  const parsed = typeof value === "number"
+    ? value
+    : typeof value === "string" && value.trim()
+      ? Number(value)
+      : Number.NaN;
+  if (!Number.isFinite(parsed) || parsed < 0) throw new BookingMutationOutcomeUnknownError();
+  return parsed;
+}
+
 export function assertReservationPreconditions(lesson: Lesson, user: User, now = new Date()) {
   const nowTime = now.getTime();
   const startTime = new Date(lesson.startsAt).getTime();
@@ -569,35 +609,46 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
       const resourceMap = parseEnvironmentMapping("LUXART_RESOURCE_MAP_JSON");
       const resourceId = Number(resourceMap?.[String(lesson.luxartRoomNumber ?? "")]);
       const payload = buildLuxartReservationInsert(lesson, userId, resourceId);
-      const result = await luxartFetch<LuxartReservationInsertResult>(
+      const response = await luxartFetch<unknown>(
         config,
         "/api/Reservations",
         { method: "POST", body: JSON.stringify(payload) },
         "create reservation",
         true,
       );
-      if (!Number.isInteger(result.success)) throw new BookingMutationOutcomeUnknownError();
-      if (![1, 2].includes(result.success)) {
-        throw new BookingApiError(409, "RESERVATION_REJECTED", result.messaget || "Rezervaci nelze vytvořit.");
+      const result = asMutationResult(response);
+      const success = mutationSuccessCode(result);
+      if (![1, 2].includes(success)) {
+        throw new BookingApiError(409, "RESERVATION_REJECTED", "Rezervaci nelze vytvořit.");
       }
+      const uuid = optionalMutationIdentifier(result.uuid);
 
       try {
         const refreshed = await this.getReservations();
-        const created = refreshed.find((reservation) => result.uuid && reservation.luxartUuid === result.uuid);
+        const sameLesson = refreshed.filter(
+          (reservation) => reservation.lessonId === lesson.id && reservation.status === "active",
+        );
+        const created = uuid
+          ? refreshed.find((reservation) => reservation.luxartUuid === uuid)
+          : sameLesson.length === 1
+            ? sameLesson[0]
+            : undefined;
         if (created) return created;
       } catch {
         // The successful write response is authoritative. A failed follow-up
         // read must not turn it into a retryable failure and create a duplicate.
       }
 
+      if (!uuid) throw new BookingMutationOutcomeUnknownError();
+
       return {
-        id: `uuid:${result.uuid ?? randomUUID()}`,
+        id: `uuid:${uuid}`,
         userId,
         lessonId: lesson.id,
         status: "active",
         reservedAt: new Date().toISOString(),
         priceKc: lesson.priceKc,
-        luxartUuid: result.uuid ?? undefined,
+        luxartUuid: uuid,
         luxartCategoryId: lesson.luxartCategoryId,
       };
     },
@@ -627,7 +678,7 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
         throw new BookingApiError(409, "CANCELLATION_CLOSED", "Online storno této rezervace je uzavřené.");
       }
 
-      const response = await luxartFetch<LuxartReservationDeleteResult[] | LuxartReservationDeleteResult>(
+      const response = await luxartFetch<unknown>(
         config,
         queryPath(`/api/Reservations/${encodeURIComponent(reservation.id)}`, {
           kategorie: reservation.luxartCategoryId,
@@ -637,17 +688,18 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
         "cancel reservation",
         true,
       );
-      const result = Array.isArray(response) ? response[0] : response;
-      if (!result || !Number.isInteger(result.success)) throw new BookingMutationOutcomeUnknownError();
-      if (!result || result.success < 0) {
-        throw new BookingApiError(409, "CANCELLATION_REJECTED", result?.messaget || "Rezervaci nelze zrušit.");
+      const result = asSingleMutationResult(response);
+      const success = mutationSuccessCode(result);
+      if (success < 0) {
+        throw new BookingApiError(409, "CANCELLATION_REJECTED", "Rezervaci nelze zrušit.");
       }
+      const cancellationFeeKc = requiredNonNegativeMutationNumber(result.storno_poplatek);
 
       return {
         ...reservation,
         status: "cancelled",
         cancelledAt: new Date().toISOString(),
-        cancellationFeeKc: Math.max(0, Number(result.storno_poplatek ?? 0)),
+        cancellationFeeKc,
       };
     },
 
@@ -673,16 +725,17 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
       const resourceMap = parseEnvironmentMapping("LUXART_RESOURCE_MAP_JSON");
       const resourceId = Number(resourceMap?.[String(lesson.luxartRoomNumber ?? "")]);
       const payload = buildLuxartWatchdogInsert(lesson, userId, resourceId, luxartLanguage());
-      const result = await luxartFetch<LuxartWatchdogResult>(
+      const response = await luxartFetch<unknown>(
         config,
         watchdogInsertPath(),
         { method: "POST", body: JSON.stringify(payload) },
         "create watchdog",
         true,
       );
-      if (!Number.isInteger(result.success)) throw new BookingMutationOutcomeUnknownError();
-      if (![1, 2].includes(result.success)) {
-        throw new BookingApiError(409, "WATCHDOG_REJECTED", result.messaget || "Hlídání místa nelze vytvořit.");
+      const result = asMutationResult(response);
+      const success = mutationSuccessCode(result);
+      if (![1, 2].includes(success)) {
+        throw new BookingApiError(409, "WATCHDOG_REJECTED", "Hlídání místa nelze vytvořit.");
       }
 
       const refreshed = await this.getWaitlist();
@@ -703,17 +756,17 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
       }
       if (!watchdogId) throw new BookingApiError(404, "WATCHDOG_NOT_FOUND", "Hlídání místa nebylo nalezeno.");
 
-      const response = await luxartFetch<LuxartWatchdogResult[] | LuxartWatchdogResult>(
+      const response = await luxartFetch<unknown>(
         config,
         queryPath(`/api/Watchdog/${watchdogId}`, { resort: config.resortId }),
         { method: "DELETE" },
         "delete watchdog",
         true,
       );
-      const result = Array.isArray(response) ? response[0] : response;
-      if (!result || !Number.isInteger(result.success)) throw new BookingMutationOutcomeUnknownError();
-      if (!result || result.success < 0) {
-        throw new BookingApiError(409, "WATCHDOG_DELETE_REJECTED", result?.messaget || "Hlídání místa nelze odebrat.");
+      const result = asSingleMutationResult(response);
+      const success = mutationSuccessCode(result);
+      if (success < 0) {
+        throw new BookingApiError(409, "WATCHDOG_DELETE_REJECTED", "Hlídání místa nelze odebrat.");
       }
     },
 
@@ -721,18 +774,23 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
       const userId = requireCurrentUserId();
       const paymentMethodId = Number(process.env.LUXART_STRIPE_PAYMENT_METHOD_ID);
       const payload = buildLuxartCreditPaymentInsert(_input, userId, paymentMethodId);
-      const result = await luxartFetch<LuxartPaymentResult>(
+      const response = await luxartFetch<unknown>(
         config,
         "/api/Payment",
         { method: "POST", body: JSON.stringify(payload) },
         "credit payment",
         true,
       );
-      if (!Number.isInteger(result.success)) throw new BookingMutationOutcomeUnknownError();
-      if (result.success < 1) {
-        throw new BookingApiError(409, "PAYMENT_REJECTED", result.messaget || "Luxart platbu nepřijal.");
+      const result = asMutationResult(response);
+      const success = mutationSuccessCode(result);
+      if (success < 1) {
+        throw new BookingApiError(409, "PAYMENT_REJECTED", "Luxart platbu nepřijal.");
       }
-      return mapLuxartCreditPayment(result, _input, userId);
+      try {
+        return mapLuxartCreditPayment(result as unknown as LuxartPaymentResult, _input, userId);
+      } catch {
+        throw new BookingMutationOutcomeUnknownError();
+      }
     },
   };
 }

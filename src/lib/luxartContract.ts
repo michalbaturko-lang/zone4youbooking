@@ -477,12 +477,13 @@ export function mapLuxartCreditPayment(
   input: CreateTopupInput,
   userId: string,
 ): PaymentTopup {
-  if (!Number.isInteger(result.id_mp) || result.id_mp <= 0) {
+  const paymentId = requiredNumber(result?.id_mp);
+  if (!Number.isSafeInteger(paymentId) || paymentId <= 0) {
     throw new Error("Luxart payment response is missing id_mp.");
   }
   const now = new Date().toISOString();
   return {
-    id: `luxart-payment:${result.id_mp}`,
+    id: `luxart-payment:${paymentId}`,
     userId,
     amountKc: input.amountKc,
     currency: "CZK",

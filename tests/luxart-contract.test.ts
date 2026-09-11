@@ -314,5 +314,10 @@ test("maps a verified Stripe top-up to the documented Luxart credit payment payl
   const topup = mapLuxartCreditPayment({ success: 1, id_mp: 901 }, input, "42");
   assert.equal(topup.id, "luxart-payment:901");
   assert.equal(topup.status, "succeeded");
+  assert.throws(() => mapLuxartCreditPayment({ success: 1, id_mp: 0 }, input, "42"), /missing id_mp/i);
+  assert.throws(
+    () => mapLuxartCreditPayment({ success: 1, id_mp: Number.NaN }, input, "42"),
+    /missing id_mp/i,
+  );
   assert.throws(() => buildLuxartCreditPaymentInsert(input, "42", 0), /payment method mapping/i);
 });

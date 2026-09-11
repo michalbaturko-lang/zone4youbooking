@@ -109,7 +109,7 @@ Skript ověří jeden zápis, tři replaye stejného klíče, dva paralelní kl�
 | `/api/readiness` | 1 neúspěch, `schedule` jiné než `ready` nebo Luxart pomalejší než 3 s | 2 neúspěchy během 2 minut |
 | HTTP 5xx | více než 1 % za 5 minut | více než 3 % za 5 minut |
 | Luxart timeout | 1 za 5 minut | 3 za 5 minut nebo 2 po sobě |
-| Rezervace/storno | 1 `BOOKING_ALREADY_PROCESSING` nebo `BOOKING_RECONCILIATION_REQUIRED` | jakýkoli nejistý výsledek, 3 selhání nebo falešný úspěch |
+| Rezervace/storno | 1 `BOOKING_ALREADY_PROCESSING` nebo `BOOKING_RECONCILIATION_REQUIRED` | jakýkoli nejistý výsledek, chybějící/nejednoznačný Luxart identifikátor po zápisu, 3 selhání nebo falešný úspěch |
 | Stripe | jakýkoli neověřený podpis | jakýkoli nejistý nebo duplicitní kredit |
 | Logout | — | důvěryhodný požadavek nevrátí 200 nebo nesmaže lokální session cookie |
 

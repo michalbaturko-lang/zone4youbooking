@@ -20,6 +20,13 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
   let delayReservationPost = false;
   let redirectFollowed = false;
   let malformedRead: "lessons" | "reservations" | "watchdog" | "credit" | undefined;
+  let malformedMutation:
+    | "reservation-create"
+    | "reservation-cancel"
+    | "watchdog-create"
+    | "watchdog-delete"
+    | "payment"
+    | undefined;
   let capturedReservationBody: Record<string, unknown> | undefined;
   let capturedWatchdogBody: Record<string, unknown> | undefined;
   let capturedPaymentBody: Record<string, unknown> | undefined;
@@ -167,6 +174,10 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
       const chunks: Buffer[] = [];
       for await (const chunk of request) chunks.push(Buffer.from(chunk));
       capturedReservationBody = JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>;
+      if (malformedMutation === "reservation-create") {
+        response.end(JSON.stringify({ success: 1 }));
+        return;
+      }
       if (delayReservationPost) await new Promise((resolve) => setTimeout(resolve, 1_100));
       reservationCreated = true;
       reservationCancelled = false;
@@ -186,12 +197,20 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
       const chunks: Buffer[] = [];
       for await (const chunk of request) chunks.push(Buffer.from(chunk));
       capturedWatchdogBody = JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>;
+      if (malformedMutation === "watchdog-create") {
+        response.end(JSON.stringify({ success: "invalid" }));
+        return;
+      }
       watchdogCreated = true;
       response.end(JSON.stringify({ success: 1, messaget: "OK", uuid: "watchdog-test-uuid" }));
       return;
     }
     if (request.method === "DELETE" && url.pathname === "/api/Watchdog/777") {
       assert.equal(url.searchParams.get("resort"), "1");
+      if (malformedMutation === "watchdog-delete") {
+        response.end(JSON.stringify([]));
+        return;
+      }
       watchdogDeleted = true;
       response.end(JSON.stringify([{ success: 1, messaget: "OK" }]));
       return;
@@ -200,12 +219,20 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
       const chunks: Buffer[] = [];
       for await (const chunk of request) chunks.push(Buffer.from(chunk));
       capturedPaymentBody = JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>;
+      if (malformedMutation === "payment") {
+        response.end(JSON.stringify({ success: 1, id_mp: 0 }));
+        return;
+      }
       response.end(JSON.stringify({ success: 1, messaget: "OK", id_mp: 901 }));
       return;
     }
     if (request.method === "DELETE" && url.pathname === "/api/Reservations/987") {
       assert.equal(url.searchParams.get("kategorie"), "12");
       assert.equal(url.searchParams.get("resort"), "1");
+      if (malformedMutation === "reservation-cancel") {
+        response.end(JSON.stringify([{ success: 1, messaget: "OK", storno_poplatek: "invalid" }]));
+        return;
+      }
       reservationCancelled = true;
       response.end(JSON.stringify([{ success: 1, messaget: "OK", storno_poplatek: 0 }]));
       return;
@@ -369,14 +396,27 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
   assert.equal((await adapter.getCreditTransactions())[0].balanceAfterKc, 1_400);
   assert.deepEqual(await adapter.getReservations(), []);
 
+  malformedMutation = "reservation-create";
+  await assert.rejects(
+    adapter.createReservation({ lessonId: lessons[0].id }),
+    (error: unknown) => error instanceof BookingMutationOutcomeUnknownError,
+  );
+  malformedMutation = undefined;
+
   const created = await adapter.createReservation({ lessonId: lessons[0].id });
   assert.equal(created.id, "987");
   assert.equal(capturedReservationBody?.id_resource_1, 207);
   const lessonReadsBeforeCancellation = capturedLessonQueries.length;
+  malformedMutation = "reservation-cancel";
+  await assert.rejects(
+    adapter.cancelReservation({ reservationId: created.id }),
+    (error: unknown) => error instanceof BookingMutationOutcomeUnknownError,
+  );
+  malformedMutation = undefined;
   const cancelled = await adapter.cancelReservation({ reservationId: created.id });
   assert.equal(cancelled.status, "cancelled");
   assert.equal(reservationCancelled, true);
-  assert.equal(capturedLessonQueries.length, lessonReadsBeforeCancellation + 1);
+  assert.equal(capturedLessonQueries.length, lessonReadsBeforeCancellation + 2);
 
   user.current_balance = 199;
   const lowCreditAdapter = createRealLuxartAdapter({ userId: "42", locale: "en" });
@@ -388,20 +428,39 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
   assert.equal(reservationPostCount, postsBeforeLowCreditAttempt);
   user.current_balance = 1_400;
 
+  malformedMutation = "watchdog-create";
+  await assert.rejects(
+    adapter.joinWaitlist({ lessonId: lessons[0].id }),
+    (error: unknown) => error instanceof BookingMutationOutcomeUnknownError,
+  );
+  malformedMutation = undefined;
   const watched = await adapter.joinWaitlist({ lessonId: lessons[0].id });
   assert.equal(watched.id, "watchdog:777");
   assert.equal(capturedWatchdogBody?.id_resource_1, 207);
   assert.equal(capturedWatchdogBody?.language, "en");
+  malformedMutation = "watchdog-delete";
+  await assert.rejects(
+    adapter.leaveWaitlist({ waitlistEntryId: watched.id }),
+    (error: unknown) => error instanceof BookingMutationOutcomeUnknownError,
+  );
+  malformedMutation = undefined;
   await adapter.leaveWaitlist({ waitlistEntryId: watched.id });
   assert.equal(watchdogDeleted, true);
 
-  const topup = await adapter.createTopup({
+  const topupInput = {
     amountKc: 500,
-    provider: "stripe",
+    provider: "stripe" as const,
     idempotencyKey: "evt_1",
     providerSessionId: "cs_test_zone4you",
     providerPaymentIntentId: "pi_zone4you",
-  });
+  };
+  malformedMutation = "payment";
+  await assert.rejects(
+    adapter.createTopup(topupInput),
+    (error: unknown) => error instanceof BookingMutationOutcomeUnknownError,
+  );
+  malformedMutation = undefined;
+  const topup = await adapter.createTopup(topupInput);
   assert.equal(topup.id, "luxart-payment:901");
   assert.deepEqual(capturedPaymentBody?.uuid, ["KREDIT"]);
   assert.equal(capturedPaymentBody?.zpusob_uhrady, 3);
