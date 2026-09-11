@@ -194,7 +194,7 @@ function nonNegativeSafeInteger(value: number) {
   return Number.isSafeInteger(value) && value >= 0;
 }
 
-function parseExplicitLuxartDateTime(value: unknown) {
+export function parseExplicitLuxartDateTime(value: unknown) {
   if (typeof value !== "string") return null;
   const normalized = value.trim();
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?(Z|([+-])(\d{2}):(\d{2}))$/i.exec(normalized);

@@ -5,9 +5,30 @@ import type {
   DurableBookingMutationLedger,
 } from "./bookingMutationLedger";
 import { BookingApiError, BookingMutationOutcomeUnknownError } from "./errors";
+import { parseExplicitLuxartDateTime, parseLuxartLessonId } from "./luxartContract";
 
 function requestFingerprint(operation: BookingMutationOperation, targetId: string) {
   return createHash("sha256").update(`${operation}\0${targetId}`, "utf8").digest("hex");
+}
+
+function canonicalPositiveInteger(value: string) {
+  if (!/^[1-9]\d*$/.test(value)) return false;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && String(parsed) === value;
+}
+
+function boundedIdentifier(value: unknown, maximumLength: number) {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= maximumLength &&
+    value.trim() === value &&
+    !/[\u0000-\u001f\u007f]/.test(value)
+  );
+}
+
+function nonNegativeAmount(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
 function validReservationForMutation(
@@ -18,22 +39,38 @@ function validReservationForMutation(
 ): value is Reservation {
   if (!value || typeof value !== "object") return false;
   const reservation = value as Partial<Reservation>;
+  const lessonIdentity = typeof reservation.lessonId === "string"
+    ? parseLuxartLessonId(reservation.lessonId)
+    : null;
   const shapeValid = (
-    typeof reservation.id === "string" &&
+    boundedIdentifier(reservation.id, 320) &&
+    canonicalPositiveInteger(userId) &&
     reservation.userId === userId &&
-    typeof reservation.lessonId === "string" &&
+    Boolean(lessonIdentity) &&
     ["active", "cancelled", "attended", "no_show"].includes(reservation.status ?? "") &&
-    typeof reservation.reservedAt === "string" &&
-    !Number.isNaN(new Date(reservation.reservedAt).getTime()) &&
-    typeof reservation.priceKc === "number" &&
-    Number.isFinite(reservation.priceKc)
+    Boolean(parseExplicitLuxartDateTime(reservation.reservedAt)) &&
+    nonNegativeAmount(reservation.priceKc) &&
+    typeof reservation.luxartCategoryId === "number" &&
+    Number.isSafeInteger(reservation.luxartCategoryId) &&
+    reservation.luxartCategoryId > 0 &&
+    reservation.luxartCategoryId === lessonIdentity?.categoryId &&
+    (reservation.luxartUuid === undefined || boundedIdentifier(reservation.luxartUuid, 256))
   );
   if (!shapeValid) return false;
   if (operation === "create_reservation") {
-    return reservation.status === "active" && reservation.lessonId === targetId;
+    return Boolean(parseLuxartLessonId(targetId)) && reservation.status === "active" && reservation.lessonId === targetId;
   }
+  if (
+    !boundedIdentifier(targetId, 320) ||
+    !parseExplicitLuxartDateTime(reservation.cancelledAt) ||
+    !nonNegativeAmount(reservation.cancellationFeeKc)
+  ) return false;
   const targetMatches = reservation.id === targetId ||
-    (targetId.startsWith("uuid:") && reservation.luxartUuid === targetId.slice(5));
+    (
+      targetId.startsWith("uuid:") &&
+      boundedIdentifier(targetId.slice(5), 256) &&
+      reservation.luxartUuid === targetId.slice(5)
+    );
   return reservation.status === "cancelled" && targetMatches;
 }
 

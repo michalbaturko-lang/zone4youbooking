@@ -17,6 +17,7 @@ const reservation: Reservation = {
   status: "active",
   reservedAt: "2026-08-29T12:00:00.000Z",
   priceKc: 180,
+  luxartCategoryId: 12,
 };
 
 function fakeLease(
@@ -72,6 +73,83 @@ test("a claimed mutation is recorded before returning success", async () => {
   const result = await processBookingMutation({ ...baseInput, ledger: ledgerWith(lease), async mutate() { return reservation; } });
   assert.equal(result.replayed, false);
   assert.deepEqual(calls, ["applied", "released"]);
+});
+
+test("a claimed mutation rejects unsafe or inconsistent Luxart results as uncertain", async () => {
+  const invalidResults: Reservation[] = [
+    { ...reservation, userId: "43" },
+    { ...reservation, lessonId: "luxart:1:13:321:2026-09-01T14:30:00.000Z" },
+    { ...reservation, reservedAt: "2026-08-29T12:00:00" },
+    { ...reservation, priceKc: -1 },
+    { ...reservation, luxartCategoryId: 13 },
+    { ...reservation, luxartUuid: "unsafe\nidentifier" },
+  ];
+
+  for (const invalidResult of invalidResults) {
+    const { lease, calls } = fakeLease("claimed");
+    await assert.rejects(
+      processBookingMutation({
+        ...baseInput,
+        ledger: ledgerWith(lease),
+        async mutate() { return invalidResult; },
+      }),
+      (error: unknown) => error instanceof BookingApiError && error.code === "BOOKING_RECONCILIATION_REQUIRED",
+    );
+    assert.deepEqual(calls, ["uncertain", "released"]);
+  }
+});
+
+test("an applied replay with an invalid financial result is rejected without another Luxart write", async () => {
+  const { lease, calls } = fakeLease("applied", { response: { ...reservation, priceKc: -1 } });
+  let mutations = 0;
+  await assert.rejects(
+    processBookingMutation({
+      ...baseInput,
+      ledger: ledgerWith(lease),
+      async mutate() { mutations += 1; return reservation; },
+    }),
+    (error: unknown) => error instanceof BookingApiError && error.code === "BOOKING_LEDGER_STATE_INVALID",
+  );
+  assert.equal(mutations, 0);
+  assert.deepEqual(calls, ["released"]);
+});
+
+test("a cancellation result must bind the reservation and include explicit non-negative fee evidence", async () => {
+  const cancelled: Reservation = {
+    ...reservation,
+    status: "cancelled",
+    cancelledAt: "2026-08-30T12:00:00.000Z",
+    cancellationFeeKc: 0,
+  };
+  const valid = fakeLease("claimed");
+  const result = await processBookingMutation({
+    ...baseInput,
+    operation: "cancel_reservation",
+    targetId: reservation.id,
+    ledger: ledgerWith(valid.lease),
+    async mutate() { return cancelled; },
+  });
+  assert.equal(result.reservation.cancellationFeeKc, 0);
+  assert.deepEqual(valid.calls, ["applied", "released"]);
+
+  for (const invalidResult of [
+    { ...cancelled, cancelledAt: "2026-08-30T12:00:00" },
+    { ...cancelled, cancellationFeeKc: -1 },
+    { ...cancelled, id: "other" },
+  ]) {
+    const invalid = fakeLease("claimed");
+    await assert.rejects(
+      processBookingMutation({
+        ...baseInput,
+        operation: "cancel_reservation",
+        targetId: reservation.id,
+        ledger: ledgerWith(invalid.lease),
+        async mutate() { return invalidResult; },
+      }),
+      (error: unknown) => error instanceof BookingApiError && error.code === "BOOKING_RECONCILIATION_REQUIRED",
+    );
+    assert.deepEqual(invalid.calls, ["uncertain", "released"]);
+  }
 });
 
 test("an unknown Luxart write outcome becomes uncertain and is never discarded for blind retry", async () => {
