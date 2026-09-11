@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildDeploymentPreflightReport,
+  deploymentCliOnlyVariables,
   deploymentRuntimeConfigurationProblems,
   runtimeDeploymentRegion,
 } from "../src/lib/deploymentPreflight";
@@ -132,6 +133,29 @@ test("Stripe staging preflight accepts only the fully signed and durable payment
 });
 
 test("preflight report never echoes configured secrets, database URLs or Luxart endpoint", () => {
+  const requiredOperatorOnlyVariables = [
+    "LUXART_REQUIRE_AUTHENTICATED_PROBE",
+    "ZONE4YOU_ALERT_EVIDENCE_PATH",
+    "ZONE4YOU_BOOKING_UAT_EVIDENCE_PATH",
+    "ZONE4YOU_LUXART_EVIDENCE_PATH",
+    "ZONE4YOU_RELEASE_DOSSIER_OUTPUT_PATH",
+    "ZONE4YOU_RELEASE_ID",
+    "ZONE4YOU_RELEASE_MAXIMUM_EVIDENCE_AGE_HOURS",
+    "ZONE4YOU_RELEASE_WINDOW_ENDS_AT",
+    "ZONE4YOU_RELEASE_WINDOW_STARTS_AT",
+    "ZONE4YOU_ROLLBACK_EVIDENCE_PATH",
+    "ZONE4YOU_RUNTIME_EVIDENCE_PATH",
+    "ZONE4YOU_STRIPE_UAT_EVIDENCE_PATH",
+    "PROBE_REQUIRE_REFORMER",
+    "PROBE_TIMEOUT_MS",
+    "VERCEL_PROTECTION_BYPASS",
+    "PLAYWRIGHT_EXTERNAL_DEMO_URL",
+    "PLAYWRIGHT_EXPECTED_DEMO_COMMIT",
+  ] as const;
+  for (const name of requiredOperatorOnlyVariables) {
+    assert.ok(deploymentCliOnlyVariables.includes(name), `${name} must remain CLI-only`);
+  }
+
   const sensitiveValues = {
     SESSION_SECRET: fakeSessionSecret,
     LUXART_API_BASE_URL: "https://private-luxart-gateway.example.com:9759/",
@@ -139,6 +163,11 @@ test("preflight report never echoes configured secrets, database URLs or Luxart 
     NEXT_PUBLIC_API_TOKEN: "fake-public-token-that-must-not-be-echoed",
     ZONE4YOU_UAT_PASSWORD: "fake-uat-password-that-must-not-be-echoed",
     ZONE4YOU_PRECUTOVER_EVIDENCE_PATH: "/secure/private-precutover-evidence.json",
+    ZONE4YOU_RUNTIME_EVIDENCE_PATH: "/secure/private-runtime-evidence.json",
+    ZONE4YOU_RELEASE_WINDOW_STARTS_AT: "2026-09-15T20:00:00.000Z",
+    VERCEL_PROTECTION_BYPASS: "fake-preview-bypass-secret",
+    PLAYWRIGHT_EXTERNAL_DEMO_URL: "https://private-preview.example.com/",
+    LUXART_REQUIRE_AUTHENTICATED_PROBE: "true",
   };
   const environment = readOnlyStagingEnvironment({
     ...sensitiveValues,

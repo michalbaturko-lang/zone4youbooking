@@ -22,11 +22,11 @@ Tento záznam je pouze neosobní read-only evidence veřejné referenční dokum
 - Samostatný kandidátní test stejného Luxart hostname na portu `9191` v 16:17 CEST dosáhl HTTP služby, ale `/Help` vrátilo 404, HTTPS nebylo podporováno a kořen byl pouze obecný HTML index. Současný referenční `:9295/Help` přitom znovu prošel s HTTP 200 a klasifikací `ready`. `api.memberzone.online:9191` proto není doložený ani použitelný Zone4You API root.
 - Původní Luxart zpráva z 1. 4. 2026 potvrzuje API na serveru Zone4You na interním portu `9759` a testovací databázi. Port `9191` je proto pravděpodobný veřejný překlad na tuto službu, nikoli port referenčního Luxart hostu; přesný NAT/reverse-proxy vztah musí potvrdit IT.
 - Následný neautentizovaný IPv4 probe běžných Zone4You hostname variant na portech `9191` i `9759` skončil connect timeoutem přes HTTP i HTTPS. To je konzistentní s neaktivním pravidlem, jiným hostem, VPN nebo allowlistem, ale samo o sobě žádnou variantu nepotvrzuje.
-- Kořen služby `api.memberzone.online:9191` zveřejňuje directory listing s názvy aplikačních adresářů a konfiguračních souborů. Žádný odkaz ani soubor nebyl otevřen; službu dál nezkoumáme a doporučujeme správci výpis adresáře vypnout.
+- Kořen služby `api.memberzone.online:9191` zveřejňuje directory listing s názvy aplikačních adresářů a konfiguračních souborů. Bez credentials byl načten pouze odkazovaný `Service1.svc` a jeho veřejné WSDL: jde o starší SOAP/WCF kontrakt s operacemi typu `Login`, `GetReservation`, `SetReservation` a `DEL_Reservation`, nikoli o dokumentované REST `api/Lesson`. Žádný konfigurační soubor nebyl otevřen; doporučujeme správci directory browsing vypnout a tuto službu nepoužívat pro pilot.
 
 ## Aktuální automatický důkaz kontraktu
 
-Spuštěno v 16:21 CEST:
+Znovu ověřeno v 20:52 CEST:
 
 ```bash
 npm run verify:luxart-public-contract
