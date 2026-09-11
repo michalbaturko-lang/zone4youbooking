@@ -350,8 +350,18 @@ export function validateBookingUatEvidence(
   evidence: JsonObject,
   stagingOrigin: string,
   resourceMap: Map<string, number>,
+  expectedCommit: string,
+  launchMode: string,
 ) {
   exactString(cleanHttpsOrigin(evidence.target, "artifacts.bookingMutationUat.target"), stagingOrigin, "Booking UAT target");
+  trueValue(evidence.deploymentProvenanceVerified, "booking UAT deploymentProvenanceVerified");
+  exactString(
+    stringValue(evidence.commit, "booking UAT commit").toLowerCase(),
+    expectedCommit,
+    "booking UAT commit",
+  );
+  exactString(evidence.phase, launchMode, "booking UAT phase");
+  exactString(evidence.region, "fra1", "booking UAT region");
   trueValue(evidence.userVerified, "booking UAT userVerified");
   trueValue(evidence.personalizedEligibilityVerified, "booking UAT personalizedEligibilityVerified");
   trueValue(evidence.authoritativeAvailabilityVerified, "booking UAT authoritativeAvailabilityVerified");
@@ -488,7 +498,7 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
     expectedCommit,
     launchMode,
   );
-  validateBookingUatEvidence(load("bookingMutationUat"), stagingTarget, resources);
+  validateBookingUatEvidence(load("bookingMutationUat"), stagingTarget, resources, expectedCommit, launchMode);
   validateRollbackEvidence(load("rollback", Math.min(24, maximumAgeHours)), stagingTarget);
   const dnsRollbackReference = objectValue(artifacts.dnsRollbackBaseline, "artifacts.dnsRollbackBaseline");
   const dnsRollbackPathValue = stringValue(dnsRollbackReference.path, "artifacts.dnsRollbackBaseline.path");

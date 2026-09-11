@@ -10,6 +10,7 @@ import {
 
 type FetchLike = typeof fetch;
 type Environment = Record<string, string | undefined>;
+type BookingMutationUatPhase = "booking_without_payments" | "booking_with_stripe";
 
 interface Snapshot {
   user: User;
@@ -21,6 +22,8 @@ interface Snapshot {
 
 export interface BookingMutationUatConfig {
   target: URL;
+  expectedCommit: string;
+  expectedPhase: BookingMutationUatPhase;
   login: string;
   password: string;
   memberCardNumber?: string;
@@ -81,6 +84,15 @@ export function loadBookingMutationUatConfig(environment: Environment = process.
     throw new Error(`ZONE4YOU_UAT_MUTATION_CONFIRMATION must exactly equal ${expectedConfirmation}.`);
   }
 
+  const expectedCommit = required(environment, "ZONE4YOU_UAT_EXPECTED_COMMIT").toLowerCase();
+  if (!/^[a-f0-9]{40}$/.test(expectedCommit)) {
+    throw new Error("ZONE4YOU_UAT_EXPECTED_COMMIT must be a full 40-character Git SHA.");
+  }
+  const expectedPhase = required(environment, "ZONE4YOU_UAT_EXPECTED_PHASE");
+  if (!(["booking_without_payments", "booking_with_stripe"] as string[]).includes(expectedPhase)) {
+    throw new Error("ZONE4YOU_UAT_EXPECTED_PHASE must be booking_without_payments or booking_with_stripe.");
+  }
+
   const minimumHoursBeforeStart = Number(environment.ZONE4YOU_UAT_MIN_HOURS_BEFORE_START ?? "6");
   const timeoutMs = Number(environment.ZONE4YOU_UAT_TIMEOUT_MS ?? "12000");
   if (!Number.isFinite(minimumHoursBeforeStart) || minimumHoursBeforeStart < 4) {
@@ -92,6 +104,8 @@ export function loadBookingMutationUatConfig(environment: Environment = process.
 
   return {
     target,
+    expectedCommit,
+    expectedPhase: expectedPhase as BookingMutationUatPhase,
     login: required(environment, "ZONE4YOU_UAT_LOGIN"),
     password: required(environment, "ZONE4YOU_UAT_PASSWORD"),
     memberCardNumber: environment.ZONE4YOU_UAT_MEMBER_CARD_NUMBER?.trim() || undefined,
@@ -235,17 +249,40 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
   const readiness = await api<{
     status?: string;
     mode?: string;
+    phase?: string;
+    commit?: string;
+    region?: string;
+    luxart?: string;
+    schedule?: string;
     booking?: string;
+    payments?: string;
     capabilities?: Partial<BookingCapabilities>;
   }>(config, fetchImpl, "/api/readiness");
+  const noPayments = config.expectedPhase === "booking_without_payments";
   if (
     readiness.body.status !== "ready" ||
     readiness.body.mode !== "live" ||
+    readiness.body.phase !== config.expectedPhase ||
+    readiness.body.commit?.toLowerCase() !== config.expectedCommit ||
+    readiness.body.region !== "fra1" ||
+    readiness.body.luxart !== "reachable" ||
+    readiness.body.schedule !== "ready" ||
     readiness.body.booking !== "ready" ||
     readiness.body.capabilities?.reservationsEnabled !== true ||
-    readiness.body.capabilities?.businessRulesStatus !== "confirmed"
+    readiness.body.capabilities?.waitlistEnabled !== false ||
+    readiness.body.capabilities?.businessRulesStatus !== "confirmed" ||
+    (noPayments && (
+      readiness.body.payments !== "disabled" ||
+      readiness.body.capabilities?.topupsEnabled !== false ||
+      readiness.body.capabilities?.topupMode !== "disabled"
+    )) ||
+    (!noPayments && (
+      readiness.body.payments !== "ready" ||
+      readiness.body.capabilities?.topupsEnabled !== true ||
+      readiness.body.capabilities?.topupMode !== "stripe"
+    ))
   ) {
-    throw new Error("Target is not an explicitly ready live staging booking runtime.");
+    throw new Error("Target is not the exact approved ready live staging runtime.");
   }
 
   const login = await api<{ user: User }>(config, fetchImpl, "/api/auth/login", {
@@ -402,6 +439,10 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
       ok: true,
       checkedAt: new Date().toISOString(),
       target: config.target.origin,
+      deploymentProvenanceVerified: true,
+      commit: config.expectedCommit,
+      phase: config.expectedPhase,
+      region: "fra1",
       userVerified: true,
       personalizedEligibilityVerified: true,
       authoritativeAvailabilityVerified: true,

@@ -125,6 +125,10 @@ function validFixture() {
       ok: true,
       checkedAt,
       target: stagingTarget,
+      deploymentProvenanceVerified: true,
+      commit,
+      phase: "booking_without_payments",
+      region: "fra1",
       userVerified: true,
       personalizedEligibilityVerified: true,
       authoritativeAvailabilityVerified: true,
@@ -275,6 +279,13 @@ test("pilot release dossier rejects evidence that cannot come from the real guar
         artifact.authoritativeAvailabilityVerified = false;
       },
       /booking UAT authoritativeAvailabilityVerified must be true/i,
+    ],
+    [
+      "bookingMutationUat",
+      (artifact: Record<string, unknown>) => {
+        artifact.commit = "b".repeat(40);
+      },
+      /booking UAT commit must exactly equal/i,
     ],
     [
       "bookingMutationUat",
@@ -520,9 +531,16 @@ test("Stripe launch mode cannot pass without its own end-to-end UAT artifact", (
   capabilities.topupsEnabled = true;
   capabilities.topupMode = "stripe";
   const runtimeSha = writeJson(join(fixture.directory, "runtimeProbe.json"), runtime);
+  const bookingMutationUat = structuredClone(fixture.files.bookingMutationUat) as Record<string, unknown>;
+  bookingMutationUat.phase = "booking_with_stripe";
+  const bookingMutationUatSha = writeJson(
+    join(fixture.directory, "bookingMutationUat.json"),
+    bookingMutationUat,
+  );
   const dossier = structuredClone(fixture.dossier);
   dossier.launchMode = "booking_with_stripe";
   dossier.artifacts.runtimeProbe.sha256 = runtimeSha;
+  dossier.artifacts.bookingMutationUat.sha256 = bookingMutationUatSha;
   const dossierSha = writeJson(fixture.dossierPath, dossier);
   assert.throws(
     () => verifyPilotReleaseEvidence({

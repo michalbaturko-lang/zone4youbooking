@@ -9,9 +9,12 @@ import {
 import { validateBookingUatEvidence } from "../scripts/verify-pilot-release";
 
 const target = "https://staging.booking.zone4you.cz/";
+const commit = "1234567890abcdef1234567890abcdef12345678";
 const baseEnvironment = {
   ZONE4YOU_UAT_APP_URL: target,
   ZONE4YOU_UAT_MUTATION_CONFIRMATION: "ZONE4YOU_TEST_DB_ONLY:https://staging.booking.zone4you.cz",
+  ZONE4YOU_UAT_EXPECTED_COMMIT: commit,
+  ZONE4YOU_UAT_EXPECTED_PHASE: "booking_without_payments",
   ZONE4YOU_UAT_LOGIN: "approved-test-user",
   ZONE4YOU_UAT_PASSWORD: "test-secret",
   ZONE4YOU_UAT_EXPECTED_USER_ID: "42",
@@ -36,6 +39,14 @@ test("mutation UAT configuration refuses production and stale confirmations", ()
       ZONE4YOU_UAT_MUTATION_CONFIRMATION: "ZONE4YOU_TEST_DB_ONLY:https://example.com",
     }),
     /staging-named/i,
+  );
+  assert.throws(
+    () => loadBookingMutationUatConfig({ ...baseEnvironment, ZONE4YOU_UAT_EXPECTED_COMMIT: "latest" }),
+    /full 40-character Git SHA/i,
+  );
+  assert.throws(
+    () => loadBookingMutationUatConfig({ ...baseEnvironment, ZONE4YOU_UAT_EXPECTED_PHASE: "read_only" }),
+    /booking_without_payments or booking_with_stripe/i,
   );
   assert.equal(loadBookingMutationUatConfig(baseEnvironment).target.origin, "https://staging.booking.zone4you.cz");
 });
@@ -107,6 +118,7 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
   let cancelledReservation: Reservation | undefined;
   let personalizedEligibility = true;
   let authoritativeAvailableCount = 8;
+  let readinessCommit = commit;
   let sequence = 0;
   const idempotentResponses = new Map<string, Reservation>();
 
@@ -118,7 +130,18 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
     const url = new URL(typeof input === "string" ? input : input instanceof URL ? input : input.url);
     const headers = new Headers(init?.headers);
     if (url.pathname === "/api/readiness") {
-      return response({ status: "ready", mode: "live", booking: "ready", capabilities });
+      return response({
+        status: "ready",
+        mode: "live",
+        phase: "booking_without_payments",
+        commit: readinessCommit,
+        region: "fra1",
+        luxart: "reachable",
+        schedule: "ready",
+        booking: "ready",
+        payments: "disabled",
+        capabilities,
+      });
     }
     if (url.pathname === "/api/auth/login") {
       const rawBody = String(init?.body ?? "");
@@ -183,8 +206,18 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
   };
 
   const evidence = await runBookingMutationUat(config, fakeFetch);
-  validateBookingUatEvidence(evidence, config.target.origin, new Map([["1", 101]]));
+  validateBookingUatEvidence(
+    evidence,
+    config.target.origin,
+    new Map([["1", 101]]),
+    config.expectedCommit,
+    config.expectedPhase,
+  );
   assert.equal(evidence.ok, true);
+  assert.equal(evidence.deploymentProvenanceVerified, true);
+  assert.equal(evidence.commit, commit);
+  assert.equal(evidence.phase, "booking_without_payments");
+  assert.equal(evidence.region, "fra1");
   assert.equal(evidence.personalizedEligibilityVerified, true);
   assert.equal(evidence.authoritativeAvailabilityVerified, true);
   assert.equal(evidence.reservationWindowVerified, true);
@@ -209,6 +242,14 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
   await assert.rejects(
     runBookingMutationUat(config, fakeFetch),
     /no authoritative available place.*no mutation was attempted/i,
+  );
+  assert.equal(createWrites, writesAfterSuccessfulUat);
+
+  authoritativeAvailableCount = 8;
+  readinessCommit = "b".repeat(40);
+  await assert.rejects(
+    runBookingMutationUat(config, fakeFetch),
+    /exact approved ready live staging runtime/i,
   );
   assert.equal(createWrites, writesAfterSuccessfulUat);
 });

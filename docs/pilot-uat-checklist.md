@@ -42,7 +42,7 @@ Každý bod označte `PASS`, `FAIL` nebo `N/A — funkce bezpečně vypnutá`. K
 - [ ] Storno/Reformer poplatek odpovídá písemně potvrzenému pravidlu.
 - [ ] Při chybě Luxartu UI neukáže falešný úspěch.
 - [ ] Timeout po odeslání Luxart mutace skončí jako `uncertain`, další pokus se zablokuje a projde ruční reconciliation drill.
-- [ ] Guarded `verify:booking-mutations` proběhl pouze na schválené test DB, odmítl produkční origin a před prvním POSTem ověřil personalizované povolení, autoritativní `volno`, mapovaný sál, rezervační okno, možnost online storna a očekávaný poplatek; uložil privacy-safe JSON důkaz.
+- [ ] Guarded `verify:booking-mutations` proběhl pouze na schválené test DB, odmítl produkční origin a před loginem svázal `/api/readiness` s přesným commitem, launch fází, regionem `fra1` a capability profilem; před prvním POSTem ověřil personalizované povolení, autoritativní `volno`, mapovaný sál, rezervační okno, možnost online storna a očekávaný poplatek; uložil privacy-safe JSON důkaz.
 - [ ] Read-only režim zobrazí rozvrh, ale bezpečně zablokuje rezervaci, storno a watchdog hlídání místa.
 
 ## Waitlist a platby
