@@ -711,7 +711,7 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
       );
       const result = asSingleMutationResult(response);
       const success = mutationSuccessCode(result);
-      if (success < 0) {
+      if (![1, 2].includes(success)) {
         throw new BookingApiError(409, "CANCELLATION_REJECTED", "Rezervaci nelze zrušit.");
       }
       const cancellationFeeKc = requiredNonNegativeMutationNumber(result.storno_poplatek);
@@ -788,7 +788,7 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
       );
       const result = asSingleMutationResult(response);
       const success = mutationSuccessCode(result);
-      if (success < 0) {
+      if (![1, 2].includes(success)) {
         throw new BookingApiError(409, "WATCHDOG_DELETE_REJECTED", "Hlídání místa nelze odebrat.");
       }
     },

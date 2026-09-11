@@ -23,8 +23,10 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
   let malformedMutation:
     | "reservation-create"
     | "reservation-cancel"
+    | "reservation-cancel-rejected"
     | "watchdog-create"
     | "watchdog-delete"
+    | "watchdog-delete-rejected"
     | "payment"
     | undefined;
   let capturedReservationBody: Record<string, unknown> | undefined;
@@ -215,6 +217,10 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
         response.end(JSON.stringify([]));
         return;
       }
+      if (malformedMutation === "watchdog-delete-rejected") {
+        response.end(JSON.stringify([{ success: 0, messaget: "Rejected" }]));
+        return;
+      }
       watchdogDeleted = true;
       response.end(JSON.stringify([{ success: 1, messaget: "OK" }]));
       return;
@@ -235,6 +241,10 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
       assert.equal(url.searchParams.get("resort"), "1");
       if (malformedMutation === "reservation-cancel") {
         response.end(JSON.stringify([{ success: 1, messaget: "OK", storno_poplatek: "invalid" }]));
+        return;
+      }
+      if (malformedMutation === "reservation-cancel-rejected") {
+        response.end(JSON.stringify([{ success: 0, messaget: "Rejected", storno_poplatek: 0 }]));
         return;
       }
       reservationCancelled = true;
@@ -456,11 +466,17 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
     adapter.cancelReservation({ reservationId: created.id }),
     (error: unknown) => error instanceof BookingMutationOutcomeUnknownError,
   );
+  malformedMutation = "reservation-cancel-rejected";
+  await assert.rejects(
+    adapter.cancelReservation({ reservationId: created.id }),
+    (error: unknown) => error instanceof BookingApiError && error.code === "CANCELLATION_REJECTED",
+  );
+  assert.equal(reservationCancelled, false);
   malformedMutation = undefined;
   const cancelled = await adapter.cancelReservation({ reservationId: created.id });
   assert.equal(cancelled.status, "cancelled");
   assert.equal(reservationCancelled, true);
-  assert.equal(capturedLessonQueries.length, lessonReadsBeforeCancellation + 2);
+  assert.equal(capturedLessonQueries.length, lessonReadsBeforeCancellation + 3);
 
   user.current_balance = 199;
   const lowCreditAdapter = createRealLuxartAdapter({ userId: "42", locale: "en" });
@@ -492,6 +508,12 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
     adapter.leaveWaitlist({ waitlistEntryId: watched.id }),
     (error: unknown) => error instanceof BookingMutationOutcomeUnknownError,
   );
+  malformedMutation = "watchdog-delete-rejected";
+  await assert.rejects(
+    adapter.leaveWaitlist({ waitlistEntryId: watched.id }),
+    (error: unknown) => error instanceof BookingApiError && error.code === "WATCHDOG_DELETE_REJECTED",
+  );
+  assert.equal(watchdogDeleted, false);
   malformedMutation = undefined;
   await adapter.leaveWaitlist({ waitlistEntryId: watched.id });
   assert.equal(watchdogDeleted, true);
