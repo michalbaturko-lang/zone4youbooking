@@ -36,6 +36,7 @@ import { availablePlacesForLesson, bookingRules, canCancelLessonAt } from "./boo
 import { BookingApiError, BookingMutationOutcomeUnknownError } from "./errors";
 import type { Locale } from "./i18n";
 import { loadLuxartGatewayAuthConfig } from "./luxartGatewayAuth";
+import { parseLuxartResourceMapping, parseLuxartTextMapping } from "./luxartMappings";
 import { zone4YouScheduleRange } from "./zone4YouTime";
 
 interface RealLuxartConfig {
@@ -218,27 +219,23 @@ function passwordHash(password: string) {
 }
 
 function mappingFromEnvironment(locale: Locale = "cs"): LuxartLessonMapping {
-  const defaultRoomNames = parseEnvironmentMapping("LUXART_ROOM_MAP_JSON");
-  const defaultLessonTypeNames = parseEnvironmentMapping("LUXART_LESSON_TYPE_MAP_JSON");
+  const defaultRoomNames = parseLuxartTextMapping(process.env.LUXART_ROOM_MAP_JSON, "LUXART_ROOM_MAP_JSON");
+  const defaultLessonTypeNames = parseLuxartTextMapping(
+    process.env.LUXART_LESSON_TYPE_MAP_JSON,
+    "LUXART_LESSON_TYPE_MAP_JSON",
+  );
   return {
-    roomNames: locale === "en" ? parseEnvironmentMapping("LUXART_ROOM_MAP_EN_JSON") ?? defaultRoomNames : defaultRoomNames,
+    roomNames: locale === "en"
+      ? parseLuxartTextMapping(process.env.LUXART_ROOM_MAP_EN_JSON, "LUXART_ROOM_MAP_EN_JSON") ?? defaultRoomNames
+      : defaultRoomNames,
     lessonTypeNames:
       locale === "en"
-        ? parseEnvironmentMapping("LUXART_LESSON_TYPE_MAP_EN_JSON") ?? defaultLessonTypeNames
+        ? parseLuxartTextMapping(
+          process.env.LUXART_LESSON_TYPE_MAP_EN_JSON,
+          "LUXART_LESSON_TYPE_MAP_EN_JSON",
+        ) ?? defaultLessonTypeNames
         : defaultLessonTypeNames,
   };
-}
-
-function parseEnvironmentMapping(name: string) {
-  const raw = process.env[name];
-  if (!raw) return undefined;
-  try {
-    const value = JSON.parse(raw) as unknown;
-    if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error();
-    return value as Record<string, string>;
-  } catch {
-    throw new Error(`${name} must contain a JSON object with numeric Luxart IDs as keys.`);
-  }
 }
 
 function scheduleDays(query: LessonQuery) {
@@ -611,7 +608,7 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
 
       assertReservationPreconditions(lesson, user);
 
-      const resourceMap = parseEnvironmentMapping("LUXART_RESOURCE_MAP_JSON");
+      const resourceMap = parseLuxartResourceMapping(process.env.LUXART_RESOURCE_MAP_JSON);
       const resourceId = Number(resourceMap?.[String(lesson.luxartRoomNumber ?? "")]);
       const payload = buildLuxartReservationInsert(lesson, userId, resourceId);
       const response = await luxartFetch<unknown>(
@@ -727,7 +724,7 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
 
       const existing = (await this.getWaitlist()).find((entry) => entry.lessonId === lesson.id);
       if (existing) return existing;
-      const resourceMap = parseEnvironmentMapping("LUXART_RESOURCE_MAP_JSON");
+      const resourceMap = parseLuxartResourceMapping(process.env.LUXART_RESOURCE_MAP_JSON);
       const resourceId = Number(resourceMap?.[String(lesson.luxartRoomNumber ?? "")]);
       const payload = buildLuxartWatchdogInsert(lesson, userId, resourceId, luxartLanguage());
       const response = await luxartFetch<unknown>(

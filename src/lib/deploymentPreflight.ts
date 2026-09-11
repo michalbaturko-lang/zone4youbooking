@@ -6,6 +6,7 @@ import {
   type BusinessRulesProfile,
 } from "./businessRuleConfirmation";
 import { assertConfirmedLuxartGatewayAuth, type LuxartGatewayAuthMode } from "./luxartGatewayAuth";
+import { validLuxartResourceMapping, validLuxartTextMapping } from "./luxartMappings";
 import { paymentConfigurationProblems } from "./paymentConfig";
 import {
   paymentProductProfile,
@@ -138,17 +139,7 @@ function cleanRootHttpsOrigin(value: string | undefined) {
 }
 
 function validResourceMap(value: string | undefined) {
-  if (!value) return false;
-  try {
-    const mapping = JSON.parse(value) as unknown;
-    if (!mapping || typeof mapping !== "object" || Array.isArray(mapping)) return false;
-    const entries = Object.entries(mapping);
-    return entries.length > 0 && entries.every(([room, resource]) =>
-      /^\d+$/.test(room) && Number(room) > 0 && Number.isSafeInteger(Number(resource)) && Number(resource) > 0,
-    );
-  } catch {
-    return false;
-  }
+  return validLuxartResourceMapping(value);
 }
 
 function deploymentCommit(environment: BusinessRulesEnvironment) {
@@ -250,6 +241,14 @@ export function deploymentRuntimeConfigurationProblems(
   const timeout = Number(environment.LUXART_TIMEOUT_MS);
   if (!Number.isInteger(timeout) || timeout < 1_000 || timeout > 30_000) {
     issues.push(issue("LUXART_TIMEOUT_MS", "LUXART_TIMEOUT_MS"));
+  }
+  for (const name of [
+    "LUXART_ROOM_MAP_JSON",
+    "LUXART_ROOM_MAP_EN_JSON",
+    "LUXART_LESSON_TYPE_MAP_JSON",
+    "LUXART_LESSON_TYPE_MAP_EN_JSON",
+  ] as const) {
+    if (!validLuxartTextMapping(environment[name])) issues.push(issue(name, name));
   }
   try {
     assertConfirmedLuxartGatewayAuth(environment);

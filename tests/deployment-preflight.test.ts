@@ -173,4 +173,14 @@ test("preflight fails closed on commit drift, phase drift and production HTTP ov
     LUXART_API_BASE_URL: "https://luxart-test.example.com:9191/api/",
   }));
   assert.ok(nestedApiPath.some(({ code }) => code === "LUXART_API_TRANSPORT"));
+
+  for (const [name, value] of [
+    ["LUXART_ROOM_MAP_JSON", JSON.stringify({ room: "Cycling" })],
+    ["LUXART_ROOM_MAP_EN_JSON", JSON.stringify({ 2: 42 })],
+    ["LUXART_LESSON_TYPE_MAP_JSON", JSON.stringify({ 8: "" })],
+    ["LUXART_LESSON_TYPE_MAP_EN_JSON", "[]"],
+  ] as const) {
+    const invalidDisplayMap = deploymentRuntimeConfigurationProblems(readOnlyStagingEnvironment({ [name]: value }));
+    assert.ok(invalidDisplayMap.some(({ code }) => code === name));
+  }
 });

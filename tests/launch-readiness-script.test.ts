@@ -54,6 +54,12 @@ test("launch gate treats Stripe as out of scope only for booking_without_payment
   assert.equal(malformedResourceMap.status, 1);
   assert.match(malformedResourceMap.output, /FAIL  Luxart reservation resources/);
 
+  const ambiguousResourceMap = runLaunchCheck("booking_without_payments", "false", {
+    LUXART_RESOURCE_MAP_JSON: JSON.stringify({ "01": 101 }),
+  });
+  assert.equal(ambiguousResourceMap.status, 1);
+  assert.match(ambiguousResourceMap.output, /FAIL  Luxart reservation resources/);
+
   const withStripe = runLaunchCheck("booking_with_stripe", "false");
   assert.equal(withStripe.status, 1);
   assert.match(withStripe.output, /FAIL  Stripe credentials/);

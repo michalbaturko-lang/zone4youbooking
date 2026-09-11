@@ -34,12 +34,15 @@ Přepnutí fáze je release změna. Samotné nastavení boolean přepínače nes
 | Staging origin | explicitní čistý HTTPS kořen v `ZONE4YOU_STAGING_APP_ORIGIN`, shodný s `APP_BASE_URL` a odlišný od produkce |
 | Veřejné prostředí | `NEXT_PUBLIC_APP_ENV` musí přesně odpovídat cíli; žádný jiný `NEXT_PUBLIC_*` secret |
 | Luxart | live režim, resort `1`, timeout 1–30 s, potvrzený gateway auth a HTTPS; testovací HTTP je možné pouze na stagingu s explicitní výjimkou |
+| Luxart mapy | volitelné mapy názvů sálů a typů pro CS/EN musí používat kanonická nezáporná číselná ID a krátké neprázdné texty; booking fáze navíc vyžaduje úplnou mapu kladných `cislo_salu` → `id_resource` |
 | Session | samostatný serverový secret nejméně 32 znaků, nerecyklovaný jako gateway nebo Stripe secret |
 | Rate limit | PostgreSQL s TLS, nebo pouze u doložené single-instance topologie paměťový režim s výslovným potvrzením; na Vercelu se identita klienta bere pouze z validní platformní `x-vercel-forwarded-for` |
 | Notifikace | `NOTIFICATION_PROVIDER=luxart`; aplikace standardní Luxart e-maily neduplikuje |
 | Watchdog | současný omezený pilot vyžaduje `LUXART_WAITLIST_ENABLED=false`; pozdější zapnutí vyžaduje potvrzený `watchdog_III`, bezpečné opakování create/delete a živý E4 důkaz Luxart notifikace |
 
 Produkce vždy vyžaduje `LUXART_ALLOW_INSECURE_TEST_HTTP=false`. `LUXART_API_BASE_URL` musí být čistý origin bez cesty (např. `https://host:9191/`); adapter si `/api/...` přidává sám. Stejnou podmínku kontroluje i runtime, takže chybná adresa nebo produkční HTTP selžou ještě před odesláním Luxart požadavku. Přesměrování autorizačních hlaviček na jiný host adapter odmítá. Všechny Luxart požadavky mají explicitní `no-store`; JSON odpověď je streamovaně omezená na 4 MiB. Nadlimitní čtení selže bezpečně a u mutace se zachová povinné ruční smíření místo slepého opakování zápisu.
+
+Mapy `LUXART_ROOM_MAP_JSON`, `LUXART_ROOM_MAP_EN_JSON`, `LUXART_LESSON_TYPE_MAP_JSON` a `LUXART_LESSON_TYPE_MAP_EN_JSON` jsou volitelné, ale pokud jsou nastavené, preflight odmítne pole, nečíselné nebo nekanonické klíče (např. `"02"`), netextové/prázdné hodnoty, řídicí znaky, texty nad 120 znaků a mapy nad 256 položek. `LUXART_RESOURCE_MAP_JSON` je v booking fázi povinná a přijímá jen kanonická kladná čísla sálů a kladná bezpečná celočíselná `id_resource`. Stejný parser používá runtime i finální release dossier, takže neplatná položka se nikdy tiše nezahodí.
 
 ## Co do runtime prostředí nepatří
 

@@ -339,6 +339,20 @@ test("pilot release dossier rejects an observed hall without a reservation resou
   );
 });
 
+test("pilot release dossier rejects malformed resource-map entries instead of silently dropping them", () => {
+  for (const mapping of [
+    JSON.stringify({ 1: 101, 2: 102, 3: 203, broken: 999 }),
+    JSON.stringify({ 1: 101, 2: 102, 3: 203, "04": 204 }),
+    JSON.stringify({ 1: 101, 2: 102, 3: 203, 4: 0 }),
+  ]) {
+    const fixture = validFixture();
+    assert.throws(
+      () => verifyPilotReleaseEvidence({ ...fixture.environment, LUXART_RESOURCE_MAP_JSON: mapping }, now),
+      /LUXART_RESOURCE_MAP_JSON must map positive room numbers/i,
+    );
+  }
+});
+
 test("pilot release dossier binds the live Luxart evidence to the confirmed gateway auth mode", () => {
   const fixture = validFixture();
   assert.throws(

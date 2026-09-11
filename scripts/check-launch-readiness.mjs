@@ -103,9 +103,11 @@ function validPositiveIntegerMapping(value) {
     const mapping = JSON.parse(value);
     if (typeof mapping !== "object" || mapping === null || Array.isArray(mapping)) return false;
     const entries = Object.entries(mapping);
-    return entries.length > 0 && entries.every(([room, resource]) =>
+    return entries.length > 0 && entries.length <= 256 && entries.every(([room, resource]) =>
       /^\d+$/.test(room) &&
+      Number.isSafeInteger(Number(room)) &&
       Number(room) > 0 &&
+      String(Number(room)) === room &&
       Number.isSafeInteger(Number(resource)) &&
       Number(resource) > 0
     );

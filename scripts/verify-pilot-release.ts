@@ -3,6 +3,7 @@ import { lstatSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { assertConfirmedLuxartGatewayAuth, type LuxartGatewayAuthMode } from "../src/lib/luxartGatewayAuth";
+import { parseLuxartResourceMapping } from "../src/lib/luxartMappings";
 import { bookingRules } from "../src/lib/bookingRules";
 import { rateLimitRuntimeReady } from "../src/lib/rateLimit";
 import { zone4YouDateKey, zone4YouScheduleRange, zone4YouTimeZone } from "../src/lib/zone4YouTime";
@@ -200,19 +201,8 @@ function requireApproval(
 }
 
 function roomMap(environment: Environment) {
-  const raw = required(environment, "LUXART_RESOURCE_MAP_JSON");
-  let value: unknown;
-  try {
-    value = JSON.parse(raw);
-  } catch {
-    throw new Error("LUXART_RESOURCE_MAP_JSON must be valid JSON.");
-  }
-  const mapping = objectValue(value, "LUXART_RESOURCE_MAP_JSON");
-  return new Map(
-    Object.entries(mapping)
-      .filter(([, resource]) => Number.isSafeInteger(Number(resource)) && Number(resource) > 0)
-      .map(([room, resource]) => [room, Number(resource)]),
-  );
+  const mapping = parseLuxartResourceMapping(required(environment, "LUXART_RESOURCE_MAP_JSON"));
+  return new Map(Object.entries(mapping));
 }
 
 export function validateLuxartEvidence(
