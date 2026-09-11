@@ -53,6 +53,56 @@ interface RealLuxartContext {
   locale?: Locale;
 }
 
+export const maximumLuxartResponseBytes = 4 * 1024 * 1024;
+
+function throwLuxartResponseError(mutationOutcomeMayBeUnknown: boolean, tooLarge = false): never {
+  if (mutationOutcomeMayBeUnknown) throw new BookingMutationOutcomeUnknownError();
+  throw new BookingApiError(
+    502,
+    tooLarge ? "LUXART_RESPONSE_TOO_LARGE" : "LUXART_RESPONSE_INVALID",
+    tooLarge ? "Luxart vrátil příliš velkou odpověď." : "Luxart vrátil neplatnou odpověď.",
+  );
+}
+
+export async function readLuxartJsonResponse<T>(
+  response: Response,
+  mutationOutcomeMayBeUnknown = false,
+  maximumBytes = maximumLuxartResponseBytes,
+): Promise<T> {
+  const rawLength = response.headers.get("content-length");
+  if (rawLength && /^\d+$/.test(rawLength) && Number(rawLength) > maximumBytes) {
+    await response.body?.cancel().catch(() => undefined);
+    throwLuxartResponseError(mutationOutcomeMayBeUnknown, true);
+  }
+  if (!response.body) throwLuxartResponseError(mutationOutcomeMayBeUnknown);
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let bytesRead = 0;
+  let text = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytesRead += value.byteLength;
+      if (bytesRead > maximumBytes) {
+        await reader.cancel().catch(() => undefined);
+        throwLuxartResponseError(mutationOutcomeMayBeUnknown, true);
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throwLuxartResponseError(mutationOutcomeMayBeUnknown);
+  }
+}
+
 function normalizedLuxartBaseUrl(environment: NodeJS.ProcessEnv = process.env) {
   const rawBaseUrl = environment.LUXART_API_BASE_URL;
   if (!rawBaseUrl) {
@@ -141,12 +191,7 @@ async function luxartFetch<T>(
       }
       throw new LuxartHttpError(response.status, operation);
     }
-    try {
-      return (await response.json()) as T;
-    } catch {
-      if (mutationOutcomeMayBeUnknown) throw new BookingMutationOutcomeUnknownError();
-      throw new BookingApiError(502, "LUXART_RESPONSE_INVALID", "Luxart vrátil neplatnou odpověď.");
-    }
+    return await readLuxartJsonResponse<T>(response, mutationOutcomeMayBeUnknown);
   } catch (error) {
     if (error instanceof BookingApiError) throw error;
     if (mutationOutcomeMayBeUnknown) throw new BookingMutationOutcomeUnknownError();

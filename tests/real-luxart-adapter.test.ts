@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import test from "node:test";
-import { assertReservationPreconditions, createRealLuxartAdapter } from "../src/lib/realLuxartAdapter";
+import {
+  assertReservationPreconditions,
+  createRealLuxartAdapter,
+  maximumLuxartResponseBytes,
+  readLuxartJsonResponse,
+} from "../src/lib/realLuxartAdapter";
 import { BookingApiError, BookingMutationOutcomeUnknownError } from "../src/lib/errors";
 import type { Lesson, User } from "../src/lib/domain";
 import { zone4YouScheduleRange } from "../src/lib/zone4YouTime";
@@ -401,6 +406,36 @@ test("runtime adapter accepts only a clean HTTPS origin outside an explicit stag
   } finally {
     restore();
   }
+});
+
+test("Luxart response reader bounds declared and streamed JSON without weakening mutation reconciliation", async () => {
+  const declared = new Response("{}", {
+    headers: { "content-length": String(maximumLuxartResponseBytes + 1) },
+  });
+  await assert.rejects(
+    readLuxartJsonResponse(declared),
+    (error: unknown) => error instanceof BookingApiError &&
+      error.status === 502 &&
+      error.code === "LUXART_RESPONSE_TOO_LARGE",
+  );
+
+  const streamed = new Response(new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode("{\"value\":\""));
+      controller.enqueue(new TextEncoder().encode("x".repeat(64)));
+      controller.close();
+    },
+  }));
+  await assert.rejects(
+    readLuxartJsonResponse(streamed, false, 32),
+    (error: unknown) => error instanceof BookingApiError &&
+      error.code === "LUXART_RESPONSE_TOO_LARGE",
+  );
+
+  await assert.rejects(
+    readLuxartJsonResponse(new Response("{"), true),
+    (error: unknown) => error instanceof BookingMutationOutcomeUnknownError,
+  );
 });
 
 test("fails closed before a reservation when credit, capacity or booking window is invalid", () => {
