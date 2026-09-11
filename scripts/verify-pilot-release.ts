@@ -371,11 +371,19 @@ export function validateBookingUatEvidence(
   if (!resourceMap.has(String(lessonRoomNumber))) {
     throw new Error("The booking UAT lesson room is missing from LUXART_RESOURCE_MAP_JSON.");
   }
+  for (const key of ["lessonIdSha256", "reservationIdSha256"] as const) {
+    const digest = stringValue(evidence[key], `booking UAT ${key}`);
+    if (!/^[a-f0-9]{16}$/.test(digest)) {
+      throw new Error(`booking UAT ${key} must be a 16-character lowercase SHA-256 prefix.`);
+    }
+  }
+  integerValue(evidence.expectedCancellationFeeKc, "booking UAT expectedCancellationFeeKc");
   integerValue(evidence.sameKeyCreateReplays, "booking UAT sameKeyCreateReplays", 3);
   integerValue(evidence.parallelCreateRequests, "booking UAT parallelCreateRequests", 2);
   integerValue(evidence.sameKeyCancellationReplays, "booking UAT sameKeyCancellationReplays", 3);
   trueValue(evidence.crossKeyCancellationReplay, "booking UAT crossKeyCancellationReplay");
   trueValue(evidence.oneActiveReservationObserved, "booking UAT oneActiveReservationObserved");
+  trueValue(evidence.preExistingActiveReservationsPreserved, "booking UAT preExistingActiveReservationsPreserved");
   trueValue(evidence.finalStateRestored, "booking UAT finalStateRestored");
   trueValue(evidence.cancellationFeeMatched, "booking UAT cancellationFeeMatched");
   const requestIds = stringArray(evidence.requestIds, "booking UAT requestIds");

@@ -182,6 +182,13 @@ function exactActiveReservation(snapshot: Snapshot, lessonId: string) {
   return snapshot.reservations.filter((reservation) => reservation.status === "active" && reservation.lessonId === lessonId);
 }
 
+function activeReservationIdentitySet(snapshot: Snapshot) {
+  return snapshot.reservations
+    .filter((reservation) => reservation.status === "active")
+    .map((reservation) => `${reservation.id}\u0000${reservation.userId}\u0000${reservation.lessonId}`)
+    .sort();
+}
+
 function assertReservation(
   reservation: Reservation | undefined,
   config: BookingMutationUatConfig,
@@ -299,6 +306,7 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
   const cookie = cookieFromSetCookie(login.setCookie);
   const before = await authenticatedSnapshot(config, fetchImpl, cookie);
   if (before.user?.id !== config.expectedUserId) throw new Error("Authenticated snapshot user does not match the approved test user.");
+  const beforeActiveReservations = activeReservationIdentitySet(before);
   const lesson = before.lessons.find((candidate) => candidate.id === config.lessonId);
   if (!lesson) throw new Error("ZONE4YOU_UAT_LESSON_ID is not present in the current staging schedule.");
   if (exactActiveReservation(before, config.lessonId).length !== 0) {
@@ -402,11 +410,11 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
     const cancelKey = `uat:cancel:${randomUUID()}`;
     const cancellation = await cancellationRequest(config, fetchImpl, cookie, verifiedReservation.id, cancelKey);
     requestIds.push(cancellation.requestId);
-    cancelled = true;
     assertReservation(cancellation.body.reservation, config, "cancelled", verifiedReservation.id);
     if (Number(cancellation.body.reservation.cancellationFeeKc ?? 0) !== config.expectedCancellationFeeKc) {
       throw new Error("Cancellation fee does not match ZONE4YOU_UAT_EXPECTED_CANCELLATION_FEE_KC.");
     }
+    cancelled = true;
     for (let replay = 0; replay < 3; replay += 1) {
       const repeated = await cancellationRequest(config, fetchImpl, cookie, verifiedReservation.id, cancelKey);
       requestIds.push(repeated.requestId);
@@ -430,9 +438,8 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
         exactActiveReservation(snapshot, config.lessonId).length === 0 &&
         snapshot.user.creditBalanceKc === before.user.creditBalanceKc - config.expectedCancellationFeeKc,
     );
-    if (after.reservations.filter((reservation) => reservation.status === "active").length !==
-        before.reservations.filter((reservation) => reservation.status === "active").length) {
-      throw new Error("Final active reservation count does not match the pre-test state.");
+    if (JSON.stringify(activeReservationIdentitySet(after)) !== JSON.stringify(beforeActiveReservations)) {
+      throw new Error("Final active reservation identity set does not match the pre-test state.");
     }
 
     return {
@@ -451,11 +458,13 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
       lessonRoomNumber: lesson.luxartRoomNumber,
       lessonIdSha256: shortHash(config.lessonId),
       reservationIdSha256: shortHash(verifiedReservation.id),
+      expectedCancellationFeeKc: config.expectedCancellationFeeKc,
       sameKeyCreateReplays: 3,
       parallelCreateRequests: 2,
       sameKeyCancellationReplays: 3,
       crossKeyCancellationReplay: true,
       oneActiveReservationObserved: true,
+      preExistingActiveReservationsPreserved: true,
       finalStateRestored: true,
       cancellationFeeMatched: true,
       requestIds,

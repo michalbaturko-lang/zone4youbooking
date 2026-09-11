@@ -112,13 +112,22 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
     forgotPasswordEnabled: false,
     englishEnabled: true,
   };
-  let reservations: Reservation[] = [];
+  const preExistingReservation: Reservation = {
+    id: "existing-123",
+    userId: user.id,
+    lessonId: "luxart:1:12:111:2026-09-01T12:00:00.000Z",
+    status: "active",
+    reservedAt: new Date().toISOString(),
+    priceKc: 170,
+  };
+  let reservations: Reservation[] = [preExistingReservation];
   let createWrites = 0;
   let cancelWrites = 0;
   let cancelledReservation: Reservation | undefined;
   let personalizedEligibility = true;
   let authoritativeAvailableCount = 8;
   let readinessCommit = commit;
+  let corruptPreExistingReservation = false;
   let sequence = 0;
   const idempotentResponses = new Map<string, Reservation>();
 
@@ -164,7 +173,9 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
     }
     if (url.pathname === "/api/reservations" && init?.method === "POST") {
       const key = headers.get("idempotency-key")!;
-      const stored = idempotentResponses.get(key) ?? reservations[0];
+      const stored = idempotentResponses.get(key) ?? reservations.find(
+        (reservation) => reservation.status === "active" && reservation.lessonId === lesson.id,
+      );
       if (stored) {
         idempotentResponses.set(key, stored);
         return response({ reservation: stored });
@@ -178,7 +189,7 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
         reservedAt: new Date().toISOString(),
         priceKc: lesson.priceKc,
       };
-      reservations = [created];
+      reservations = [...reservations, created];
       idempotentResponses.set(key, created);
       return response({ reservation: created }, 201);
     }
@@ -191,13 +202,19 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
         return response({ reservation: cancelledReservation });
       }
       cancelWrites += 1;
+      const targetReservation = reservations.find((reservation) => reservation.id === "987");
       const cancelled: Reservation = {
-        ...(reservations[0] ?? { id: "987", userId: user.id, lessonId: lesson.id, reservedAt: new Date().toISOString(), priceKc: 180 }),
+        ...(targetReservation ?? { id: "987", userId: user.id, lessonId: lesson.id, reservedAt: new Date().toISOString(), priceKc: 180 }),
         status: "cancelled",
         cancelledAt: new Date().toISOString(),
         cancellationFeeKc: 0,
       };
-      reservations = [];
+      reservations = reservations.filter((reservation) => reservation.id !== "987");
+      if (corruptPreExistingReservation) {
+        reservations = reservations.map((reservation) => reservation.id === preExistingReservation.id
+          ? { ...reservation, id: "unexpected-replacement" }
+          : reservation);
+      }
       cancelledReservation = cancelled;
       idempotentResponses.set(key, cancelled);
       return response({ reservation: cancelled });
@@ -223,6 +240,8 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
   assert.equal(evidence.reservationWindowVerified, true);
   assert.equal(evidence.onlineCancellationVerified, true);
   assert.equal(evidence.lessonRoomNumber, 1);
+  assert.equal(evidence.expectedCancellationFeeKc, 0);
+  assert.equal(evidence.preExistingActiveReservationsPreserved, true);
   assert.equal(evidence.finalStateRestored, true);
   assert.equal(createWrites, 1);
   assert.equal(cancelWrites, 1);
@@ -252,4 +271,14 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
     /exact approved ready live staging runtime/i,
   );
   assert.equal(createWrites, writesAfterSuccessfulUat);
+
+  reservations = [preExistingReservation];
+  cancelledReservation = undefined;
+  idempotentResponses.clear();
+  readinessCommit = commit;
+  corruptPreExistingReservation = true;
+  await assert.rejects(
+    runBookingMutationUat(config, fakeFetch),
+    /active reservation identity set does not match/i,
+  );
 });

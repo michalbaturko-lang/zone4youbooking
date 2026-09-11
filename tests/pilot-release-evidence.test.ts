@@ -135,11 +135,15 @@ function validFixture() {
       reservationWindowVerified: true,
       onlineCancellationVerified: true,
       lessonRoomNumber: 1,
+      lessonIdSha256: "c".repeat(16),
+      reservationIdSha256: "d".repeat(16),
+      expectedCancellationFeeKc: 0,
       sameKeyCreateReplays: 3,
       parallelCreateRequests: 2,
       sameKeyCancellationReplays: 3,
       crossKeyCancellationReplay: true,
       oneActiveReservationObserved: true,
+      preExistingActiveReservationsPreserved: true,
       finalStateRestored: true,
       cancellationFeeMatched: true,
       requestIds: Array.from({ length: 12 }, (_, index) => `request-${index}`),
@@ -293,6 +297,20 @@ test("pilot release dossier rejects evidence that cannot come from the real guar
         artifact.requestIds = Array.from({ length: 12 }, () => "reused-request-id");
       },
       /booking UAT evidence request IDs must be unique/i,
+    ],
+    [
+      "bookingMutationUat",
+      (artifact: Record<string, unknown>) => {
+        artifact.preExistingActiveReservationsPreserved = false;
+      },
+      /booking UAT preExistingActiveReservationsPreserved must be true/i,
+    ],
+    [
+      "bookingMutationUat",
+      (artifact: Record<string, unknown>) => {
+        artifact.lessonIdSha256 = "not-a-digest";
+      },
+      /booking UAT lessonIdSha256 must be a 16-character lowercase SHA-256 prefix/i,
     ],
     [
       "rollback",
