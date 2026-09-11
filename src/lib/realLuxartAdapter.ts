@@ -257,6 +257,14 @@ function assertWatchdogEnabled() {
   }
 }
 
+function mapValidatedLuxartUser(data: LuxartUserData) {
+  try {
+    return mapLuxartUser(data);
+  } catch {
+    throw new BookingApiError(502, "LUXART_RESPONSE_INVALID", "Luxart vrátil neplatná data klienta.");
+  }
+}
+
 export function assertReservationPreconditions(lesson: Lesson, user: User, now = new Date()) {
   const nowTime = now.getTime();
   const startTime = new Date(lesson.startsAt).getTime();
@@ -330,7 +338,7 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
         { method: "POST" },
         "login",
       );
-      const user = mapLuxartUser(userData);
+      const user = mapValidatedLuxartUser(userData);
       return { user };
     },
 
@@ -349,7 +357,7 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
           undefined,
           "current user",
         );
-        cachedUser = mapLuxartUser(userData);
+        cachedUser = mapValidatedLuxartUser(userData);
         return cachedUser;
       } catch (error) {
         if (error instanceof LuxartHttpError && error.upstreamStatus === 404) {

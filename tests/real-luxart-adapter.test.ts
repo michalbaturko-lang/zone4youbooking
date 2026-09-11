@@ -99,6 +99,10 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
         response.end();
         return;
       }
+      if (url.searchParams.get("login") === "invalid-user@example.invalid") {
+        response.end(JSON.stringify({ user_id: 0, current_balance: null }));
+        return;
+      }
       assert.equal(url.searchParams.get("login"), "test@example.invalid");
       assert.match(url.searchParams.get("password") ?? "", /^[A-F0-9]{32}$/);
       response.end(JSON.stringify(user));
@@ -259,6 +263,12 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
   const login = await anonymousAdapter.login({ login: "test@example.invalid", password: "1" });
   assert.equal(login.user.id, "42");
   assert.equal("sessionToken" in login, false);
+  await assert.rejects(
+    anonymousAdapter.login({ login: "invalid-user@example.invalid", password: "1" }),
+    (error: unknown) => error instanceof BookingApiError &&
+      error.status === 502 &&
+      error.code === "LUXART_RESPONSE_INVALID",
+  );
   await assert.rejects(
     anonymousAdapter.login({ login: "redirect@example.invalid", password: "1" }),
     /dočasně nedostupný/i,

@@ -170,6 +170,13 @@ function number(value: unknown, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function requiredNumber(value: unknown) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : Number.NaN;
+  if (typeof value !== "string" || value.trim() === "") return Number.NaN;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
 function inferredLessonType(name: string) {
   const normalized = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
   if (normalized.includes("REFORMER")) return "Reformer";
@@ -203,19 +210,25 @@ export function parseLuxartLessonId(lessonId: string) {
 }
 
 export function mapLuxartUser(data: LuxartUserData): User {
+  const userId = requiredNumber(data?.user_id);
+  const creditBalanceKc = requiredNumber(data?.current_balance);
+  if (!Number.isInteger(userId) || userId <= 0 || !Number.isFinite(creditBalanceKc)) {
+    throw new Error("Luxart user contains invalid required fields.");
+  }
+
   const firstName = text(data.name, "");
   const surname = text(data.surname, "");
   const fullName = `${firstName} ${surname}`.trim() || text(data.login, "Klient Zone4You");
 
   return {
-    id: String(data.user_id),
+    id: String(userId),
     login: text(data.login, text(data.email, "")),
     fullName,
     email: text(data.email, ""),
     phone: text(data.phone, "") || undefined,
     memberCardNumber: text(data.member_card_number, text(data.member_card, "")) || undefined,
     membership: text(data.membership, "") || undefined,
-    creditBalanceKc: number(data.current_balance),
+    creditBalanceKc,
   };
 }
 

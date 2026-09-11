@@ -78,16 +78,33 @@ test("maps Luxart user credit without exposing password data", () => {
 test("maps the member card from both documented Luxart user response variants", () => {
   const loginUser = mapLuxartUser({
     user_id: 42,
+    current_balance: 0,
     member_card: "LOGIN-CARD",
   });
   const refreshedUser = mapLuxartUser({
     user_id: 42,
+    current_balance: 0,
     member_card: "LEGACY-CARD",
     member_card_number: "CURRENT-CARD",
   });
 
   assert.equal(loginUser.memberCardNumber, "LOGIN-CARD");
   assert.equal(refreshedUser.memberCardNumber, "CURRENT-CARD");
+});
+
+test("rejects a Luxart user without a valid positive ID and finite credit", () => {
+  assert.throws(
+    () => mapLuxartUser({ user_id: 0, current_balance: 500 }),
+    /invalid required fields/i,
+  );
+  assert.throws(
+    () => mapLuxartUser({ user_id: 42 }),
+    /invalid required fields/i,
+  );
+  assert.throws(
+    () => mapLuxartUser({ user_id: 42, current_balance: Number.NaN }),
+    /invalid required fields/i,
+  );
 });
 
 test("maps an active reservation back to the same Luxart lesson occurrence", () => {
