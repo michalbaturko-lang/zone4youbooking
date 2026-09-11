@@ -75,6 +75,21 @@ test("maps Luxart user credit without exposing password data", () => {
   assert.equal(user.creditBalanceKc, 1250);
 });
 
+test("maps the member card from both documented Luxart user response variants", () => {
+  const loginUser = mapLuxartUser({
+    user_id: 42,
+    member_card: "LOGIN-CARD",
+  });
+  const refreshedUser = mapLuxartUser({
+    user_id: 42,
+    member_card: "LEGACY-CARD",
+    member_card_number: "CURRENT-CARD",
+  });
+
+  assert.equal(loginUser.memberCardNumber, "LOGIN-CARD");
+  assert.equal(refreshedUser.memberCardNumber, "CURRENT-CARD");
+});
+
 test("maps an active reservation back to the same Luxart lesson occurrence", () => {
   const reservation = mapLuxartReservation(
     {

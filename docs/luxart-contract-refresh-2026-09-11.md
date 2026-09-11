@@ -7,27 +7,31 @@ Tento záznam je pouze neosobní read-only evidence veřejné referenční dokum
 - Referenční `http://api.memberzone.online:9295/Help` odpovědělo HTTP 200.
 - Neautentizovaný `GET /api/Lesson` odpověděl 401; žádné přihlašovací údaje ani osobní data nebyly odeslány.
 - Dokumentace uvádí potřebné kontrakty pro login, všechny `Lesson` položky, seznam/vytvoření/storno rezervace a watchdog.
+- Automatický `verify:luxart-public-contract` ověřuje 11 používaných endpointů podle jejich HTTP metody, přesného titulku a povinných polí. Výstup je vždy `referenceOnly=true`, `launchAuthority=false` a neobsahuje cílový hostname ani syrové HTML.
+- Aktuální dokumentace rozlišuje dvě podoby členské karty: odpověď `POST api/Login` uvádí `member_card`, zatímco `GET api/User` uvádí také `member_card_number`. Adaptér přijímá obě varianty a při jejich současné přítomnosti dává přednost `member_card_number`.
 - Storno odpověď obsahuje `storno_poplatek`; UI proto nesmí částku domýšlet a ukazuje hodnotu vrácenou Luxartem.
 - `Lesson_data` obsahuje mimo jiné datum a čas, službu, cenu, název, popis, kapacity/obsazenost, `cislo_salu`, instruktora a příznak rezervovatelnosti. To odpovídá pilotnímu rozsahu všech lekcí, všech sálů a Reformeru.
 - Nový automatický `probe:luxart-help` na referenčním portu `9295` v 12:43 CEST prošel s HTTP 200 a klasifikací `ready`; bezpečný výstup neobsahuje hostname ani credentials.
 - Stejný probe na zjevné veřejné Zone4You variantě s portem `9191` skončil connect timeoutem. Host ale nebyl IT potvrzen, proto jde pouze o negativní kandidátní pozorování, nikoli o definitivní stav portu.
-- Samostatný kandidátní test stejného Luxart hostname na portu `9191` ve 15:17 CEST dosáhl HTTP služby, ale `/Help` vrátilo 404, HTTPS nebylo podporováno a kořen byl pouze obecný HTML index. Současný referenční `:9295/Help` přitom znovu prošel s HTTP 200 a klasifikací `ready`. `api.memberzone.online:9191` proto není doložený ani použitelný Zone4You API root.
+- Samostatný kandidátní test stejného Luxart hostname na portu `9191` v 16:17 CEST dosáhl HTTP služby, ale `/Help` vrátilo 404, HTTPS nebylo podporováno a kořen byl pouze obecný HTML index. Současný referenční `:9295/Help` přitom znovu prošel s HTTP 200 a klasifikací `ready`. `api.memberzone.online:9191` proto není doložený ani použitelný Zone4You API root.
 - Původní Luxart zpráva z 1. 4. 2026 potvrzuje API na serveru Zone4You na interním portu `9759` a testovací databázi. Port `9191` je proto pravděpodobný veřejný překlad na tuto službu, nikoli port referenčního Luxart hostu; přesný NAT/reverse-proxy vztah musí potvrdit IT.
 - Následný neautentizovaný IPv4 probe běžných Zone4You hostname variant na portech `9191` i `9759` skončil connect timeoutem přes HTTP i HTTPS. To je konzistentní s neaktivním pravidlem, jiným hostem, VPN nebo allowlistem, ale samo o sobě žádnou variantu nepotvrzuje.
 - Kořen služby `api.memberzone.online:9191` zveřejňuje directory listing s názvy aplikačních adresářů a konfiguračních souborů. Žádný odkaz ani soubor nebyl otevřen; službu dál nezkoumáme a doporučujeme správci výpis adresáře vypnout.
 
-## SHA-256 uložené odpovědi
+## Aktuální automatický důkaz kontraktu
 
-| Help stránka | SHA-256 |
-|---|---|
-| Login | `3a206e99a7366e0b5fad39014d90b216f696a50a490c5ace09dbb0d96c633ca0` |
-| Lesson | `9bd77da566b9bef0c80981b01df8a8e960f708f64268fca49de8031d0a6fa52b` |
-| Reservations GET | `be858e8f9696475fc39b9ea3bdcbc07b7f816413fd517f3dcb744d73e5ae38c1` |
-| Reservations POST | `33f9e782a2204ff56fdb6223a33e60272dab3d0ddf1129ea51e526732aa50b16` |
-| Reservations DELETE | `350d423bbd354a6845a5fd492c262f69667bfd0431d0e03b3e65b4cf2fe1e28e` |
-| watchdog_III POST | `b893e636d421b3ee04767b2cc2219c677dde0826f9f993f3147f0520f435858d` |
-| watchdog_II/user GET | `3de87e3ac7fb87266c2eab0fe7f6e0218c841500ef4aa2991476bdbfa3af4d99` |
-| Watchdog DELETE | `4bdf30073b5f39e0da1b928322eb3f765a80e0c8faef18f5a3066a308a6e9b88` |
+Spuštěno v 16:21 CEST:
+
+```bash
+npm run verify:luxart-public-contract
+```
+
+- výsledek: `ok=true`;
+- ověřeno: `11/11` endpointů;
+- chybějící pole nebo neočekávaný dokument: `0`;
+- sémantický SHA-256 nad názvy endpointů a jejich dokumentovanými poli: `869beb3af67e648854462982b15f099aad622992dbbc81c2ec5bb4c9afc7bf20`.
+
+Sémantický otisk záměrně ignoruje CSS, bundlované asset URL a další prezentační HTML. Při změně názvu endpointu nebo datových polí se naopak změní a povinné pole použité adaptérem způsobí `NO-GO` výsledek.
 
 ## Release dopad
 

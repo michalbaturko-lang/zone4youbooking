@@ -20,7 +20,7 @@ Reformer může být v potvrzeném profilu označen jako `same_as_group`, nebo m
 ## Povinné předstartovní důkazy
 
 1. `npm run quality` je zelené.
-2. Přesný build projde `npm run verify:deployment-preflight` podle matice v `docs/deployment-preflight.md`; výstup je uložený jako ne-secret důkaz.
+2. Veřejný referenční kontrakt projde `npm run verify:luxart-public-contract`; tento výsledek pouze odhaluje dokumentační drift a výslovně není živým Zone4You důkazem ani launch autoritou. Přesný build následně projde `npm run verify:deployment-preflight` podle matice v `docs/deployment-preflight.md`; výstup je uložený jako ne-secret důkaz.
 3. IT potvrdilo gateway auth režim, případné hodnoty jsou v secret store a `npm run verify:luxart-gateway-config` projde bez vypsání credentials. Režim `none` musí být stejně explicitní jako Basic/Bearer/`X-*`.
 4. Operátor vytvoří mimo repozitář nový adresář s oprávněním `0700`, nastaví jedinečnou dosud neexistující cestu `ZONE4YOU_LUXART_EVIDENCE_OUTPUT_PATH` a spustí `npm run verify:luxart-d1`. Brána přijme pouze schválený čistý Zone4You HTTPS origin bez `/api` cesty na portu 9191, stejný `/Help` a API origin, potvrzený gateway režim, resort 1 a autentizovaný český i anglický read-only feed včetně Reformeru. Nepřijme veřejný referenční server, HTTP, nechráněný adresář ani existující výstup. JSON důkaz uloží s oprávněním `0600`; neobsahuje credentials, osobní data ani syrový payload. Samostatné `verify:luxart-readonly` zůstává diagnostický stavební blok, ale pro D1/release se používá složená brána.
 5. `npm run check:launch` nemá žádný automatický `FAIL` relevantní pro zvolený režim.

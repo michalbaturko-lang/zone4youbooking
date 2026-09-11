@@ -17,6 +17,7 @@ export interface LuxartUserData {
   surname?: string | null;
   current_balance?: number | null;
   membership?: string | null;
+  member_card?: string | null;
   member_card_number?: string | null;
   phone?: string | null;
 }
@@ -212,7 +213,7 @@ export function mapLuxartUser(data: LuxartUserData): User {
     fullName,
     email: text(data.email, ""),
     phone: text(data.phone, "") || undefined,
-    memberCardNumber: text(data.member_card_number, "") || undefined,
+    memberCardNumber: text(data.member_card_number, text(data.member_card, "")) || undefined,
     membership: text(data.membership, "") || undefined,
     creditBalanceKc: number(data.current_balance),
   };
