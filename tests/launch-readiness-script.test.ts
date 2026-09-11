@@ -7,7 +7,11 @@ import test from "node:test";
 const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const script = join(repositoryRoot, "scripts", "check-launch-readiness.mjs");
 
-function runLaunchCheck(phase: string, paymentMutationsEnabled: string) {
+function runLaunchCheck(
+  phase: string,
+  paymentMutationsEnabled: string,
+  overrides: Record<string, string | undefined> = {},
+) {
   const result = spawnSync(process.execPath, [script], {
     cwd: repositoryRoot,
     encoding: "utf8",
@@ -15,6 +19,8 @@ function runLaunchCheck(phase: string, paymentMutationsEnabled: string) {
       ...process.env,
       ZONE4YOU_DEPLOYMENT_PHASE: phase,
       PAYMENT_MUTATIONS_ENABLED: paymentMutationsEnabled,
+      LUXART_WAITLIST_ENABLED: "false",
+      ...overrides,
     },
   });
   return { status: result.status, output: `${result.stdout}\n${result.stderr}` };
@@ -28,12 +34,25 @@ test("launch gate treats Stripe as out of scope only for booking_without_payment
   assert.match(withoutPayments.output, /SKIP  Durable payment ledger/);
   assert.match(withoutPayments.output, /PASS  Payment mutation release switch/);
   assert.match(withoutPayments.output, /PASS  Runtime readiness and region contract/);
+  assert.match(withoutPayments.output, /PASS  Watchdog mutation release switch/);
   assert.match(withoutPayments.output, /SKIP  Luxart Stripe payment mapping/);
   assert.match(withoutPayments.output, /4 Stripe checks are explicitly not applicable/);
 
   const unsafeWithoutPayments = runLaunchCheck("booking_without_payments", "true");
   assert.equal(unsafeWithoutPayments.status, 1);
   assert.match(unsafeWithoutPayments.output, /FAIL  Payment mutation release switch/);
+
+  const unsafeWatchdog = runLaunchCheck("booking_without_payments", "false", {
+    LUXART_WAITLIST_ENABLED: "true",
+  });
+  assert.equal(unsafeWatchdog.status, 1);
+  assert.match(unsafeWatchdog.output, /FAIL  Watchdog mutation release switch/);
+
+  const malformedResourceMap = runLaunchCheck("booking_without_payments", "false", {
+    LUXART_RESOURCE_MAP_JSON: JSON.stringify({ 1: 101, broken: 0 }),
+  });
+  assert.equal(malformedResourceMap.status, 1);
+  assert.match(malformedResourceMap.output, /FAIL  Luxart reservation resources/);
 
   const withStripe = runLaunchCheck("booking_with_stripe", "false");
   assert.equal(withStripe.status, 1);

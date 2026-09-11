@@ -101,11 +101,13 @@ function validProductionAppUrl(value) {
 function validPositiveIntegerMapping(value) {
   try {
     const mapping = JSON.parse(value);
-    return (
-      typeof mapping === "object" &&
-      mapping !== null &&
-      !Array.isArray(mapping) &&
-      Object.values(mapping).some((item) => Number.isInteger(Number(item)) && Number(item) > 0)
+    if (typeof mapping !== "object" || mapping === null || Array.isArray(mapping)) return false;
+    const entries = Object.entries(mapping);
+    return entries.length > 0 && entries.every(([room, resource]) =>
+      /^\d+$/.test(room) &&
+      Number(room) > 0 &&
+      Number.isSafeInteger(Number(resource)) &&
+      Number(resource) > 0
     );
   } catch {
     return false;
@@ -287,6 +289,11 @@ check(
   "Booking mutation release switch",
   process.env.BOOKING_MUTATIONS_ENABLED === "true",
   "BOOKING_MUTATIONS_ENABLED must be explicitly enabled only for an approved transactional pilot; false is the read-only rollback state.",
+);
+check(
+  "Watchdog mutation release switch",
+  process.env.LUXART_WAITLIST_ENABLED === "false",
+  "The limited pilot requires LUXART_WAITLIST_ENABLED=false until watchdog create/delete and Luxart notification delivery pass live E4 evidence.",
 );
 check(
   "Business rules sign-off",

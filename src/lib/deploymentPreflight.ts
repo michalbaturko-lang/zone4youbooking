@@ -300,6 +300,9 @@ export function deploymentRuntimeConfigurationProblems(
   if (phase === "booking_without_payments" && environment.PAYMENT_MUTATIONS_ENABLED !== "false") {
     issues.push(issue("PAYMENT_MUTATIONS_MUST_BE_DISABLED", "PAYMENT_MUTATIONS_ENABLED"));
   }
+  if (phase === "booking_without_payments" && environment.LUXART_WAITLIST_ENABLED !== "false") {
+    issues.push(issue("WAITLIST_MUST_BE_DISABLED", "LUXART_WAITLIST_ENABLED"));
+  }
   if (phase === "booking_with_stripe") {
     for (const code of paymentConfigurationProblems(environment, profile)) {
       issues.push(issue(code, code));

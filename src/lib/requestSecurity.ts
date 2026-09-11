@@ -24,6 +24,16 @@ export function bookingMutationsEnabled(mode: "demo" | "live", configuredValue?:
   return mode === "demo" || configuredValue === "true";
 }
 
+export function waitlistMutationsEnabled(
+  mode: "demo" | "live",
+  bookingConfiguredValue?: string,
+  waitlistConfiguredValue?: string,
+) {
+  return mode === "demo" || (
+    bookingConfiguredValue === "true" && waitlistConfiguredValue === "true"
+  );
+}
+
 export function assertBookingMutationsEnabled() {
   if (!bookingMutationsEnabled(isRealLuxartMode() ? "live" : "demo", process.env.BOOKING_MUTATIONS_ENABLED)) {
     throw new BookingApiError(
@@ -34,6 +44,21 @@ export function assertBookingMutationsEnabled() {
   }
   if (!isRealLuxartMode()) return;
   assertBookingMutationRuntimeReady();
+}
+
+export function assertWaitlistMutationsEnabled() {
+  assertBookingMutationsEnabled();
+  if (!waitlistMutationsEnabled(
+    isRealLuxartMode() ? "live" : "demo",
+    process.env.BOOKING_MUTATIONS_ENABLED,
+    process.env.LUXART_WAITLIST_ENABLED,
+  )) {
+    throw new BookingApiError(
+      503,
+      "WATCHDOG_DISABLED",
+      "Hlídání uvolněného místa je do živého ověření Luxart notifikací vypnuté.",
+    );
+  }
 }
 
 export function readIdempotencyKey(request: Request) {

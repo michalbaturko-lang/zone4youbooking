@@ -98,6 +98,13 @@ test("booking staging preflight requires and accepts confirmed rules, mapping an
   assert.equal(report.configuration.bookingMutations, "enabled");
   assert.equal(report.configuration.payments, "disabled");
   assert.equal(report.profiles.businessRulesStatus, "confirmed");
+
+  const watchdogEnabled = buildDeploymentPreflightReport(
+    bookingStagingEnvironment({ LUXART_WAITLIST_ENABLED: "true" }),
+    { profile: confirmedBusinessRulesProfile, expectedCommit: commit },
+  );
+  assert.equal(watchdogEnabled.ok, false);
+  assert.ok(watchdogEnabled.issues.some(({ code }) => code === "WAITLIST_MUST_BE_DISABLED"));
 });
 
 test("Stripe staging preflight accepts only the fully signed and durable payment phase", () => {

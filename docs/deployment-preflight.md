@@ -18,7 +18,7 @@ Preflight je fail-closed kontrola konfigurace přesného nasazovaného commitu. 
 | `ZONE4YOU_DEPLOYMENT_PHASE` | Booking | Stripe | Povinné navíc |
 |---|---:|---:|---|
 | `read_only` | vypnutý | vypnutý | `LUXART_WAITLIST_ENABLED=false`; není vyžadovaný resource map ani potvrzený business-rule profil |
-| `booking_without_payments` | zapnutý | vypnutý | potvrzený a hashovaný business-rule profil, úplný `LUXART_RESOURCE_MAP_JSON`, PostgreSQL booking ledger |
+| `booking_without_payments` | zapnutý | vypnutý | potvrzený a hashovaný business-rule profil, úplný `LUXART_RESOURCE_MAP_JSON`, PostgreSQL booking ledger, `LUXART_WAITLIST_ENABLED=false` |
 | `booking_with_stripe` | zapnutý | zapnutý | vše z booking fáze plus Stripe test/live režim a secrets, potvrzený payment profil, PostgreSQL payment ledger a potvrzené Luxart payment mapování |
 
 Přepnutí fáze je release změna. Samotné nastavení boolean přepínače nestačí; preflight kontroluje vzájemnou shodu celé konfigurace.
@@ -37,7 +37,7 @@ Přepnutí fáze je release změna. Samotné nastavení boolean přepínače nes
 | Session | samostatný serverový secret nejméně 32 znaků, nerecyklovaný jako gateway nebo Stripe secret |
 | Rate limit | PostgreSQL s TLS, nebo pouze u doložené single-instance topologie paměťový režim s výslovným potvrzením; na Vercelu se identita klienta bere pouze z validní platformní `x-vercel-forwarded-for` |
 | Notifikace | `NOTIFICATION_PROVIDER=luxart`; aplikace standardní Luxart e-maily neduplikuje |
-| Watchdog | `LUXART_WAITLIST_ENABLED` musí být explicitní; při zapnutí je povolen pouze potvrzený `watchdog_III` |
+| Watchdog | současný omezený pilot vyžaduje `LUXART_WAITLIST_ENABLED=false`; pozdější zapnutí vyžaduje potvrzený `watchdog_III`, bezpečné opakování create/delete a živý E4 důkaz Luxart notifikace |
 
 Produkce vždy vyžaduje `LUXART_ALLOW_INSECURE_TEST_HTTP=false`. `LUXART_API_BASE_URL` musí být čistý origin bez cesty (např. `https://host:9191/`); adapter si `/api/...` přidává sám. Stejnou podmínku kontroluje i runtime, takže chybná adresa nebo produkční HTTP selžou ještě před odesláním Luxart požadavku. Přesměrování autorizačních hlaviček na jiný host adapter odmítá. Všechny Luxart požadavky mají explicitní `no-store`; JSON odpověď je streamovaně omezená na 4 MiB. Nadlimitní čtení selže bezpečně a u mutace se zachová povinné ruční smíření místo slepého opakování zápisu.
 

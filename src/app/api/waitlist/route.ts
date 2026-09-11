@@ -1,7 +1,7 @@
 import { fail, ok } from "@/lib/apiResponse";
 import { getRequestLuxartAdapter } from "@/lib/adapterProvider";
 import { readJsonWithDemoState, withDemoState } from "@/lib/demoStateTransport";
-import { assertBookingMutationsEnabled, assertTrustedMutation } from "@/lib/requestSecurity";
+import { assertTrustedMutation, assertWaitlistMutationsEnabled } from "@/lib/requestSecurity";
 import { assertRateLimit, rateLimitRules } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     assertTrustedMutation(request);
-    assertBookingMutationsEnabled();
+    assertWaitlistMutationsEnabled();
     const body = await readJsonWithDemoState<{ lessonId?: string }>(request);
     if (!body.lessonId) throw new Error("Missing lessonId.");
     await assertRateLimit(request, rateLimitRules.waitlistJoin, body.lessonId);
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     assertTrustedMutation(request);
-    assertBookingMutationsEnabled();
+    assertWaitlistMutationsEnabled();
     await readJsonWithDemoState(request);
     const url = new URL(request.url);
     const waitlistEntryId = url.searchParams.get("waitlistEntryId") ?? undefined;

@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { bookingMutationsEnabled, isTrustedMutationOrigin, readIdempotencyKey } from "../src/lib/requestSecurity";
+import {
+  bookingMutationsEnabled,
+  isTrustedMutationOrigin,
+  readIdempotencyKey,
+  waitlistMutationsEnabled,
+} from "../src/lib/requestSecurity";
 
 test("accepts only the configured application origin", () => {
   const trusted = new Request("https://booking.zone4you.cz/api/reservations", {
@@ -25,6 +30,14 @@ test("live booking mutations fail closed unless the release switch is explicit",
   assert.equal(bookingMutationsEnabled("live"), false);
   assert.equal(bookingMutationsEnabled("live", "false"), false);
   assert.equal(bookingMutationsEnabled("live", "true"), true);
+});
+
+test("live watchdog mutations require both the booking and dedicated waitlist switches", () => {
+  assert.equal(waitlistMutationsEnabled("demo"), true);
+  assert.equal(waitlistMutationsEnabled("live", "true", "true"), true);
+  assert.equal(waitlistMutationsEnabled("live", "false", "true"), false);
+  assert.equal(waitlistMutationsEnabled("live", "true", "false"), false);
+  assert.equal(waitlistMutationsEnabled("live", "true"), false);
 });
 
 test("booking writes require a bounded idempotency key", () => {
