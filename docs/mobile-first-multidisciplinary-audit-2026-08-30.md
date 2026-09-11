@@ -35,6 +35,8 @@ Audit našel a lokálně opravil šest důležitých mezer:
 
 `config/business-rules-profile.json` proto zůstává `provisional`. Zná půlnoc pro běžné lekce, ale neznámé hodnoty jsou explicitně `null`. Živý booking se bez úplného profilu, jeho přesného hashe a `BOOKING_RULES_CONFIRMED=true` nezapne.
 
+Datový model Reformeru už není omezený na „stejné jako skupinová lekce“. Potvrzený profil může bezpečně zvolit shodné pravidlo nebo vlastní cutoff v celých hodinách před začátkem, vlastní pozdní/no-show částky a povolení či zákaz pozdního online storna. Backend před stornem znovu načte odpovídající výskyt lekce; bez dohledatelné lekce nebo ověřitelného pravidla zápis neodešle.
+
 ## 3. Audit z různých úhlů
 
 | Perspektiva | Verdikt | Důkaz / nález | Nutná další akce |

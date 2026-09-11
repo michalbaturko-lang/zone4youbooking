@@ -69,6 +69,8 @@ const englishApiErrors: Record<string, string> = {
   BOOKING_READ_ONLY: "Booking is temporarily read-only. Reception can help you.",
   RESERVATION_NOT_FOUND: "The booking could not be found.",
   CANCELLATION_REJECTED: "This booking could not be cancelled.",
+  CANCELLATION_CLOSED: "Online cancellation for this booking is closed.",
+  CANCELLATION_POLICY_UNAVAILABLE: "The cancellation policy for this booking could not be verified safely.",
   BOOKING_RECONCILIATION_REQUIRED: "The result could not be confirmed safely. Do not repeat the action; contact reception.",
   WATCHDOG_DISABLED: "Seat alerts are temporarily unavailable.",
 };

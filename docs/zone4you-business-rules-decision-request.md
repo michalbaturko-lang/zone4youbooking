@@ -24,7 +24,9 @@ pro spuštění nového bookingového pilotu potřebujeme písemně potvrdit zb�
    - Liší se kterákoli z těchto hodnot u Reformeru? Pokud ano, prosíme uvést přesně jak.
    - Vynucuje tato pravidla už Luxart API, nebo je musí před odesláním storna hlídat i nový booking?
 
-Historický čtyřhodinový cutoff je nově překonaný potvrzenou půlnocí. Historické částky 100 Kč / 100 Kč zatím nepovažujeme za schválené pro pilot. Jakmile obdržíme odpověď, uzamkneme její přesné znění a hash v release konfiguraci a otestujeme ji proti Luxart testovací databázi.
+   U Reformeru stačí odpovědět jedním z těchto přesných způsobů: „stejné jako běžná lekce“, nebo například „bezplatně do 24 hodin před začátkem, poté online storno není dovoleno, pozdní storno X Kč, no-show Y Kč“. Uvedené hodnoty jsou pouze ukázkou formátu, nikoli návrhem pravidla.
+
+Historický čtyřhodinový cutoff je nově překonaný potvrzenou půlnocí. Historické částky 100 Kč / 100 Kč zatím nepovažujeme za schválené pro pilot. Implementace umí pro Reformer bezpečně rozlišit stejné pravidlo jako u skupinových lekcí i vlastní počet hodin před začátkem, poplatky a zákaz/povolení pozdního online storna. Jakmile obdržíme odpověď, doplníme skutečné hodnoty, uzamkneme jejich přesný hash v release konfiguraci a otestujeme je proti Luxart testovací databázi.
 
 Bez tohoto potvrzení může běžet pouze bezpečný read-only rozvrh; živé vytvoření a storno rezervace zůstane vypnuté.
 

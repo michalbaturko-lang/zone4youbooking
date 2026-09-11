@@ -15,6 +15,8 @@ Tento runbook neuděluje oprávnění k deployi, DNS změně ani živé mutaci. 
 
 Výchozí a rollback hodnoty jsou `BOOKING_MUTATIONS_ENABLED=false`, `BOOKING_RULES_CONFIRMED=false` a `PAYMENT_MUTATIONS_ENABLED=false`. `BOOKING_RULES_CONFIRMED=true` není technický bypass: profil `config/business-rules-profile.json` už zaznamenává bezplatné běžné storno do `00:00 Europe/Prague` na začátku dne lekce, ale musí být doplněn o pozdní/no-show částky, možnost pozdního online storna, Reformer, rezervační okno a kreditní mechaniku. Teprve potom se změní na `confirmed`, musí odpovídat implementaci a jeho přesný výstup `npm run inspect:business-rules` musí být schválen v `BOOKING_RULES_PROFILE_SHA256`. Jakákoli změna obsahu SHA zneplatní. Každé zapnutí je samostatná cutover akce, nikoli běžná konfigurace.
 
+Reformer může být v potvrzeném profilu označen jako `same_as_group`, nebo mít vlastní `custom` cutoff `hours_before_start`, pozdní/no-show částky a příznak povoleného pozdního online storna. Server před každým živým stornem znovu dohledá výskyt v aktuálním schváleném feedu a pravidlo vyhodnotí; chybějící lekce, neplatný cutoff nebo uzavřené online storno skončí před Luxart `DELETE` zápisem.
+
 ## Povinné předstartovní důkazy
 
 1. `npm run quality` je zelené.

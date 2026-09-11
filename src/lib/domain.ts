@@ -163,15 +163,35 @@ export interface BookingCapabilities {
   englishEnabled: true;
 }
 
+export type FreeCancellationCutoff = {
+  mode: "lesson_day_midnight";
+  timeZone: "Europe/Prague";
+} | {
+  mode: "hours_before_start";
+  hours: number;
+};
+
+export interface CancellationPolicy {
+  freeCancellationCutoff: FreeCancellationCutoff;
+  lateCancelFeeKc: number;
+  noShowFeeKc: number;
+  lateCancellationAllowed: boolean;
+}
+
+export type ReformerCancellationPolicy = {
+  mode: "same_as_group";
+} | ({
+  mode: "custom";
+} & CancellationPolicy);
+
 export interface BookingRules {
   resortId: number;
   scheduleDays: number;
-  freeCancellationCutoff: {
-    mode: "lesson_day_midnight";
-    timeZone: "Europe/Prague";
-  };
+  freeCancellationCutoff: FreeCancellationCutoff;
   lateCancelFeeKc: number;
   noShowFeeKc: number;
+  lateCancellationAllowed: boolean;
+  reformerCancellation: ReformerCancellationPolicy;
   minimumCreditForReservationKc: number;
   reservationHoldKc: number;
   reservationWindowHours: number;

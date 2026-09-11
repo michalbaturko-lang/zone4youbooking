@@ -42,7 +42,7 @@
   "reservations.policyPending": "Cancellation and credit terms are awaiting Zone4You confirmation.",
   "reservations.demoPolicy": "Demo terms – these are not the final pilot rules.",
   "reservations.reformerPolicyPending": "Reformer cancellation terms are awaiting confirmation; other values are for demonstration only.",
-  "reservations.cancelClosed": "The class has started",
+  "reservations.cancelClosed": "Online cancellation is closed",
   "reservations.cancelling": "Cancelling...",
   "reservations.cancel": "Cancel",
   "reservations.temporarilyUnavailable": "Temporarily unavailable",

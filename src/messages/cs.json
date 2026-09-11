@@ -42,7 +42,7 @@
   "reservations.policyPending": "Storno a kreditní podmínky čekají na potvrzení Zone4You.",
   "reservations.demoPolicy": "Ukázkové podmínky – nejde o finální pravidla pilotu.",
   "reservations.reformerPolicyPending": "Storno podmínky Reformeru čekají na potvrzení; ostatní hodnoty jsou pouze ukázkové.",
-  "reservations.cancelClosed": "Lekce už začala",
+  "reservations.cancelClosed": "Online storno je uzavřené",
   "reservations.cancelling": "Ruším...",
   "reservations.cancel": "Zrušit",
   "reservations.temporarilyUnavailable": "Dočasně nedostupné",

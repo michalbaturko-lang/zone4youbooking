@@ -9,6 +9,8 @@ import {
   confirmedBusinessRulesEnvironment,
   confirmedBusinessRulesProfile,
 } from "./testBusinessRules";
+import { bookingRules } from "../src/lib/bookingRules";
+import type { BookingRules } from "../src/lib/domain";
 
 test("checked-in business rules record the free-cancellation midnight but stay provisional", () => {
   assert.equal(businessRulesProfile.status, "provisional");
@@ -47,6 +49,39 @@ test("a confirmed profile must match both implementation values and its exact di
       ...confirmedBusinessRulesProfile,
       reservationWindow: { mode: "rolling_hours", hours: 24 },
     }),
+    false,
+  );
+});
+
+test("a custom Reformer cancellation policy must match every implemented value", () => {
+  const reformerCancellation = {
+    mode: "custom" as const,
+    freeCancellationCutoff: { mode: "hours_before_start" as const, hours: 24 },
+    lateFeeKc: 320,
+    noShowFeeKc: 320,
+    lateCancellationAllowed: false,
+  };
+  const profile = {
+    ...confirmedBusinessRulesProfile,
+    reformerCancellation,
+  };
+  const implementation: BookingRules = {
+    ...bookingRules,
+    reformerCancellation: {
+      mode: "custom",
+      freeCancellationCutoff: reformerCancellation.freeCancellationCutoff,
+      lateCancelFeeKc: reformerCancellation.lateFeeKc,
+      noShowFeeKc: reformerCancellation.noShowFeeKc,
+      lateCancellationAllowed: reformerCancellation.lateCancellationAllowed,
+    },
+  };
+
+  assert.equal(businessRulesProfileMatchesImplementation(profile, implementation), true);
+  assert.equal(
+    businessRulesProfileMatchesImplementation(
+      { ...profile, reformerCancellation: { ...reformerCancellation, lateFeeKc: 200 } },
+      implementation,
+    ),
     false,
   );
 });

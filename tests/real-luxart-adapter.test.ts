@@ -309,9 +309,11 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
   const created = await adapter.createReservation({ lessonId: lessons[0].id });
   assert.equal(created.id, "987");
   assert.equal(capturedReservationBody?.id_resource_1, 207);
+  const lessonReadsBeforeCancellation = capturedLessonQueries.length;
   const cancelled = await adapter.cancelReservation({ reservationId: created.id });
   assert.equal(cancelled.status, "cancelled");
   assert.equal(reservationCancelled, true);
+  assert.equal(capturedLessonQueries.length, lessonReadsBeforeCancellation + 1);
 
   user.current_balance = 199;
   const lowCreditAdapter = createRealLuxartAdapter({ userId: "42", locale: "en" });

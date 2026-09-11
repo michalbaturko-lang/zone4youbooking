@@ -81,6 +81,8 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
     },
     lateCancelFeeKc: 100,
     noShowFeeKc: 100,
+    lateCancellationAllowed: true,
+    reformerCancellation: { mode: "same_as_group" },
     minimumCreditForReservationKc: 200,
     reservationHoldKc: 100,
     reservationWindowHours: 48,

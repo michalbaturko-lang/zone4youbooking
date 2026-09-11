@@ -12,12 +12,15 @@ import type {
   User,
   WaitlistEntry,
 } from "./domain";
-import { bookingRules } from "./bookingRules";
+import {
+  bookingRules,
+  cancellationPolicyForLesson,
+  canCancelLessonAt,
+  freeCancellationDeadlineForLesson,
+} from "./bookingRules";
 import { BookingApiError } from "./errors";
-import { zone4YouDateKey, zone4YouStartOfDay } from "./zone4YouTime";
 
 const RESORT_ID = bookingRules.resortId;
-const LATE_CANCELLATION_FEE_KC = bookingRules.lateCancelFeeKc;
 const MINIMUM_CREDIT_FOR_RESERVATION_KC = bookingRules.minimumCreditForReservationKc;
 const RESERVATION_HOLD_KC = bookingRules.reservationHoldKc;
 const RESERVATION_WINDOW_HOURS = bookingRules.reservationWindowHours;
@@ -505,11 +508,13 @@ export const mockLuxartAdapter: LuxartAdapter = {
     const lesson = lessons.find((item) => item.id === reservation.lessonId);
     if (!lesson) throw new Error("Lekce nebyla nalezena.");
 
-    if (new Date(lesson.startsAt).getTime() <= Date.now()) {
-      throw new Error("Lekce už začala.");
+    const now = new Date();
+    if (!canCancelLessonAt(lesson, bookingRules, now)) {
+      throw new Error("Online storno je uzavřené.");
     }
-    const freeUntil = new Date(zone4YouStartOfDay(zone4YouDateKey(lesson.startsAt))).getTime();
-    const cancellationFeeKc = Date.now() < freeUntil ? 0 : LATE_CANCELLATION_FEE_KC;
+    const freeUntil = new Date(freeCancellationDeadlineForLesson(lesson, bookingRules)).getTime();
+    const cancellationPolicy = cancellationPolicyForLesson(lesson, bookingRules);
+    const cancellationFeeKc = now.getTime() < freeUntil ? 0 : cancellationPolicy.lateCancelFeeKc;
     const holdKc = reservation.holdAmountKc ?? RESERVATION_HOLD_KC;
     const refundKc = Math.max(0, holdKc - cancellationFeeKc);
     if (refundKc > 0) {

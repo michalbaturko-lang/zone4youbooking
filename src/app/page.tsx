@@ -26,14 +26,18 @@ import {
   type ReactNode,
 } from "react";
 import { BookingApiClientError, bookingApiClient } from "@/lib/bookingApiClient";
-import { bookingRules as fallbackRules } from "@/lib/bookingRules";
+import {
+  bookingRules as fallbackRules,
+  canCancelLessonAt,
+  freeCancellationDeadlineForLesson,
+  isReformerLesson,
+} from "@/lib/bookingRules";
 import type { BookingCapabilities, BookingRules, BookingSnapshot, Lesson, LoginInput, Reservation, WaitlistEntry } from "@/lib/domain";
 import { useI18n } from "./providers";
 import type { Locale, Translate } from "@/lib/i18n";
 import {
   addZone4YouCalendarDays,
   zone4YouDateKey,
-  zone4YouStartOfDay,
   zone4YouTimeZone,
 } from "@/lib/zone4YouTime";
 
@@ -248,27 +252,8 @@ function hasMinimumCredit(creditBalanceKc: number, rules: BookingRules) {
   return Number.isFinite(creditBalanceKc) && creditBalanceKc >= rules.minimumCreditForReservationKc;
 }
 
-function isReformerLesson(lesson: Lesson) {
-  return [lesson.name, lesson.category, lesson.roomName]
-    .some((value) => value.toUpperCase().includes("REFORMER"));
-}
-
 function addDaysToKey(dayKey: string, offset: number) {
   return addZone4YouCalendarDays(dayKey, offset);
-}
-
-function freeCancellationDeadline(lesson: Lesson, rules: BookingRules) {
-  if (
-    rules.freeCancellationCutoff.mode !== "lesson_day_midnight" ||
-    rules.freeCancellationCutoff.timeZone !== zone4YouTimeZone
-  ) {
-    throw new Error("Unsupported cancellation cutoff.");
-  }
-  return zone4YouStartOfDay(zone4YouDateKey(lesson.startsAt));
-}
-
-function canCancelReservation(lesson: Lesson) {
-  return Date.now() < new Date(lesson.startsAt).getTime();
 }
 
 function reservationHold(reservation: Reservation, rules: BookingRules) {
@@ -966,7 +951,9 @@ export default function Home() {
                   <>
                     {activeReservations.map((reservation) => {
                       const lesson = lessonById.get(reservation.lessonId);
-                      const cancellationOpen = capabilities.reservationsEnabled && lesson ? canCancelReservation(lesson) : false;
+                      const cancellationOpen = capabilities.reservationsEnabled && lesson
+                        ? canCancelLessonAt(lesson, rules)
+                        : false;
                       const policyVisible = ["demo", "confirmed"].includes(capabilities.businessRulesStatus);
                       const reformerDemoPolicyPending = capabilities.businessRulesStatus === "demo" && Boolean(lesson && isReformerLesson(lesson));
                       return (
@@ -984,7 +971,7 @@ export default function Home() {
                             </p>
                             {lesson && policyVisible && !reformerDemoPolicyPending && (
                               <span className="reservation-note">
-                                {t("reservations.freeCancelUntil", { deadline: formatDateTime(freeCancellationDeadline(lesson, rules), locale) })}
+                                {t("reservations.freeCancelUntil", { deadline: formatDateTime(freeCancellationDeadlineForLesson(lesson, rules), locale) })}
                               </span>
                             )}
                             {capabilities.businessRulesStatus !== "confirmed" && (
@@ -1447,7 +1434,7 @@ function LessonModal({
                 <div className="modal-info-row">
                   <span className="modal-info-label">{t("lesson.cancelOnline")}</span>
                   <span className="modal-info-value">
-                    {t("lesson.freeCancelUntil", { date: formatDateTime(freeCancellationDeadline(lesson, rules), locale) })}
+                    {t("lesson.freeCancelUntil", { date: formatDateTime(freeCancellationDeadlineForLesson(lesson, rules), locale) })}
                   </span>
                 </div>
             ) : reformerDemoPolicyPending ? (

@@ -35,7 +35,7 @@ import {
   type LuxartWatchdogResult,
 } from "./luxartContract";
 import { createHash, randomUUID } from "node:crypto";
-import { bookingRules } from "./bookingRules";
+import { bookingRules, canCancelLessonAt } from "./bookingRules";
 import { BookingApiError, BookingMutationOutcomeUnknownError } from "./errors";
 import type { Locale } from "./i18n";
 import { loadLuxartGatewayAuthConfig } from "./luxartGatewayAuth";
@@ -536,6 +536,20 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
       );
       if (!reservation || !reservation.luxartCategoryId) {
         throw new BookingApiError(404, "RESERVATION_NOT_FOUND", "Rezervace nebyla nalezena.");
+      }
+
+      const lessonRange = zone4YouScheduleRange(new Date(), bookingRules.scheduleDays);
+      const lesson = (await this.getLessons({ ...lessonRange, resortId: config.resortId }))
+        .find((candidate) => candidate.id === reservation.lessonId);
+      if (!lesson) {
+        throw new BookingApiError(
+          409,
+          "CANCELLATION_POLICY_UNAVAILABLE",
+          "Pravidla storna této rezervace nelze bezpečně ověřit.",
+        );
+      }
+      if (!canCancelLessonAt(lesson, bookingRules)) {
+        throw new BookingApiError(409, "CANCELLATION_CLOSED", "Online storno této rezervace je uzavřené.");
       }
 
       const response = await luxartFetch<LuxartReservationDeleteResult[] | LuxartReservationDeleteResult>(
