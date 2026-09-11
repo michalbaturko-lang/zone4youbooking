@@ -44,6 +44,22 @@ export function externalDemoOrigin(environment: Environment = process.env) {
   return url.origin;
 }
 
+export function externalDemoRequestHeaders(environment: Environment = process.env): Record<string, string> {
+  return externalDemoOrigin(environment)
+    ? { "x-vercel-skip-toolbar": "1" }
+    : {};
+}
+
+export function isExpectedExternalDemoConsoleNoise(
+  message: string,
+  environment: Environment = process.env,
+) {
+  if (!externalDemoOrigin(environment)) return false;
+  return message.includes("https://vercel.live/_next-live/feedback/feedback.js") &&
+    message.includes("violates the following Content Security Policy directive") &&
+    message.endsWith("The action has been blocked.");
+}
+
 export function assertExternalDemoReadiness(payload: DemoReadiness) {
   const safeDemo = payload.status === "ready" &&
     payload.mode === "demo" &&

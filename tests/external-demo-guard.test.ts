@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   assertExternalDemoReadiness,
   externalDemoOrigin,
+  externalDemoRequestHeaders,
+  isExpectedExternalDemoConsoleNoise,
   verifyExternalDemoTarget,
 } from "../e2e/external-demo-guard";
 
@@ -33,6 +35,30 @@ test("external browser regression accepts only isolated Zone4You HTTPS previews"
   ]) {
     assert.throws(() => externalDemoOrigin({ PLAYWRIGHT_EXTERNAL_DEMO_URL: unsafe }), /root HTTPS|restricted/i);
   }
+});
+
+test("external browser regression disables only the Vercel Preview toolbar", () => {
+  assert.deepEqual(externalDemoRequestHeaders({}), {});
+  assert.deepEqual(
+    externalDemoRequestHeaders({ PLAYWRIGHT_EXTERNAL_DEMO_URL: `${previewUrl}/` }),
+    { "x-vercel-skip-toolbar": "1" },
+  );
+});
+
+test("external browser regression ignores only Vercel toolbar CSP noise", () => {
+  const toolbarCspError = "Loading the script 'https://vercel.live/_next-live/feedback/feedback.js' violates the following Content Security Policy directive: script-src. The action has been blocked.";
+  const previewEnvironment = { PLAYWRIGHT_EXTERNAL_DEMO_URL: `${previewUrl}/` };
+
+  assert.equal(isExpectedExternalDemoConsoleNoise(toolbarCspError, previewEnvironment), true);
+  assert.equal(isExpectedExternalDemoConsoleNoise(toolbarCspError, {}), false);
+  assert.equal(isExpectedExternalDemoConsoleNoise("Application failed to load.", previewEnvironment), false);
+  assert.equal(
+    isExpectedExternalDemoConsoleNoise(
+      "Loading the script 'https://example.com/feedback.js' violates the following Content Security Policy directive: script-src. The action has been blocked.",
+      previewEnvironment,
+    ),
+    false,
+  );
 });
 
 test("external browser regression requires the complete demo/mock capability profile", () => {

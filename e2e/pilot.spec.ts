@@ -1,11 +1,17 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import {
+  externalDemoRequestHeaders,
+  isExpectedExternalDemoConsoleNoise,
+} from "./external-demo-guard";
 
 function captureUnexpectedBrowserErrors(page: Page) {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
   page.on("console", (message) => {
-    if (message.type() === "error") errors.push(`console: ${message.text()}`);
+    if (message.type() !== "error") return;
+    const text = message.text();
+    if (!isExpectedExternalDemoConsoleNoise(text)) errors.push(`console: ${text}`);
   });
   return errors;
 }
@@ -14,7 +20,10 @@ let isolatedTestClient = 0;
 
 async function openCleanDemo(page: Page) {
   isolatedTestClient += 1;
-  await page.setExtraHTTPHeaders({ "x-forwarded-for": `198.51.100.${isolatedTestClient}` });
+  await page.setExtraHTTPHeaders({
+    "x-forwarded-for": `198.51.100.${isolatedTestClient}`,
+    ...externalDemoRequestHeaders(),
+  });
   await page.goto("/");
   await page.evaluate(() => window.localStorage.clear());
   await page.reload();
