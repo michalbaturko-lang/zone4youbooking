@@ -127,25 +127,43 @@ test("rejects a Luxart user without a valid positive ID and finite credit", () =
 });
 
 test("maps an active reservation back to the same Luxart lesson occurrence", () => {
-  const reservation = mapLuxartReservation(
-    {
-      resort: 1,
-      id_rezervace: 987,
-      id_kategorie: 12,
-      datum: "2026-09-01T16:30:00+02:00",
-      id_service: 321,
-      delka: 50,
-      id_resource: 2,
-      price: 180,
-      status: 1,
-      uuid: "test-uuid",
-    },
-    "42",
-  );
+  const source = {
+    resort: 1,
+    id_rezervace: 987,
+    id_kategorie: 12,
+    datum: "2026-09-01T16:30:00+02:00",
+    id_service: 321,
+    delka: 50,
+    id_resource: 2,
+    price: 180,
+    status: 1,
+    uuid: "test-uuid",
+  };
+  const reservation = mapLuxartReservation(source, "42", 1);
 
   assert.equal(reservation.id, "987");
   assert.equal(reservation.lessonId, "luxart:1:12:321:2026-09-01T14:30:00.000Z");
   assert.equal(reservation.luxartUuid, "test-uuid");
+
+  for (const invalid of [
+    { resort: 0 },
+    { id_rezervace: 0 },
+    { id_kategorie: 0 },
+    { id_service: 0 },
+    { delka: 0 },
+    { id_resource: 0 },
+    { price: Number.NaN },
+    { price: -1 },
+    { status: Number.NaN },
+    { datum: "invalid" },
+  ]) {
+    assert.throws(
+      () => mapLuxartReservation({ ...source, ...invalid }, "42", 1),
+      /invalid/i,
+    );
+  }
+  assert.throws(() => mapLuxartReservation(source, "invalid-user", 1), /invalid/i);
+  assert.throws(() => mapLuxartReservation({ ...source, resort: 2 }, "42", 1), /invalid/i);
 });
 
 test("derives running credit balances from newest Luxart history entry", () => {
@@ -176,6 +194,45 @@ test("derives running credit balances from newest Luxart history entry", () => {
   assert.equal(transactions[0].balanceAfterKc, 1_400);
   assert.equal(transactions[1].type, "reservation_charge");
   assert.equal(transactions[1].balanceAfterKc, 900);
+
+  const validEntry = {
+    resort: 1,
+    datum: "2026-08-29T08:00:00Z",
+    castka: 500,
+    cdd: 10,
+    text: "Dobití kreditu",
+    sportoviste: 1010,
+  };
+  for (const invalid of [
+    { resort: 0 },
+    { datum: "invalid" },
+    { castka: Number.NaN },
+    { cdd: 0 },
+  ]) {
+    assert.throws(
+      () => mapLuxartCreditHistory([{ ...validEntry, ...invalid }], "42", 1_400, 1),
+      /invalid/i,
+    );
+  }
+  assert.throws(() => mapLuxartCreditHistory([validEntry], "invalid-user", 1_400, 1), /invalid/i);
+  assert.throws(() => mapLuxartCreditHistory([validEntry], "42", Number.NaN, 1), /invalid/i);
+  assert.throws(
+    () => mapLuxartCreditHistory([validEntry, { ...validEntry }], "42", 1_400, 1),
+    /duplicate/i,
+  );
+  assert.equal(
+    mapLuxartCreditHistory(
+      [validEntry, { ...validEntry, datum: "2026-08-28T08:00:00Z" }],
+      "42",
+      1_400,
+      1,
+    ).length,
+    2,
+  );
+  assert.throws(
+    () => mapLuxartCreditHistory([{ ...validEntry, resort: 2 }], "42", 1_400, 1),
+    /invalid/i,
+  );
 });
 
 test("builds the documented reservation payload only with an explicit resource mapping", () => {
@@ -214,6 +271,25 @@ test("maps the documented Luxart watchdog as a seat alert without inventing a qu
   assert.equal(parseLuxartWatchdogId("watchdog:777"), 777);
   assert.equal(parseLuxartWatchdogId("wl-777"), null);
   assert.throws(() => buildLuxartWatchdogInsert(lesson, "42", 0, "cz"), /resource mapping/i);
+  for (const invalid of [
+    { resort: 0 },
+    { id_kategorie: 0 },
+    { user_id: 999 },
+    { datum: "invalid" },
+    { id_service_1: 0 },
+    { delka_1: 0 },
+    { id_resource_1: 0 },
+    { id_watchdog: 0 },
+  ]) {
+    assert.throws(
+      () => mapLuxartWatchdog({ ...payload, id_watchdog: 777, ...invalid }, "42", [lesson], 1),
+      /invalid/i,
+    );
+  }
+  assert.throws(
+    () => mapLuxartWatchdog({ ...payload, id_watchdog: 777, resort: 2 }, "42", [lesson], 1),
+    /invalid/i,
+  );
 });
 
 test("maps a verified Stripe top-up to the documented Luxart credit payment payload", () => {

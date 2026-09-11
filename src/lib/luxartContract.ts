@@ -160,8 +160,8 @@ export interface LuxartPaymentResult {
   id_mp: number;
 }
 
-function text(value: string | null | undefined, fallback: string) {
-  const normalized = value?.trim();
+function text(value: unknown, fallback: string) {
+  const normalized = typeof value === "string" ? value.trim() : "";
   return normalized || fallback;
 }
 
@@ -390,17 +390,38 @@ export function mapLuxartWatchdog(
   data: LuxartWatchdogData,
   userId: string,
   lessons: Lesson[],
+  expectedResort?: number,
 ): WaitlistEntry | null {
-  const startsAt = new Date(data.datum);
-  const watchdogId = number(data.id_watchdog);
-  if (Number.isNaN(startsAt.getTime()) || !Number.isInteger(watchdogId) || watchdogId <= 0) {
-    throw new Error("Luxart watchdog contains an invalid identifier or date.");
+  const resort = requiredNumber(data?.resort);
+  const categoryId = requiredNumber(data?.id_kategorie);
+  const responseUserId = requiredNumber(data?.user_id);
+  const expectedUserId = requiredNumber(userId);
+  const serviceId = requiredNumber(data?.id_service_1);
+  const durationMinutes = requiredNumber(data?.delka_1);
+  const resourceId = requiredNumber(data?.id_resource_1);
+  const watchdogId = requiredNumber(data?.id_watchdog);
+  const startsAtValue = typeof data?.datum === "string" ? data.datum.trim() : "";
+  const startsAt = new Date(startsAtValue);
+  if (
+    !Number.isSafeInteger(resort) || resort <= 0 ||
+    (expectedResort !== undefined && resort !== expectedResort) ||
+    !Number.isSafeInteger(categoryId) || categoryId <= 0 ||
+    !Number.isSafeInteger(responseUserId) || responseUserId <= 0 ||
+    !Number.isSafeInteger(expectedUserId) || expectedUserId <= 0 ||
+    responseUserId !== expectedUserId ||
+    !Number.isSafeInteger(serviceId) || serviceId <= 0 ||
+    !Number.isSafeInteger(durationMinutes) || durationMinutes <= 0 ||
+    !Number.isSafeInteger(resourceId) || resourceId <= 0 ||
+    !Number.isSafeInteger(watchdogId) || watchdogId <= 0 ||
+    Number.isNaN(startsAt.getTime())
+  ) {
+    throw new Error("Luxart watchdog contains invalid required fields.");
   }
   const lesson = lessons.find((candidate) => {
     const candidateStart = new Date(candidate.startsAt).getTime();
     return (
-      candidate.serviceId === String(data.id_service_1) &&
-      candidate.luxartCategoryId === number(data.id_kategorie) &&
+      candidate.serviceId === String(serviceId) &&
+      candidate.luxartCategoryId === categoryId &&
       Math.abs(candidateStart - startsAt.getTime()) < 60_000
     );
   });
@@ -475,28 +496,57 @@ export function mapLuxartCreditPayment(
   };
 }
 
-export function mapLuxartReservation(data: LuxartReservationData, userId: string): Reservation {
-  const startsAt = new Date(data.datum);
+export function mapLuxartReservation(
+  data: LuxartReservationData,
+  userId: string,
+  expectedResort?: number,
+): Reservation {
+  const resort = requiredNumber(data?.resort);
+  const reservationId = requiredNumber(data?.id_rezervace);
+  const categoryId = requiredNumber(data?.id_kategorie);
+  const serviceId = requiredNumber(data?.id_service);
+  const durationMinutes = requiredNumber(data?.delka);
+  const resourceId = requiredNumber(data?.id_resource);
+  const priceKc = requiredNumber(data?.price);
+  const status = requiredNumber(data?.status);
+  const numericUserId = requiredNumber(userId);
+  if (
+    !Number.isSafeInteger(resort) || resort <= 0 ||
+    (expectedResort !== undefined && resort !== expectedResort) ||
+    !Number.isSafeInteger(reservationId) || reservationId <= 0 ||
+    !Number.isSafeInteger(categoryId) || categoryId <= 0 ||
+    !Number.isSafeInteger(serviceId) || serviceId <= 0 ||
+    !Number.isSafeInteger(durationMinutes) || durationMinutes <= 0 ||
+    !Number.isSafeInteger(resourceId) || resourceId <= 0 ||
+    !Number.isFinite(priceKc) || priceKc < 0 ||
+    !Number.isSafeInteger(status) ||
+    !Number.isSafeInteger(numericUserId) || numericUserId <= 0
+  ) {
+    throw new Error("Luxart reservation contains invalid required fields.");
+  }
+
+  const startsAtValue = typeof data?.datum === "string" ? data.datum.trim() : "";
+  const startsAt = new Date(startsAtValue);
   if (Number.isNaN(startsAt.getTime())) {
     throw new Error("Luxart reservation contains an invalid datum value.");
   }
 
   const occurrenceId = luxartLessonOccurrenceId({
-    resort: number(data.resort),
-    categoryId: number(data.id_kategorie),
-    serviceId: number(data.id_service),
+    resort,
+    categoryId,
+    serviceId,
     startsAt: startsAt.toISOString(),
   });
 
   return {
-    id: String(data.id_rezervace),
+    id: String(reservationId),
     userId,
     lessonId: `luxart:${occurrenceId}`,
     status: "active",
     reservedAt: startsAt.toISOString(),
-    priceKc: Math.max(0, number(data.price)),
+    priceKc,
     luxartUuid: text(data.uuid, "") || undefined,
-    luxartCategoryId: number(data.id_kategorie),
+    luxartCategoryId: categoryId,
   };
 }
 
@@ -513,15 +563,55 @@ export function mapLuxartCreditHistory(
   entries: LuxartPaymentHistory[],
   userId: string,
   currentBalanceKc: number,
+  expectedResort?: number,
 ): CreditTransaction[] {
+  const numericUserId = requiredNumber(userId);
+  if (
+    !Array.isArray(entries) ||
+    !Number.isSafeInteger(numericUserId) || numericUserId <= 0 ||
+    !Number.isFinite(currentBalanceKc)
+  ) {
+    throw new Error("Luxart credit history context is invalid.");
+  }
+
+  const normalized = entries.map((entry) => {
+    const resort = requiredNumber(entry?.resort);
+    const amountKc = requiredNumber(entry?.castka);
+    const historyId = requiredNumber(entry?.cdd);
+    const occurredAtValue = typeof entry?.datum === "string" ? entry.datum.trim() : "";
+    const occurredAtDate = new Date(occurredAtValue);
+    if (
+      !Number.isSafeInteger(resort) || resort <= 0 ||
+      (expectedResort !== undefined && resort !== expectedResort) ||
+      !Number.isFinite(amountKc) ||
+      !Number.isSafeInteger(historyId) || historyId <= 0 ||
+      Number.isNaN(occurredAtDate.getTime())
+    ) {
+      throw new Error("Luxart credit history contains invalid required fields.");
+    }
+    return {
+      entry,
+      amountKc,
+      historyId,
+      occurredAt: occurredAtDate.toISOString(),
+    };
+  });
+
+  const historyIds = new Set<string>();
+  for (const item of normalized) {
+    const transactionId = `${item.historyId}:${item.occurredAt}`;
+    if (historyIds.has(transactionId)) {
+      throw new Error("Luxart credit history contains duplicate identifiers.");
+    }
+    historyIds.add(transactionId);
+  }
+
   let balance = currentBalanceKc;
-  return [...entries]
-    .sort((first, second) => new Date(second.datum).getTime() - new Date(first.datum).getTime())
-    .map((entry) => {
-      const amountKc = number(entry.castka);
-      const occurredAt = new Date(entry.datum).toISOString();
+  return normalized
+    .sort((first, second) => second.occurredAt.localeCompare(first.occurredAt))
+    .map(({ entry, amountKc, historyId, occurredAt }) => {
       const transaction: CreditTransaction = {
-        id: `luxart-credit:${entry.cdd}:${occurredAt}`,
+        id: `luxart-credit:${historyId}:${occurredAt}`,
         userId,
         type: creditTransactionType(entry),
         amountKc,
@@ -530,6 +620,9 @@ export function mapLuxartCreditHistory(
         note: text(entry.text, text(entry.uhrada, "")) || undefined,
       };
       balance -= amountKc;
+      if (!Number.isFinite(balance)) {
+        throw new Error("Luxart credit history produces an invalid balance.");
+      }
       return transaction;
     });
 }

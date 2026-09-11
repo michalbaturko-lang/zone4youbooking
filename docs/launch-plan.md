@@ -46,6 +46,7 @@ Poznámka: audit neprovedl vytvoření ani zrušení skutečné rezervace. Tyto 
 - podepsaná serverová session v produkční `HttpOnly`, `Secure`, `SameSite=Lax` cookie; Luxart `user_id` se neposílá klientovi jako autorita;
 - live login a následný refresh odmítnou neúplnou Luxart identitu: session vznikne pouze pro kladné celočíselné `user_id` a konečný stav kreditu; vadný upstream payload vrací privacy-safe `502` bez cookie;
 - živý výpis odmítne celý vadný Luxart feed místo tichého převodu chybějících nebo neplatných čísel na nulu; kontroluje zejména resort, kategorii, službu, délku, cenu, kapacitu, obsazenost a sál, ale zachová všechny platné neznámé sály a typy lekcí;
+- seznam rezervací, historie kreditu a watchdog jsou stejně fail-closed: odmítnou nečíselná nebo nulová povinná ID, neplatná data a částky, cizí resort, watchdog jiného klienta, duplicitní výsledné identifikátory i odpověď, která není pole; chyba se normalizuje na privacy-safe `502` místo částečného účtu;
 - live logout je lokální bezpečnostní operace nezávislá na Luxart endpointu a rate-limit databázi; důvěryhodný Origin cookie vždy smaže, cizí Origin dostane `403` bez změny session;
 - živé mapování uživatele, kreditu, všech `api/Lesson` položek a seznamu/vytvoření/storna rezervace;
 - kontrola původu mutačních požadavků a bezpečné normalizované chyby API;

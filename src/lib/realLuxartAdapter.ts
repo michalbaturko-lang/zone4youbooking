@@ -273,6 +273,58 @@ function mapValidatedLuxartLesson(data: LuxartLessonData, mapping: LuxartLessonM
   }
 }
 
+function asValidatedLuxartArray<T>(value: unknown): T[] {
+  if (!Array.isArray(value)) {
+    throw new BookingApiError(502, "LUXART_RESPONSE_INVALID", "Luxart vrátil neplatný seznam dat.");
+  }
+  return value as T[];
+}
+
+function assertUniqueResponseIds<T extends { id: string }>(items: T[]) {
+  const ids = new Set<string>();
+  for (const item of items) {
+    if (ids.has(item.id)) {
+      throw new BookingApiError(502, "LUXART_RESPONSE_INVALID", "Luxart vrátil duplicitní identifikátory.");
+    }
+    ids.add(item.id);
+  }
+  return items;
+}
+
+function mapValidatedLuxartReservation(data: LuxartReservationData, userId: string, resortId: number) {
+  try {
+    return mapLuxartReservation(data, userId, resortId);
+  } catch {
+    throw new BookingApiError(502, "LUXART_RESPONSE_INVALID", "Luxart vrátil neplatná data rezervace.");
+  }
+}
+
+function mapValidatedLuxartWatchdog(
+  data: LuxartWatchdogData,
+  userId: string,
+  lessons: Lesson[],
+  resortId: number,
+) {
+  try {
+    return mapLuxartWatchdog(data, userId, lessons, resortId);
+  } catch {
+    throw new BookingApiError(502, "LUXART_RESPONSE_INVALID", "Luxart vrátil neplatná data hlídání místa.");
+  }
+}
+
+function mapValidatedLuxartCreditHistory(
+  entries: LuxartPaymentHistory[],
+  userId: string,
+  currentBalanceKc: number,
+  resortId: number,
+) {
+  try {
+    return mapLuxartCreditHistory(entries, userId, currentBalanceKc, resortId);
+  } catch {
+    throw new BookingApiError(502, "LUXART_RESPONSE_INVALID", "Luxart vrátil neplatnou historii kreditu.");
+  }
+}
+
 export function assertReservationPreconditions(lesson: Lesson, user: User, now = new Date()) {
   const nowTime = now.getTime();
   const startTime = new Date(lesson.startsAt).getTime();
@@ -327,6 +379,9 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
   function requireCurrentUserId() {
     const userId = currentUserId();
     if (!userId) throw new BookingApiError(401, "AUTH_REQUIRED", "Pro tuto akci se přihlaste.");
+    if (!/^[1-9]\d*$/.test(userId) || !Number.isSafeInteger(Number(userId))) {
+      throw new BookingApiError(401, "SESSION_INVALID", "Přihlášení vypršelo. Přihlaste se znovu.");
+    }
     return userId;
   }
 
@@ -380,7 +435,7 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
       if (query.resortId !== undefined && query.resortId !== config.resortId) {
         throw new BookingApiError(400, "RESORT_OUT_OF_SCOPE", "Rozvrh je dostupný pouze pro Zone4You.");
       }
-      const lessons = await luxartFetch<LuxartLessonData[]>(
+      const response = await luxartFetch<unknown>(
         config,
         queryPath("/api/Lesson", {
           resort: config.resortId,
@@ -394,7 +449,8 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
         undefined,
         "lesson list",
       );
-      if (lessons.some((lesson) => Number(lesson.resort) !== config.resortId)) {
+      const lessons = asValidatedLuxartArray<LuxartLessonData>(response);
+      if (lessons.some((lesson) => Number(lesson?.resort) !== config.resortId)) {
         throw new BookingApiError(502, "LUXART_RESPONSE_INVALID", "Luxart vrátil lekci mimo Zone4You resort.");
       }
       const mapping = mappingFromEnvironment(context.locale);
@@ -408,7 +464,7 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
     async getReservations(): Promise<Reservation[]> {
       const userId = requireCurrentUserId();
       try {
-        const reservations = await luxartFetch<LuxartReservationData[]>(
+        const response = await luxartFetch<unknown>(
           config,
           queryPath("/api/Reservations", {
             user_id: userId,
@@ -419,9 +475,9 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
           undefined,
           "reservation list",
         );
-        return reservations
-          .filter((reservation) => Number(reservation.resort) === config.resortId)
-          .map((reservation) => mapLuxartReservation(reservation, userId));
+        const reservations = asValidatedLuxartArray<LuxartReservationData>(response)
+          .map((reservation) => mapValidatedLuxartReservation(reservation, userId, config.resortId));
+        return assertUniqueResponseIds(reservations);
       } catch (error) {
         if (error instanceof LuxartHttpError && error.upstreamStatus === 404) return [];
         throw error;
@@ -432,21 +488,22 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
       const userId = requireCurrentUserId();
       if (process.env.LUXART_WAITLIST_ENABLED !== "true") return [];
       try {
-        const entries = await luxartFetch<LuxartWatchdogData[]>(
+        const response = await luxartFetch<unknown>(
           config,
           queryPath("/api/watchdog_II/user", { user_id: userId }),
           undefined,
           "watchdog list",
         );
+        const entries = asValidatedLuxartArray<LuxartWatchdogData>(response);
         const range = zone4YouScheduleRange(new Date(), 31);
         const lessons = await this.getLessons({
           ...range,
           resortId: config.resortId,
         });
-        return entries
-          .filter((entry) => Number(entry.resort) === config.resortId)
-          .map((entry) => mapLuxartWatchdog(entry, userId, lessons))
+        const waitlist = entries
+          .map((entry) => mapValidatedLuxartWatchdog(entry, userId, lessons, config.resortId))
           .filter((entry): entry is WaitlistEntry => entry !== null);
+        return assertUniqueResponseIds(waitlist);
       } catch (error) {
         if (error instanceof LuxartHttpError && error.upstreamStatus === 404) return [];
         throw error;
@@ -458,7 +515,7 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
       const user = await this.getCurrentUser();
       if (!user) throw new BookingApiError(401, "SESSION_INVALID", "Přihlášení vypršelo. Přihlaste se znovu.");
       try {
-        const entries = await luxartFetch<LuxartPaymentHistory[]>(
+        const response = await luxartFetch<unknown>(
           config,
           queryPath("/api/user/credit_history", {
             user_id: user.id,
@@ -467,10 +524,12 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
           undefined,
           "credit history",
         );
-        return mapLuxartCreditHistory(
-          entries.filter((entry) => Number(entry.resort) === config.resortId),
+        const entries = asValidatedLuxartArray<LuxartPaymentHistory>(response);
+        return mapValidatedLuxartCreditHistory(
+          entries,
           user.id,
           user.creditBalanceKc,
+          config.resortId,
         );
       } catch (error) {
         if (error instanceof LuxartHttpError && error.upstreamStatus === 404) return [];

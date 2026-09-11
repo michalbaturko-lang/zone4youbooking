@@ -19,6 +19,7 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
   let watchdogDeleted = false;
   let delayReservationPost = false;
   let redirectFollowed = false;
+  let malformedRead: "lessons" | "reservations" | "watchdog" | "credit" | undefined;
   let capturedReservationBody: Record<string, unknown> | undefined;
   let capturedWatchdogBody: Record<string, unknown> | undefined;
   let capturedPaymentBody: Record<string, unknown> | undefined;
@@ -119,6 +120,10 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
       assert.equal(url.searchParams.get("lang"), "en");
       assert.equal(url.searchParams.get("id_kategorie"), "0");
       assert.equal(url.searchParams.get("id_service"), "0");
+      if (malformedRead === "lessons") {
+        response.end(JSON.stringify({ unexpected: true }));
+        return;
+      }
       response.end(JSON.stringify([
         url.searchParams.get("date_start") === "2026-09-03"
           ? { ...lesson, resort: 2 }
@@ -130,6 +135,10 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
     }
     if (request.method === "GET" && url.pathname === "/api/user/credit_history") {
       assert.equal(url.searchParams.get("lang"), "en");
+      if (malformedRead === "credit") {
+        response.end(JSON.stringify([{ resort: 1, datum: "invalid", castka: 500, cdd: 10 }]));
+        return;
+      }
       response.end(
         JSON.stringify([
           {
@@ -146,6 +155,10 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
     }
     if (request.method === "GET" && url.pathname === "/api/Reservations") {
       assert.equal(url.searchParams.get("lang"), "en");
+      if (malformedRead === "reservations") {
+        response.end(JSON.stringify([{ ...reservation, id_rezervace: 0 }]));
+        return;
+      }
       response.end(JSON.stringify(reservationCreated && !reservationCancelled ? [reservation] : []));
       return;
     }
@@ -162,6 +175,10 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
     }
     if (request.method === "GET" && url.pathname === "/api/watchdog_II/user") {
       assert.equal(url.searchParams.get("user_id"), "42");
+      if (malformedRead === "watchdog") {
+        response.end(JSON.stringify([{ ...watchdog, user_id: 999 }]));
+        return;
+      }
       response.end(JSON.stringify(watchdogCreated && !watchdogDeleted ? [watchdog] : []));
       return;
     }
@@ -288,6 +305,28 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
   });
   assert.equal(lessons.length, 1);
   assert.equal(lessons[0].roomName, "Sál 2");
+
+  for (const endpoint of ["lessons", "reservations", "watchdog", "credit"] as const) {
+    malformedRead = endpoint;
+    const operation = endpoint === "lessons"
+      ? adapter.getLessons({
+          from: "2026-09-01T00:00:00Z",
+          to: "2026-09-02T00:00:00Z",
+          resortId: 1,
+        })
+      : endpoint === "reservations"
+        ? adapter.getReservations()
+        : endpoint === "watchdog"
+          ? adapter.getWaitlist()
+          : adapter.getCreditTransactions();
+    await assert.rejects(
+      operation,
+      (error: unknown) => error instanceof BookingApiError &&
+        error.status === 502 &&
+        error.code === "LUXART_RESPONSE_INVALID",
+    );
+    malformedRead = undefined;
+  }
 
   for (const now of ["2026-03-28T23:30:00.000Z", "2026-10-24T22:30:00.000Z"]) {
     const range = zone4YouScheduleRange(new Date(now), 7);
