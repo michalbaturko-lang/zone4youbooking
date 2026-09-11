@@ -23,6 +23,9 @@ test("login rejects missing and unbounded credentials with a stable privacy-safe
     { login: "client", password: "" },
     { login: "x".repeat(255), password: "2048" },
     { login: "client", password: "x".repeat(129) },
+    { login: "client\nforwarded", password: "2048" },
+    { login: "client", password: "2048\rforged" },
+    { login: "client", password: "2048", memberCardNumber: "card\tother" },
   ]) {
     assert.throws(
       () => parseLoginInput(input),

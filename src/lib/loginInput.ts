@@ -11,13 +11,18 @@ export function parseLoginInput(value: unknown): LoginInput {
   const memberCardNumber = typeof candidate.memberCardNumber === "string"
     ? candidate.memberCardNumber.trim()
     : undefined;
+  const containsControlCharacters = (text: string) => /[\u0000-\u001f\u007f]/.test(text);
 
   if (
     login.length === 0 ||
     login.length > 254 ||
+    containsControlCharacters(login) ||
     password.trim().length === 0 ||
     password.length > 128 ||
-    (memberCardNumber !== undefined && memberCardNumber.length > 64)
+    containsControlCharacters(password) ||
+    (memberCardNumber !== undefined && (
+      memberCardNumber.length > 64 || containsControlCharacters(memberCardNumber)
+    ))
   ) {
     throw new BookingApiError(400, "INVALID_LOGIN_INPUT", "Vyplňte platné přihlašovací údaje.");
   }
