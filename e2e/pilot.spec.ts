@@ -178,6 +178,31 @@ test("přihlášení, rezervace a storno projdou uživatelským flow", { tag: "@
   await reservation.getByRole("button", { name: "Zrušit" }).click();
   await expect(page.getByText("Rezervace byla zrušena bez storno poplatku.")).toBeVisible();
   await expect(reservation).toHaveCount(0);
+
+  if (testInfo.project.name.startsWith("mobile")) {
+    await page.getByRole("navigation", { name: "Navigace" }).getByRole("button", { name: "Rozvrh" }).click();
+  } else {
+    await page.getByRole("button", { name: "Rozvrh", exact: true }).click();
+  }
+  await page.getByLabel("Filtr místnosti").getByRole("button", { name: "Reformer", exact: true }).click();
+  await page.locator(".lesson-row").filter({ hasText: "REFORMER" }).first().click();
+  const reformerDialog = page.getByRole("dialog", { name: "REFORMER" });
+  await reformerDialog.getByRole("button", { name: "Rezervovat" }).click();
+  await expect(page.getByText("Rezervace REFORMER je potvrzená.")).toBeVisible();
+
+  if (testInfo.project.name.startsWith("mobile")) {
+    await page.getByRole("navigation", { name: "Navigace" }).getByRole("button", { name: "Rezervace" }).click();
+  } else {
+    await page.getByRole("button", { name: "Moje rezervace" }).click();
+  }
+  const reformerReservation = page.locator(".reservation-card")
+    .filter({ hasText: "REFORMER" })
+    .filter({ has: page.getByRole("button", { name: "Zrušit" }) });
+  await expect(reformerReservation.getByText("Storno podmínky Reformeru čekají na potvrzení", { exact: false })).toBeVisible();
+  await expect(reformerReservation.getByText("Bezplatné storno", { exact: false })).toHaveCount(0);
+  await reformerReservation.getByRole("button", { name: "Zrušit" }).click();
+  await expect(page.getByText("Rezervace byla zrušena bez storno poplatku.")).toBeVisible();
+  await expect(reformerReservation).toHaveCount(0);
   expect(browserErrors).toEqual([]);
 });
 
