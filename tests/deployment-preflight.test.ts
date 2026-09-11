@@ -23,7 +23,7 @@ function readOnlyStagingEnvironment(overrides: Record<string, string | undefined
     NEXT_PUBLIC_APP_ENV: "staging",
     APP_BASE_URL: "https://staging.booking.zone4you.cz/",
     LUXART_MOCK: "false",
-    LUXART_API_BASE_URL: "https://luxart-test.example.com:9759/api/",
+    LUXART_API_BASE_URL: "https://luxart-test.example.com:9759/",
     LUXART_ALLOW_INSECURE_TEST_HTTP: "false",
     LUXART_RESORT_ID: "1",
     LUXART_TIMEOUT_MS: "12000",
@@ -127,7 +127,7 @@ test("Stripe staging preflight accepts only the fully signed and durable payment
 test("preflight report never echoes configured secrets, database URLs or Luxart endpoint", () => {
   const sensitiveValues = {
     SESSION_SECRET: fakeSessionSecret,
-    LUXART_API_BASE_URL: "https://private-luxart-gateway.example.com:9759/api/",
+    LUXART_API_BASE_URL: "https://private-luxart-gateway.example.com:9759/",
     RATE_LIMIT_DATABASE_URL: "postgresql://fake-rate-limit-secret@example.com/zone4you?sslmode=require",
     NEXT_PUBLIC_API_TOKEN: "fake-public-token-that-must-not-be-echoed",
     ZONE4YOU_UAT_PASSWORD: "fake-uat-password-that-must-not-be-echoed",
@@ -161,4 +161,9 @@ test("preflight fails closed on commit drift, phase drift and production HTTP ov
     LUXART_ALLOW_INSECURE_TEST_HTTP: "true",
   }));
   assert.ok(productionOverride.some(({ code }) => code === "PRODUCTION_INSECURE_HTTP_OVERRIDE"));
+
+  const nestedApiPath = deploymentRuntimeConfigurationProblems(readOnlyStagingEnvironment({
+    LUXART_API_BASE_URL: "https://luxart-test.example.com:9191/api/",
+  }));
+  assert.ok(nestedApiPath.some(({ code }) => code === "LUXART_API_TRANSPORT"));
 });

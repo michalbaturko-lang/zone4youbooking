@@ -139,7 +139,7 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
       const chunks: Buffer[] = [];
       for await (const chunk of request) chunks.push(Buffer.from(chunk));
       capturedReservationBody = JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>;
-      if (delayReservationPost) await new Promise((resolve) => setTimeout(resolve, 80));
+      if (delayReservationPost) await new Promise((resolve) => setTimeout(resolve, 1_100));
       reservationCreated = true;
       reservationCancelled = false;
       response.end(JSON.stringify({ success: 1, messaget: "OK", uuid: reservation.uuid }));
@@ -201,6 +201,10 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
     gatewayAuthMode: process.env.LUXART_API_AUTH_MODE,
     gatewayUsername: process.env.LUXART_API_BASIC_USERNAME,
     gatewayPassword: process.env.LUXART_API_BASIC_PASSWORD,
+    allowInsecureHttp: process.env.LUXART_ALLOW_INSECURE_TEST_HTTP,
+    deploymentTarget: process.env.ZONE4YOU_DEPLOYMENT_TARGET,
+    publicAppEnvironment: process.env.NEXT_PUBLIC_APP_ENV,
+    vercelEnvironment: process.env.VERCEL_ENV,
   };
   context.after(() => {
     const pairs = [
@@ -216,6 +220,10 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
       ["LUXART_API_AUTH_MODE", previousEnvironment.gatewayAuthMode],
       ["LUXART_API_BASIC_USERNAME", previousEnvironment.gatewayUsername],
       ["LUXART_API_BASIC_PASSWORD", previousEnvironment.gatewayPassword],
+      ["LUXART_ALLOW_INSECURE_TEST_HTTP", previousEnvironment.allowInsecureHttp],
+      ["ZONE4YOU_DEPLOYMENT_TARGET", previousEnvironment.deploymentTarget],
+      ["NEXT_PUBLIC_APP_ENV", previousEnvironment.publicAppEnvironment],
+      ["VERCEL_ENV", previousEnvironment.vercelEnvironment],
     ] as const;
     for (const [name, value] of pairs) {
       if (value === undefined) delete process.env[name];
@@ -235,6 +243,10 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
   process.env.LUXART_API_AUTH_MODE = "basic";
   process.env.LUXART_API_BASIC_USERNAME = "gateway-user";
   process.env.LUXART_API_BASIC_PASSWORD = "gateway-password";
+  process.env.LUXART_ALLOW_INSECURE_TEST_HTTP = "true";
+  process.env.ZONE4YOU_DEPLOYMENT_TARGET = "staging";
+  process.env.NEXT_PUBLIC_APP_ENV = "staging";
+  delete process.env.VERCEL_ENV;
 
   const anonymousAdapter = createRealLuxartAdapter();
   const login = await anonymousAdapter.login({ login: "test@example.invalid", password: "1" });
@@ -324,13 +336,71 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
   assert.equal(capturedPaymentBody?.id_payment_shop, "cs_test_zone4you");
 
   delayReservationPost = true;
-  process.env.LUXART_TIMEOUT_MS = "20";
+  process.env.LUXART_TIMEOUT_MS = "1000";
   const timeoutAdapter = createRealLuxartAdapter({ userId: "42", locale: "en" });
   await assert.rejects(
     timeoutAdapter.createReservation({ lessonId: lessons[0].id }),
     (error: unknown) => error instanceof BookingMutationOutcomeUnknownError,
   );
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  await new Promise((resolve) => setTimeout(resolve, 1_200));
+});
+
+test("runtime adapter accepts only a clean HTTPS origin outside an explicit staging test", () => {
+  const names = [
+    "LUXART_API_BASE_URL",
+    "LUXART_RESORT_ID",
+    "LUXART_TIMEOUT_MS",
+    "LUXART_API_AUTH_MODE",
+    "LUXART_ALLOW_INSECURE_TEST_HTTP",
+    "ZONE4YOU_DEPLOYMENT_TARGET",
+    "NEXT_PUBLIC_APP_ENV",
+    "VERCEL_ENV",
+  ];
+  const previous = Object.fromEntries(names.map((name) => [name, process.env[name]]));
+  const restore = () => {
+    for (const [name, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  };
+
+  try {
+    process.env.LUXART_RESORT_ID = "1";
+    process.env.LUXART_TIMEOUT_MS = "12000";
+    process.env.LUXART_API_AUTH_MODE = "none";
+    delete process.env.LUXART_ALLOW_INSECURE_TEST_HTTP;
+    delete process.env.ZONE4YOU_DEPLOYMENT_TARGET;
+    delete process.env.NEXT_PUBLIC_APP_ENV;
+    delete process.env.VERCEL_ENV;
+
+    for (const baseUrl of [
+      "http://luxart.example.com:9191/",
+      "https://luxart.example.com:9191/api/",
+      "https://user:password@luxart.example.com:9191/",
+      "https://luxart.example.com:9191/?target=other",
+    ]) {
+      process.env.LUXART_API_BASE_URL = baseUrl;
+      assert.throws(() => createRealLuxartAdapter(), /clean HTTPS origin/i);
+    }
+
+    process.env.LUXART_API_BASE_URL = "https://luxart.example.com:9191/";
+    assert.doesNotThrow(() => createRealLuxartAdapter());
+
+    process.env.LUXART_API_BASE_URL = "http://127.0.0.1:9191/";
+    process.env.LUXART_ALLOW_INSECURE_TEST_HTTP = "true";
+    process.env.ZONE4YOU_DEPLOYMENT_TARGET = "staging";
+    process.env.NEXT_PUBLIC_APP_ENV = "staging";
+    assert.doesNotThrow(() => createRealLuxartAdapter());
+
+    process.env.VERCEL_ENV = "production";
+    assert.throws(() => createRealLuxartAdapter(), /clean HTTPS origin/i);
+
+    process.env.LUXART_API_BASE_URL = "https://luxart.example.com:9191/";
+    process.env.LUXART_TIMEOUT_MS = "0";
+    assert.throws(() => createRealLuxartAdapter(), /1000 to 30000/i);
+  } finally {
+    restore();
+  }
 });
 
 test("fails closed before a reservation when credit, capacity or booking window is invalid", () => {

@@ -39,7 +39,7 @@ Přepnutí fáze je release změna. Samotné nastavení boolean přepínače nes
 | Notifikace | `NOTIFICATION_PROVIDER=luxart`; aplikace standardní Luxart e-maily neduplikuje |
 | Watchdog | `LUXART_WAITLIST_ENABLED` musí být explicitní; při zapnutí je povolen pouze potvrzený `watchdog_III` |
 
-Produkce vždy vyžaduje `LUXART_ALLOW_INSECURE_TEST_HTTP=false`. Přesměrování autorizačních hlaviček na jiný host adapter odmítá.
+Produkce vždy vyžaduje `LUXART_ALLOW_INSECURE_TEST_HTTP=false`. `LUXART_API_BASE_URL` musí být čistý origin bez cesty (např. `https://host:9191/`); adapter si `/api/...` přidává sám. Stejnou podmínku kontroluje i runtime, takže chybná adresa nebo produkční HTTP selžou ještě před odesláním Luxart požadavku. Přesměrování autorizačních hlaviček na jiný host adapter odmítá.
 
 ## Co do runtime prostředí nepatří
 

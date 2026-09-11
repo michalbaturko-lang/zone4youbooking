@@ -171,6 +171,7 @@ function luxartTransport(
       url.hostname.endsWith(".invalid") ||
       url.username ||
       url.password ||
+      url.pathname !== "/" ||
       url.search ||
       url.hash
     ) return "invalid";

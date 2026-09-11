@@ -53,6 +53,41 @@ interface RealLuxartContext {
   locale?: Locale;
 }
 
+function normalizedLuxartBaseUrl(environment: NodeJS.ProcessEnv = process.env) {
+  const rawBaseUrl = environment.LUXART_API_BASE_URL;
+  if (!rawBaseUrl) {
+    throw new Error("Missing LUXART_API_BASE_URL. Set LUXART_MOCK=true until Luxart sends the current API URL.");
+  }
+
+  let url: URL;
+  try {
+    url = new URL(rawBaseUrl);
+  } catch {
+    throw new Error("LUXART_API_BASE_URL must be a valid Luxart origin.");
+  }
+
+  const insecureStagingOverride =
+    environment.LUXART_ALLOW_INSECURE_TEST_HTTP === "true" &&
+    environment.ZONE4YOU_DEPLOYMENT_TARGET === "staging" &&
+    environment.NEXT_PUBLIC_APP_ENV === "staging" &&
+    environment.VERCEL_ENV !== "production";
+  const approvedTransport = url.protocol === "https:" || (url.protocol === "http:" && insecureStagingOverride);
+  if (
+    !approvedTransport ||
+    !url.hostname ||
+    url.hostname.endsWith(".invalid") ||
+    url.username ||
+    url.password ||
+    url.pathname !== "/" ||
+    url.search ||
+    url.hash
+  ) {
+    throw new Error("LUXART_API_BASE_URL must be a clean HTTPS origin; HTTP is allowed only for explicit staging tests.");
+  }
+
+  return url.origin;
+}
+
 class LuxartHttpError extends BookingApiError {
   constructor(
     readonly upstreamStatus: number,
@@ -63,17 +98,18 @@ class LuxartHttpError extends BookingApiError {
 }
 
 function loadConfig(): RealLuxartConfig {
-  const baseUrl = process.env.LUXART_API_BASE_URL;
-  if (!baseUrl) {
-    throw new Error("Missing LUXART_API_BASE_URL. Set LUXART_MOCK=true until Luxart sends the current API URL.");
-  }
+  const baseUrl = normalizedLuxartBaseUrl();
   const resortId = Number(process.env.LUXART_RESORT_ID ?? "1");
   if (resortId !== 1) throw new Error("LUXART_RESORT_ID must be 1 for the Zone4You pilot.");
+  const timeoutMs = Number(process.env.LUXART_TIMEOUT_MS ?? "12000");
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 1_000 || timeoutMs > 30_000) {
+    throw new Error("LUXART_TIMEOUT_MS must be an integer from 1000 to 30000.");
+  }
 
   return {
-    baseUrl: baseUrl.replace(/\/$/, ""),
+    baseUrl,
     resortId,
-    timeoutMs: Number(process.env.LUXART_TIMEOUT_MS ?? "12000"),
+    timeoutMs,
     gatewayHeaders: loadLuxartGatewayAuthConfig().headers,
   };
 }
