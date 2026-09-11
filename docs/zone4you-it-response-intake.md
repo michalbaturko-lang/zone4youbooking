@@ -9,9 +9,9 @@ Tento checklist slouží pouze k vyhodnocení technické odpovědi. Není souhla
 | Položka | Přijatá odpověď | Stav |
 |---|---|---|
 | Datum a technický kontakt | 11. 9. 2026, odpověď Zone4You IT | přijato |
-| API kontrakt a root | na `api.memberzone.online:9191` je dosažitelný SOAP/WCF `Service1.svc`; není potvrzeno, zda je autoritativní, ani zda má redesign použít SOAP nebo dříve dodaný REST | blokuje test |
-| Testovací databáze potvrzena | v odpovědi neuvedeno | nepotvrzeno |
-| Síťová cesta | `api.memberzone.online:9191/Service1.svc` je veřejně dosažitelný přes HTTP; HTTPS chybí a není potvrzené, zda jde o Zone4You test DB | částečné |
+| API kontrakt a root | objednaný kontrakt je REST na interním portu `9759`; IT potvrdilo zveřejnění `9191`, ale neuvedlo veřejný hostname/IP ani překlad na `9759` | blokuje test |
+| Testovací databáze potvrzena | Luxart 1. 4. potvrdil test DB za interním portem `9759`; IT nepotvrdilo, že veřejný `9191` vede právě na ni | blokuje test |
+| Síťová cesta | veřejná Zone4You adresa chybí; `api.memberzone.online:9191/Service1.svc` je jiný SOAP kontrakt a nelze jej použít jako důkaz | nepotvrzeno |
 | Gateway autentizace | v odpovědi neuvedena; nelze z toho odvodit režim `none` | nepotvrzeno |
 | Bezpečný kanál pro secrets | secret store / jiný schválený kanál | čeká se |
 | Read-only test povolen | výslovně neuvedeno | nepotvrzeno |
@@ -27,15 +27,15 @@ Tento checklist slouží pouze k vyhodnocení technické odpovědi. Není souhla
 
 - Je potvrzená dohoda Luxart ↔ Zone4You IT o zveřejnění nového portu `9191` pro rezervace.
 - Historický port `9759` proto nelze dál automaticky považovat za externí vstupní port.
-- Je možné, že `9191` bude jen veřejný překlad na interní `9759`, ale jde pouze o hypotézu; konfigurace ji nesmí předpokládat.
-- Formulace „zveřejnění portu“ neprokazuje, že nalezená SOAP služba vede na Zone4You testovací databázi ani že jde o kontrakt určený pro redesign.
-- Přesná kandidátní URL existuje, ale chybí rozhodnutí SOAP versus REST, HTTPS a auth režim; autentizovaný test proto nelze bezpečně spustit.
+- Podle celé e-mailové historie má `9191` pravděpodobně být veřejný překlad na interní REST port `9759`, ale přesný hostitel a vazbu musí potvrdit IT; konfigurace ji nesmí předpokládat.
+- Formulace „zveřejnění portu“ neprokazuje veřejný hostname/IP, překlad na interní REST port, HTTPS ani gateway režim.
+- URL `api.memberzone.online:9191` není kandidátní Zone4You cíl: vrací jiný SOAP kontrakt a e-mailová historie klientskou instanci umisťuje na server Zone4You.
 
 ### A — lze spustit read-only Luxart ověření
 
 Musí být současně známé:
 
-- písemně potvrzený kontrakt `memberzone_rest_v1` a přesná API + `/Help` URL; pokud má být autoritativní SOAP, musí nejprve vzniknout samostatný adapter a kontraktní testy;
+- přesná veřejná API + `/Help` URL pro Zone4You REST `memberzone_rest_v1` a potvrzení překladu na interní port `9759`;
 - bezpečná síťová cesta;
 - explicitní gateway auth režim;
 - potvrzení testovací databáze;
@@ -86,9 +86,9 @@ Read-only test se nespouští, pokud chybí síťová cesta, gateway režim, pot
 
 ## 4. Výsledek vyhodnocení
 
-- Read-only integrace: `NEPOVOLENA` — chybí rozhodnutí REST versus SOAP, potvrzený šifrovaný Zone4You test origin, test DB a auth režim
+- Read-only integrace: `NEPOVOLENA` — chybí veřejný šifrovaný Zone4You REST origin, potvrzení překladu na `9759`, test DB a auth režim
 - Rezervační UAT: `NEPOVOLENO` — chybí read-only důkaz, explicitní testovací autorita, mapování sálů a úplná business pravidla
 - Deployment: vždy `NEAUTORIZOVÁN`, dokud nevznikne samostatné schválení
 - DNS/cutover: vždy `NEAUTORIZOVÁN`, dokud nevznikne samostatné schválení
-- Nejbližší bezpečný krok: získat společné písemné rozhodnutí IT/Luxart, zda je autoritativní REST `memberzone_rest_v1`, nebo SOAP/WCF `Service1.svc`, a potvrdit šifrovaný origin i test DB. U potvrzeného REST cíle se následně spustí pouze neautentizovaný `npm run probe:luxart-help`; klientské přihlašovací údaje se použijí až po bezpečném transportním a gateway důkazu. Endpoint monitor je aktivní každé dvě hodiny a zůstává tichý, dokud se stav významně nezmění.
-- Chybějící položky a vlastník: kontrakt/HTTPS/test DB/auth — Zone4You IT + Luxart; mutační UAT a pravidla — Zone4You + Luxart.
+- Nejbližší bezpečný krok: získat od IT přesný veřejný hostname/IP, celé HTTPS URL a potvrzení, že port `9191` směruje na interní REST port `9759` a testovací databázi Zone4You. Poté se spustí pouze neautentizovaný `npm run probe:luxart-help`; klientské přihlašovací údaje se použijí až po bezpečném transportním a gateway důkazu. Endpoint monitor je aktivní každé dvě hodiny a zůstává tichý, dokud se stav významně nezmění.
+- Chybějící položky a vlastník: veřejná adresa/překlad/HTTPS/test DB/auth — Zone4You IT; endpoint semantics a notifikace — Luxart; mutační UAT a pravidla — Zone4You + Luxart.

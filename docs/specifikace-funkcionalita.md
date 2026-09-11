@@ -166,7 +166,7 @@ Verze: 1.1 (aktualizováno na základě upřesnění)
 
 ### Kritické (blokují vývoj)
 1. **Stripe přístupy** — čekáme na API klíče od klienta
-2. **Luxart API kontrakt a přístup** — port 9191 zpřístupňuje SOAP/WCF, zatímco implementace vychází z REST dokumentace na 9295; čekáme na společné rozhodnutí Luxart/IT, přesný HTTPS test origin a auth režim
+2. **Luxart API přístup** — objednaný kontrakt je REST na interním Zone4You portu 9759; IT potvrdilo zveřejnění portu 9191, ale chybí veřejný hostname/IP, potvrzení přesměrování, HTTPS a auth režim
 
 ### Důležité (potřebné brzy)
 3. **Minimální zůstatek kreditu** pro rezervaci — jaká je minimální částka?

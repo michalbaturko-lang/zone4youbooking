@@ -35,7 +35,7 @@ Pokud některá podmínka neplatí, výsledek je `NO-GO`, read-only rozvrh nebo 
 |---|---|---|
 | Projekt, kód, testy, evidence, browser QA, release doporučení | Codex | Michal |
 | Business pravidla, pilotní uživatelé, support a launch okno | Zone4You | Michal / vedení Zone4You |
-| Rozhodnutí REST versus SOAP/WCF, přesný šifrovaný origin vybraného kontraktu, aktivní přístup, test DB, auth a DNS | Zone4You IT + Luxart | Zone4You |
+| Veřejný HTTPS origin a potvrzení překladu `9191 → 9759` na Zone4You REST API, aktivní přístup, test DB, auth a DNS | Zone4You IT + Luxart | Zone4You |
 | API kontrakt, endpointy, `id_resource`, watchdog a emailové šablony | Luxart | Zone4You + Luxart |
 | Stripe účet, test/live klíče a finanční pravidla | Zone4You | Michal / oprávněný správce Stripe |
 | Finální cutover a případný rollback | Michal / Zone4You | výslovné schválení |
@@ -230,8 +230,8 @@ Práce se zastaví pouze před akcí, která vyžaduje novou autoritu (živá mu
 
 ### Červené / externě blokované brány
 
-- kandidát `http://api.memberzone.online:9191/Service1.svc` je veřejně dostupný a obsahuje rezervační SOAP/WCF operace, ale není potvrzené, že jde o autoritativní Zone4You test DB; HTTPS není funkční;
-- chybí společné rozhodnutí IT/Luxart, zda má redesign používat REST kontrakt z `http://api.memberzone.online:9295/Help`, nebo odlišný SOAP/WCF kontrakt `Service1.svc` na portu `9191`; současný adaptér je implementovaný pro REST a pouhá změna portu není možná;
+- `http://api.memberzone.online:9191/Service1.svc` je veřejně dostupná starší SOAP/WCF služba, ale e-mailová historie ji neváže k Zone4You; HTTPS není funkční a tento cíl se nesmí zaměnit za klientskou REST instanci;
+- objednaný kontrakt je REST `memberzone_rest_v1`; chybí přesný veřejný hostname/IP, na kterém IT zpřístupnilo port `9191`, a potvrzení, že tato cesta vede na interní Zone4You REST port `9759` a testovací databázi;
 - chybí rozhodnutí IT, zda gateway používá IP/VPN bez hlavičky, Basic, Bearer nebo vlastní `X-*` hlavičku; veřejný datový endpoint zatím vracel 401;
 - chybí potvrzené mapování `cislo_salu` → `id_resource`;
 - chybí povolení a důkaz živých mutací v Luxart test DB;
@@ -246,11 +246,11 @@ Aktuální release stav: `NO-GO`. To je očekávané a správné, dokud nejsou �
 
 ### Blokuje zahájení nového D1
 
-1. Zone4You IT + Luxart: písemně určit autoritativní integrační kontrakt — REST `:9295/api/*`, nebo SOAP/WCF `:9191/Service1.svc` — a potvrdit, že cíl používá testovací databázi Zone4You.
+1. Zone4You IT: dodat přesný veřejný HTTPS origin a potvrdit, že zveřejněný port `9191` směruje na interní Zone4You REST API na portu `9759` připojené k testovací databázi.
 2. Zone4You IT: dodat bezpečný šifrovaný přístup k vybranému kontraktu, jeho auth režim a případný allowlist/VPN; testovací credentials nebudou odeslány přes prosté HTTP.
 3. Zone4You IT/Luxart: tabulka `cislo_salu` → `id_resource` pro všechny sály a Reformer.
 4. Zone4You/Luxart: výslovné povolení vytvořit a zrušit rezervaci na dodaném testovacím klientovi a určení bezpečné test lekce.
-5. Luxart: pokud je autoritativní REST kontrakt, potvrdit, že Zone4You používá `POST Reservations/watchdog_III`, `GET watchdog_II/user` a `DELETE Watchdog/{id}` a že notifikace jsou zapnuté; pokud je autoritativní SOAP kontrakt, dodat ekvivalentní operace a příklady payloadů. Veřejný kontrakt neobsahuje pořadí.
+5. Luxart: potvrdit, že Zone4You REST instance používá `POST Reservations/watchdog_III`, `GET watchdog_II/user` a `DELETE Watchdog/{id}` a že notifikace jsou zapnuté. Veřejný kontrakt neobsahuje pořadí.
 
 ### Blokuje finální business akceptaci
 

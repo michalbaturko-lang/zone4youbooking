@@ -4,7 +4,7 @@ Aktualizace: 2026-09-11
 
 ## Cíl prezentace
 
-Ukázat klientovi, že nový booking má reálnou produktovou podobu: rozvrh všech `api/Lesson` položek, detail lekce, CZ/EN, přihlášení, kredit, rezervaci, storno, oblíbené lekce a Luxart hlídání uvolněného místa. Izolovaný veřejný Preview používá pouze demo data a je určený k prezentaci; pro transakční pilot stále čekáme na společné potvrzení REST versus SOAP/WCF, přesný šifrovaný Zone4You test origin, read-only důkaz a živé UAT.
+Ukázat klientovi, že nový booking má reálnou produktovou podobu: rozvrh všech `api/Lesson` položek, detail lekce, CZ/EN, přihlášení, kredit, rezervaci, storno, oblíbené lekce a Luxart hlídání uvolněného místa. Izolovaný veřejný Preview používá pouze demo data a je určený k prezentaci; pro transakční pilot stále čekáme na přesný šifrovaný veřejný origin Zone4You REST instance, potvrzení překladu na interní port `9759`, read-only důkaz a živé UAT.
 
 ## Před prezentací
 
@@ -70,7 +70,7 @@ Ukázat klientovi, že nový booking má reálnou produktovou podobu: rozvrh vš
 
 - UI a flow jsou připravené proti adapteru.
 - Veřejná `/Help` dokumentace je dostupná a reálný adapter je lokálně namapovaný a kontraktně otestovaný.
-- Port 9191 je dostupný, ale obsahuje SOAP/WCF službu odlišnou od implementovaného REST kontraktu. Čekáme na rozhodnutí Luxart/IT, přesný HTTPS REST origin, test DB a auth režim. Dále chybí mapování sálů na `id_resource` a povolení bezpečných mutačních testů.
+- IT potvrdilo zveřejnění portu 9191, ale nedodalo veřejný hostname/IP ani potvrzení překladu na interní REST port 9759. SOAP/WCF na `api.memberzone.online:9191` je jiná služba. Čekáme na přesný HTTPS REST origin, test DB a auth režim. Dále chybí mapování sálů na `id_resource` a povolení bezpečných mutačních testů.
 - Luxart musí živě potvrdit Reservations, storno, watchdog notifikaci a `zpusob_uhrady`/deduplikaci pro Payment.
 
 ## Co neprezentovat jako hotové
