@@ -89,6 +89,8 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
       request.headers.authorization,
       `Basic ${Buffer.from("gateway-user:gateway-password").toString("base64")}`,
     );
+    assert.equal(request.headers["cache-control"], "no-store");
+    assert.equal(request.headers.pragma, "no-cache");
 
     if (request.method === "POST" && url.pathname === "/api/Login") {
       if (url.searchParams.get("login") === "redirect@example.invalid") {

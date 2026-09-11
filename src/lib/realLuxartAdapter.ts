@@ -176,11 +176,14 @@ async function luxartFetch<T>(
   try {
     const response = await fetch(`${config.baseUrl}${path}`, {
       ...init,
+      cache: "no-store",
       redirect: "error",
       signal: controller.signal,
       headers: {
         Accept: "application/json",
+        "Cache-Control": "no-store",
         "Content-Type": "application/json",
+        Pragma: "no-cache",
         ...init?.headers,
         ...config.gatewayHeaders,
       },
