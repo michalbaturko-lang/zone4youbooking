@@ -21,7 +21,7 @@ Napojení je server-to-server, proto nepotřebujeme CORS pro browser. První ov�
 ## Co jsme bezpečně ověřili 11. 9. 2026
 
 - `api.memberzone.online:9295/Help` je funkční referenční Luxart dokumentace, nikoli potvrzená Zone4You instance.
-- `api.memberzone.online:9191/Help` vrací 404, HTTPS na tomto portu nefunguje a HTTP kořen ukazuje obecný adresář jiné služby. Do zveřejněných aplikačních ani konfiguračních souborů jsme nevstupovali. Tento hostname proto nepovažujeme za Zone4You API.
+- `api.memberzone.online:9191/Help` nyní vrací 404, HTTPS na tomto portu nefunguje a HTTP kořen ukazuje obecný adresář jiné služby. Do zveřejněných aplikačních ani konfiguračních souborů jsme nevstupovali. Tuto současnou službu proto nepovažujeme za Zone4You API; stejný hostname ale může být použitelný, pokud na portu 9191 správně zprovozníte potvrzenou HTTPS Zone4You instanci.
 - Běžné veřejné názvy Zone4You na portech `9191` i `9759` při HTTP i HTTPS z našeho IPv4 připojení timeoutují. Může jít o jiný hostname, neaplikované pravidlo, VPN nebo allowlist; bez přesné adresy to nelze rozlišit.
 
 Pokud je `api.memberzone.online:9191` ve správě Luxartu, prosíme zároveň o kontrolu a vypnutí veřejného výpisu adresáře. Pro Zone4You integraci tento obsah nebudeme dále procházet.

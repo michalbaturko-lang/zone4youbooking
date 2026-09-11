@@ -53,10 +53,19 @@ function cleanHttpsUrl(raw: string, name: string, pathname: RegExp) {
   if (effectivePort(url) !== expectedPort) {
     throw new Error(`${name} must use the approved port ${expectedPort}.`);
   }
-  if (url.hostname.toLowerCase() === "api.memberzone.online") {
-    throw new Error(`${name} must target the Zone4You instance, not the public reference API.`);
-  }
   return url;
+}
+
+function approvedOriginFingerprint(environment: Environment, origin: string) {
+  const approved = required(environment, "LUXART_APPROVED_ORIGIN_SHA256");
+  if (!/^[a-f0-9]{64}$/.test(approved)) {
+    throw new Error("LUXART_APPROVED_ORIGIN_SHA256 must be a full lowercase SHA-256 fingerprint.");
+  }
+  const actual = createHash("sha256").update(origin).digest("hex");
+  if (approved !== actual) {
+    throw new Error("LUXART_APPROVED_ORIGIN_SHA256 does not match the configured Luxart origin.");
+  }
+  return actual;
 }
 
 function outputTarget(raw: string, repositoryRoot: string) {
@@ -106,9 +115,11 @@ export function loadLuxartD1Configuration(
   if (apiUrl.origin !== helpUrl.origin) {
     throw new Error("LUXART_API_BASE_URL and LUXART_HELP_URL must use the same approved origin.");
   }
+  const targetFingerprintSha256 = approvedOriginFingerprint(environment, apiUrl.origin);
 
   return {
     apiOrigin: apiUrl.origin,
+    targetFingerprintSha256,
     outputPath: outputTarget(
       required(environment, "ZONE4YOU_LUXART_EVIDENCE_OUTPUT_PATH"),
       repositoryRoot,
@@ -132,6 +143,13 @@ export async function runLuxartD1Verification({
   const configuration = loadLuxartD1Configuration(environment, repositoryRoot);
   const gateway = gatewayVerifier(environment);
   const help = await helpProbe({ environment, now });
+  if (
+    help.targetFingerprintSha256 !== configuration.targetFingerprintSha256 ||
+    help.transport !== "https" ||
+    help.port !== expectedPort
+  ) {
+    throw new Error("Luxart Help evidence does not match the approved HTTPS origin and port.");
+  }
   if (!helpAccepted(help, gateway)) {
     throw new Error(`Luxart Help transport check did not pass safely (${help.classification}).`);
   }
@@ -162,6 +180,7 @@ export async function runLuxartD1Verification({
     ok: true,
     checkedAt: evidence.checkedAt,
     port: expectedPort,
+    targetFingerprintSha256: configuration.targetFingerprintSha256,
     helpClassification: help.classification,
     gatewayAuthMode: gateway.gatewayAuthMode,
     authenticated: true,
