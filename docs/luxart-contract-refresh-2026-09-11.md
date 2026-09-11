@@ -25,6 +25,18 @@ Tento záznam je pouze neosobní read-only evidence veřejné referenční dokum
 - Následný neautentizovaný IPv4 probe běžných Zone4You hostname variant na portech `9191` i `9759` skončil connect timeoutem přes HTTP i HTTPS. To je konzistentní s neaktivním pravidlem, jiným hostem, VPN nebo allowlistem, ale samo o sobě žádnou variantu nepotvrzuje.
 - Kořen služby `api.memberzone.online:9191` zveřejňuje directory listing s názvy aplikačních adresářů a konfiguračních souborů. Bez credentials byl načten pouze odkazovaný `Service1.svc` a jeho veřejné WSDL. Opakované ověření ve 21:16 CEST potvrdilo mimo jiné operace `Login`, `GetClient`, `GetResource`, `GetServices`, `GetReservation`, `SetReservation`, `UPD_Reservation` a `DEL_Reservation`; jde tedy skutečně o rezervační SOAP/WCF službu, nikoli o dokumentované REST `api/Lesson`. Žádný konfigurační soubor nebyl otevřen. Správce má vypnout directory browsing a IT s Luxartem musí písemně určit, zda je pro nový booking autoritativní REST kontrakt na `9295`, nebo tento SOAP kontrakt na `9191`.
 
+### Strojový audit SOAP/WCF kandidáta
+
+Ve 21:47 CEST proběhl nový čistě neautentizovaný audit veřejného WSDL a importů `xsd0`, `xsd2` a `xsd3`:
+
+- 4/4 dokumenty byly dostupné bez přesměrování;
+- 8/8 potřebných kandidátních operací bylo přítomných;
+- strukturální SHA-256 operací, návratových tabulek a relevantních polí: `ea560236c6623987b0ea881f33b675134fe3c16199512936619802ee0ba210b8`;
+- `GetReservation` dokumentuje čas, resource, cenu, obsazenost a kapacitu; `GetResource` a `GetServices` poskytují kandidátní číselníky; `Login` vrací klienta a kredit;
+- kontrakt ale nedokumentuje samostatnou operaci `Lesson`, volbu jazyka, ekvivalent REST `user_posible`, watchdog, identitu Zone4You testovací databáze ani HTTPS transport.
+
+Výsledek je proto `ok=true` pro strukturální veřejný kontrakt, ale `pilotCompatibility.status=unproven` a `launchAuthority=false`. Není to důkaz, že `GetReservation` vrací úplný stejný soubor všech lekcí jako REST `api/Lesson`, ani povolení použít testovací klientské údaje přes HTTP.
+
 ## Aktuální automatický důkaz kontraktu
 
 Znovu ověřeno ve 21:39 CEST:
@@ -45,3 +57,5 @@ Sémantický otisk záměrně ignoruje CSS, bundlované asset URL a další prez
 ## Release dopad
 
 Adaptér lze dál vyvíjet a lokálně testovat proti REST kontraktu na `9295`. Současný `RealLuxartAdapter` volá JSON endpointy `/api/Login`, `/api/User`, `/api/Lesson`, `/api/Reservations`, `/api/Watchdog` a `/api/Payment`; se SOAP/WCF `Service1.svc` na `9191` není kompatibilní bez nové transportní a mapovací vrstvy. Živý D1 se otevře až po písemném určení autoritativního kontraktu, potvrzení přesného Zone4You cíle a testovací databáze a dodání bezpečného šifrovaného přístupu. Rezervační zápisy zůstanou vypnuté až do samostatně povoleného UAT, mapování všech pozorovaných sálů, PostgreSQL ledgeru, úplných business pravidel, rollbacku a výslovného cutover schválení.
+
+Pokud Luxart vybere SOAP, musí před implementací potvrdit zejména: zda `GetReservation` vrací všechny skupinové lekce a Reformer; hodnotu `ID_ACTIVITY_IN` pro Zone4You; význam `ID`, `ID_DETAIL`, `ID_ACTIVITY`, `ID_RESOURCE`, `POCET_VLATNICH` a `READ_OLNLY`; ekvivalent osobní rezervovatelnosti; získání seznamu klientových rezervací; jazykovou strategii; ekvivalent watchdogu; stabilní chybové kódy; a bezpečný HTTPS test origin. Teprve potom lze přidat samostatný SOAP adapter za existující rozhraní `LuxartAdapter` a znovu použít současnou doménu, UI a release brány.
