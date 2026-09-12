@@ -1,6 +1,6 @@
 # Zone4You booking — mobile-first a multidisciplinární audit
 
-**Datum:** 30. 8. 2026
+**Datum:** 30. 8. 2026, ověřený Preview doplněn 12. 9. 2026
 
 **Rozsah:** omezený pilot všech položek `api/Lesson`, všechny sály včetně Reformeru, přesně 7 pražských kalendářních dnů, CZ/EN
 
@@ -52,7 +52,7 @@ Datový model Reformeru už není omezený na „stejné jako skupinová lekce�
 | Odolnost | zelená lokálně | fail-closed capabilities, persistentní outage stav, correlation ID, žádné slepé opakování nejisté mutace | staging outage test a skutečný rollback do 5 minut |
 | Recepce/support | červená | UI odkazuje na recepci, ale není určen vlastník, kanál, služba ani reakční doba | jméno/on-call kontakt, postup eskalace a školení |
 | Release/DNS | červená | cílová doména stále míří na cizí nginx, HTTPS hostname nesedí, Vercel nemá runtime konfiguraci | IT odpověď, vlastník DNS, staging deploy, certifikát a cutover approval |
-| Výkon | žlutá | produkční build je statický shell; největší lokální JS chunk má cca 224 KiB a CSS cca 24 KiB nekomprimovaně | měřit staging na throttled mobile; splnit rozpočty P1–P4 níže |
+| Výkon | zelená v izolovaném mobilním labu, produkční p75 otevřeno | ověřený Preview: Lighthouse výkon 95/100, LCP 2,408 s, CLS 0, přenos 164 KiB; INP v laboratorním běhu nebylo dostupné | zopakovat na stagingu a získat field/UAT důkaz pro INP a produkční p75 |
 
 ## 4. Mobile-first browser evidence
 
@@ -65,6 +65,8 @@ Datový model Reformeru už není omezený na „stejné jako skupinová lekce�
 | 1440 × 900 | desktop tabulka | 24/24 | 0 px | 0 | uvnitř, bez nutnosti scrollu | PASS |
 
 Horizontálně posuvné řady dnů a filtrů jsou záměrné lokální scrolly; dokument samotný se horizontálně neposouvá. Na 320 px je po optimalizaci vidět začátek první lekce nad pevnou spodní navigací. Na landscape je po opravě horní hrana tabulky přibližně 255 px, tedy uvnitř 390px viewportu.
+
+Veřejný Preview přesného commitu `d10e9e048168cf6a1001f50bdc6940c320b9d6b2` prošel 12. 9. 2026 všemi 20/20 nízkoobjemovými browser scénáři v pěti viewpor-tech; 5 nevhodných opakovaných variant bylo záměrně přeskočeno kvůli produkčně tvarovanému login rate limitu. Mobilní Lighthouse běh naměřil výkon 95/100, přístupnost 100/100, FCP 1,645 s, LCP 2,408 s, TBT 103 ms, CLS 0 a přenos 168 047 B. Automatický audit nenašel nesoulad viditelného a přístupného názvu loga a ikona aplikace odpověděla `200 image/svg+xml`. Jediná konzolová hláška patřila Vercel Preview toolbaru, jehož cizí skript správně zablokovala CSP; politika se kvůli němu neuvolňuje. Jde o izolované laboratorní měření, ne produkční p75. P2 zůstává otevřené, protože Lighthouse bez uživatelské interakce INP neposkytl.
 
 ## 5. Eval kritéria a launch gate
 
@@ -114,7 +116,7 @@ Všechna kritéria označená `MUST` musí být zelená. Jediný červený `MUST
 
 ### P — výkonové rozpočty pro staging
 
-Toto jsou projektové rozpočty, nikoli tvrzení o současné produkci:
+Toto jsou projektové rozpočty, nikoli tvrzení o současné produkci. Izolovaný Preview lab 12. 9. splnil laboratorní protějšky P1, P3 a P4; produkční p75 a P2/INP musí stále doložit staging/UAT nebo field data:
 
 | ID | Kritérium na reprezentativním mobilním profilu | Typ |
 |---|---|---|
