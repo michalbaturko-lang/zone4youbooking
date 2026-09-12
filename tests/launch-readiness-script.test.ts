@@ -74,3 +74,18 @@ test("launch gate treats Stripe as out of scope only for booking_without_payment
   assert.match(readOnly.output, /FAIL  Payment mutation release switch/);
   assert.doesNotMatch(readOnly.output, /SKIP  Stripe credentials/);
 });
+
+test("launch gate does not infer active Luxart email templates from provider ownership alone", () => {
+  const ownershipOnly = runLaunchCheck("booking_without_payments", "false", {
+    NOTIFICATION_PROVIDER: "luxart",
+  });
+  assert.equal(ownershipOnly.status, 1);
+  assert.match(ownershipOnly.output, /FAIL  Notification ownership/);
+
+  const confirmedTemplates = runLaunchCheck("booking_without_payments", "false", {
+    NOTIFICATION_PROVIDER: "luxart",
+    LUXART_NOTIFICATION_TEMPLATES_CONFIRMED: "true",
+  });
+  assert.equal(confirmedTemplates.status, 1);
+  assert.match(confirmedTemplates.output, /PASS  Notification ownership/);
+});

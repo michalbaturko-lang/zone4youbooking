@@ -385,10 +385,9 @@ check(
 );
 check(
   "Notification ownership",
-  process.env.NOTIFICATION_PROVIDER === "luxart" ||
-    (process.env.NOTIFICATION_PROVIDER === "application" &&
-      existsSync(join(repositoryRoot, "src/lib/notifications.ts"))),
-  "Set NOTIFICATION_PROVIDER=luxart after Luxart templates are enabled, or implement the application provider.",
+  process.env.NOTIFICATION_PROVIDER === "luxart" &&
+    process.env.LUXART_NOTIFICATION_TEMPLATES_CONFIRMED === "true",
+  "Luxart must own standard booking emails and explicitly confirm the Zone4You templates are enabled.",
 );
 check(
   "English localization",

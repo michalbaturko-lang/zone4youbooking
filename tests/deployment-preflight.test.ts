@@ -35,6 +35,7 @@ function readOnlyStagingEnvironment(overrides: Record<string, string | undefined
     RATE_LIMIT_SINGLE_INSTANCE: "true",
     SESSION_SECRET: fakeSessionSecret,
     NOTIFICATION_PROVIDER: "luxart",
+    LUXART_NOTIFICATION_TEMPLATES_CONFIRMED: "true",
     LUXART_WAITLIST_ENABLED: "false",
     LUXART_WATCHDOG_VARIANT: "watchdog_III",
     BOOKING_MUTATIONS_ENABLED: "false",
@@ -108,6 +109,25 @@ test("booking staging preflight requires and accepts confirmed rules, mapping an
   );
   assert.equal(watchdogEnabled.ok, false);
   assert.ok(watchdogEnabled.issues.some(({ code }) => code === "WAITLIST_MUST_BE_DISABLED"));
+});
+
+test("preflight requires explicit confirmation of live Luxart notification templates", () => {
+  for (const value of [undefined, "false", "yes"]) {
+    const report = buildDeploymentPreflightReport(readOnlyStagingEnvironment({
+      LUXART_NOTIFICATION_TEMPLATES_CONFIRMED: value,
+    }));
+    assert.equal(report.ok, false);
+    assert.equal(report.configuration.notifications, "invalid");
+    assert.ok(report.issues.some(({ code, variables }) =>
+      code === "LUXART_NOTIFICATION_TEMPLATES_UNCONFIRMED" &&
+      variables.includes("LUXART_NOTIFICATION_TEMPLATES_CONFIRMED")));
+  }
+
+  const wrongOwner = buildDeploymentPreflightReport(readOnlyStagingEnvironment({
+    NOTIFICATION_PROVIDER: "application",
+  }));
+  assert.equal(wrongOwner.configuration.notifications, "invalid");
+  assert.ok(wrongOwner.issues.some(({ code }) => code === "NOTIFICATION_PROVIDER"));
 });
 
 test("Stripe staging preflight accepts only the fully signed and durable payment phase", () => {

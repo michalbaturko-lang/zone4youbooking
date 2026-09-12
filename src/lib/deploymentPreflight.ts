@@ -296,6 +296,12 @@ export function deploymentRuntimeConfigurationProblems(
   if (environment.NOTIFICATION_PROVIDER !== "luxart") {
     issues.push(issue("NOTIFICATION_PROVIDER", "NOTIFICATION_PROVIDER"));
   }
+  if (environment.LUXART_NOTIFICATION_TEMPLATES_CONFIRMED !== "true") {
+    issues.push(issue(
+      "LUXART_NOTIFICATION_TEMPLATES_UNCONFIRMED",
+      "LUXART_NOTIFICATION_TEMPLATES_CONFIRMED",
+    ));
+  }
   if (!["true", "false"].includes(environment.LUXART_WAITLIST_ENABLED ?? "")) {
     issues.push(issue("LUXART_WAITLIST_ENABLED", "LUXART_WAITLIST_ENABLED"));
   }
@@ -401,7 +407,11 @@ export function buildDeploymentPreflightReport(
       waitlist: environment.LUXART_WAITLIST_ENABLED === "true"
         ? "enabled"
         : environment.LUXART_WAITLIST_ENABLED === "false" ? "disabled" : "invalid",
-      notifications: environment.NOTIFICATION_PROVIDER === "luxart" ? "luxart" : "invalid",
+      notifications:
+        environment.NOTIFICATION_PROVIDER === "luxart" &&
+        environment.LUXART_NOTIFICATION_TEMPLATES_CONFIRMED === "true"
+          ? "luxart"
+          : "invalid",
     },
     profiles: {
       businessRulesStatus: profile.status,

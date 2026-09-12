@@ -105,7 +105,7 @@ Kritický externí deadline je přístup k Zone4You testovacímu API do konce D1
 | Plná lekce | nabídne hlídání jen pokud je `watchdog_III` potvrzený na Zone4You API | API + browser E2E |
 | Přihlášení/odhlášení | jeden watchdog záznam pro klienta a výskyt lekce; bezpečné opakování | test DB před/po |
 | Uvolnění místa | Luxart odešle upozornění podle svého watchdog pravidla; UI neslibuje pořadí ani automatickou rezervaci | řízený test s Luxartem |
-| Notifikace | jedna událost = nejvýše jedna Luxart notifikace | Luxart log/šablona; aplikace neduplikuje |
+| Notifikace | jedna událost = nejvýše jedna Luxart notifikace; samotná volba Luxartu jako vlastníka nestačí bez výslovného potvrzení aktivních Zone4You šablon | Luxart log/šablona; `LUXART_NOTIFICATION_TEMPLATES_CONFIRMED=true` až po potvrzení; aplikace neduplikuje |
 
 Veřejný kontrakt neobsahuje pozici ve frontě; jde o hlídání místa, nikoli o pořadníkovou čekací listinu. Není-li E4 živě potvrzená, `LUXART_WAITLIST_ENABLED=false` a UI hlídání nenabízí.
 
