@@ -665,10 +665,12 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
       timestamp: stringValue((approval as JsonObject).approvedAt, `approvals.${name}.approvedAt`),
     })),
   ]);
+  const cutoverApprovedAt = stringValue(cutover.approvedAt, "approvals.cutover.approvedAt");
 
   return {
     ok: true,
     checkedAt: now.toISOString(),
+    cutoverApprovedAt,
     dossierFingerprint: dossierFile.sha256.slice(0, 16),
     releaseId,
     target,

@@ -25,6 +25,7 @@ export interface ProductionCutoverConfig {
   expectedCommit: string;
   expectedPhase: ProductionPilotPhase;
   dossierSha256: string;
+  cutoverApprovedAt: string;
   preCutoverCheckedAt: string;
   preCutoverEvidenceSha256: string;
   timeoutMs: number;
@@ -46,6 +47,7 @@ interface ApiResult<T> {
 interface PreCutoverReceipt {
   ok?: unknown;
   checkedAt?: unknown;
+  cutoverApprovedAt?: unknown;
   decision?: unknown;
   target?: unknown;
   commit?: unknown;
@@ -147,16 +149,20 @@ export function loadProductionCutoverConfig(
     throw new Error("Pre-cutover evidence does not match the approved production release.");
   }
 
-  if (typeof receipt.checkedAt !== "string") {
-    throw new Error("Pre-cutover evidence checkedAt is missing or invalid.");
+  if (typeof receipt.checkedAt !== "string" || typeof receipt.cutoverApprovedAt !== "string") {
+    throw new Error("Pre-cutover evidence chronology is missing or invalid.");
   }
   const preCutoverCheckedAt = new Date(receipt.checkedAt);
-  if (Number.isNaN(preCutoverCheckedAt.getTime())) {
-    throw new Error("Pre-cutover evidence checkedAt is missing or invalid.");
+  const cutoverApprovedAt = new Date(receipt.cutoverApprovedAt);
+  if (Number.isNaN(preCutoverCheckedAt.getTime()) || Number.isNaN(cutoverApprovedAt.getTime())) {
+    throw new Error("Pre-cutover evidence chronology is missing or invalid.");
+  }
+  if (cutoverApprovedAt.getTime() > preCutoverCheckedAt.getTime()) {
+    throw new Error("Pre-cutover evidence predates the final cutover approval.");
   }
   const ageMs = now.getTime() - preCutoverCheckedAt.getTime();
-  if (ageMs < -5 * 60_000) {
-    throw new Error("Pre-cutover evidence checkedAt is unexpectedly in the future.");
+  if (ageMs < 0) {
+    throw new Error("Production verification must not predate the pre-cutover evidence.");
   }
   if (ageMs > maxAgeMinutes * 60_000) {
     throw new Error("Pre-cutover evidence is stale and must be regenerated.");
@@ -196,6 +202,7 @@ export function loadProductionCutoverConfig(
     expectedCommit,
     expectedPhase: expectedPhase as ProductionPilotPhase,
     dossierSha256,
+    cutoverApprovedAt: cutoverApprovedAt.toISOString(),
     preCutoverCheckedAt: preCutoverCheckedAt.toISOString(),
     preCutoverEvidenceSha256,
     timeoutMs,
@@ -384,6 +391,16 @@ export async function runProductionCutoverVerification(
   const startedAt = Date.now();
   const checkedAt = now();
   if (Number.isNaN(checkedAt.getTime())) throw new Error("Production verification time is invalid.");
+  const cutoverApprovedAt = new Date(config.cutoverApprovedAt);
+  const preCutoverCheckedAt = new Date(config.preCutoverCheckedAt);
+  if (
+    Number.isNaN(cutoverApprovedAt.getTime()) ||
+    Number.isNaN(preCutoverCheckedAt.getTime()) ||
+    cutoverApprovedAt.getTime() > preCutoverCheckedAt.getTime() ||
+    preCutoverCheckedAt.getTime() > checkedAt.getTime()
+  ) {
+    throw new Error("Production verification chronology is invalid.");
+  }
   const range = zone4YouScheduleRange(checkedAt, 7);
 
   let unresolvedDnsRecords: AnyRecord[];
@@ -461,6 +478,7 @@ export async function runProductionCutoverVerification(
     expectedCommit: config.expectedCommit,
     expectedPhase: config.expectedPhase,
     dossierSha256: config.dossierSha256,
+    cutoverApprovedAt: config.cutoverApprovedAt,
     preCutoverCheckedAt: config.preCutoverCheckedAt,
     preCutoverEvidenceSha256: config.preCutoverEvidenceSha256,
     durationMs,

@@ -75,6 +75,13 @@ export async function verifyProductionPreCutover({
   ) {
     throw new Error("Verified release evidence does not authorize the production DNS cutover.");
   }
+  const cutoverApprovedAt = new Date(release.cutoverApprovedAt);
+  if (!Number.isFinite(cutoverApprovedAt.getTime())) {
+    throw new Error("Verified release evidence is missing a valid final cutover approval time.");
+  }
+  if (cutoverApprovedAt.getTime() > now.getTime()) {
+    throw new Error("Pre-cutover verification must not predate the final cutover approval.");
+  }
   const dnsArtifact = release.artifacts.find((artifact) => artifact.name === "dnsRollbackBaseline");
   if (!dnsArtifact || !/^[a-f0-9]{64}$/.test(dnsArtifact.sha256)) {
     throw new Error("Verified release evidence is missing the exact DNS rollback baseline artifact.");
@@ -104,6 +111,7 @@ export async function verifyProductionPreCutover({
   return {
     ok: true,
     checkedAt: now.toISOString(),
+    cutoverApprovedAt: cutoverApprovedAt.toISOString(),
     decision: "GO_TO_AUTHORIZED_DNS_CHANGE" as const,
     target: release.target,
     releaseId: release.releaseId,

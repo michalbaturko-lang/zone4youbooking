@@ -27,6 +27,7 @@ function preCutoverFixture(
   const receipt = {
     ok: true,
     checkedAt: checkedAt.toISOString(),
+    cutoverApprovedAt: new Date(checkedAt.getTime() - 5 * 60_000).toISOString(),
     decision: "GO_TO_AUTHORIZED_DNS_CHANGE",
     target: "https://booking.zone4you.cz",
     releaseId: "zone4you-pilot-2026-08-30",
@@ -156,10 +157,14 @@ test("production cutover configuration is pinned to the exact host, commit, phas
   assert.equal(config.maxDurationMs, 60_000);
   assert.equal(config.preCutoverEvidenceSha256, approvedPreCutover.sha256);
   assert.equal(config.dossierSha256, dossierSha256);
+  assert.equal(config.cutoverApprovedAt, new Date(checkedAt.getTime() - 5 * 60_000).toISOString());
 });
 
 test("production cutover configuration rejects stale, mismatched or weakly protected pre-cutover evidence", () => {
-  const stale = preCutoverFixture({ checkedAt: new Date(checkedAt.getTime() - 31 * 60_000).toISOString() });
+  const stale = preCutoverFixture({
+    checkedAt: new Date(checkedAt.getTime() - 31 * 60_000).toISOString(),
+    cutoverApprovedAt: new Date(checkedAt.getTime() - 32 * 60_000).toISOString(),
+  });
   assert.throws(
     () => loadProductionCutoverConfig({
       ...baseEnvironment,
@@ -167,6 +172,30 @@ test("production cutover configuration rejects stale, mismatched or weakly prote
       ZONE4YOU_PRODUCTION_CUTOVER_CONFIRMATION: `VERIFY_ZONE4YOU_PRODUCTION_CUTOVER:${stale.sha256}`,
     }, checkedAt),
     /stale/i,
+  );
+
+  const beforeApproval = preCutoverFixture({
+    cutoverApprovedAt: new Date(checkedAt.getTime() + 60_000).toISOString(),
+  });
+  assert.throws(
+    () => loadProductionCutoverConfig({
+      ...baseEnvironment,
+      ZONE4YOU_PRECUTOVER_EVIDENCE_PATH: beforeApproval.path,
+      ZONE4YOU_PRODUCTION_CUTOVER_CONFIRMATION: `VERIFY_ZONE4YOU_PRODUCTION_CUTOVER:${beforeApproval.sha256}`,
+    }, checkedAt),
+    /predates the final cutover approval/i,
+  );
+
+  const futureReceipt = preCutoverFixture({
+    checkedAt: new Date(checkedAt.getTime() + 1).toISOString(),
+  });
+  assert.throws(
+    () => loadProductionCutoverConfig({
+      ...baseEnvironment,
+      ZONE4YOU_PRECUTOVER_EVIDENCE_PATH: futureReceipt.path,
+      ZONE4YOU_PRODUCTION_CUTOVER_CONFIRMATION: `VERIFY_ZONE4YOU_PRODUCTION_CUTOVER:${futureReceipt.sha256}`,
+    }, checkedAt),
+    /must not predate the pre-cutover evidence/i,
   );
 
   const wrongCommit = preCutoverFixture({ commit: "f".repeat(40) });
@@ -223,6 +252,7 @@ test("production cutover verifier proves DNS, security, runtime provenance and m
   assert.equal(evidence.ok, true);
   assert.equal(evidence.expectedCommit, commit);
   assert.equal(evidence.dossierSha256, dossierSha256);
+  assert.equal(evidence.cutoverApprovedAt, approvedPreCutover.receipt.cutoverApprovedAt);
   assert.equal(evidence.preCutoverEvidenceSha256, approvedPreCutover.sha256);
   assert.equal(evidence.lessons.count, 1);
   assert.equal(evidence.lessons.reformer, 1);
@@ -233,6 +263,24 @@ test("production cutover verifier proves DNS, security, runtime provenance and m
   assert.equal(evidence.requestIds.lessonsCs, "lessons-cs");
   assert.equal(evidence.requestIds.lessonsEn, "lessons-en");
   assert.equal(JSON.stringify(evidence).includes("203.0.113.10"), false);
+});
+
+test("production verifier independently enforces the approved chronology", async () => {
+  const config = loadProductionCutoverConfig(baseEnvironment, checkedAt);
+  await assert.rejects(
+    runProductionCutoverVerification(
+      {
+        ...config,
+        preCutoverCheckedAt: new Date(checkedAt.getTime() + 1).toISOString(),
+      },
+      {
+        fetchImpl: liveFetch(),
+        resolveAnyImpl: async () => [{ type: "A", address: "203.0.113.10", ttl: 60 }],
+        now: () => checkedAt,
+      },
+    ),
+    /chronology is invalid/i,
+  );
 });
 
 test("production cutover verifier fails closed on DNS, runtime or schedule divergence", async () => {

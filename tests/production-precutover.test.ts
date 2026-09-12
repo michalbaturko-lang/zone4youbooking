@@ -18,10 +18,11 @@ const environment = {
   ZONE4YOU_DNS_BASELINE_EVIDENCE_PATH: "/secure/production-dns-baseline.json",
 };
 
-function releaseEvidence() {
+function releaseEvidence(cutoverApprovedAt = now.toISOString()) {
   return {
     ok: true as const,
     checkedAt: now.toISOString(),
+    cutoverApprovedAt,
     dossierFingerprint: dossierSha256.slice(0, 16),
     releaseId: "zone4you-pilot-2026-09-11",
     target: "https://booking.zone4you.cz",
@@ -79,6 +80,7 @@ test("pre-cutover gate binds the approved dossier to the unchanged live DNS roll
   assert.equal(result.ok, true);
   assert.equal(result.decision, "GO_TO_AUTHORIZED_DNS_CHANGE");
   assert.equal(result.explicitCutoverApproval, true);
+  assert.equal(result.cutoverApprovedAt, now.toISOString());
   assert.equal(receivedDnsConfirmation, `VERIFY_ZONE4YOU_DNS_BASELINE:${baselineSha256}`);
 });
 
@@ -91,6 +93,18 @@ test("pre-cutover gate requires its own confirmation bound to the full dossier d
       dnsVerifier: async () => dnsEvidence(),
     }),
     /must exactly equal/i,
+  );
+});
+
+test("pre-cutover gate cannot run before the recorded final approval", async () => {
+  await assert.rejects(
+    verifyProductionPreCutover({
+      environment,
+      now,
+      releaseVerifier: () => releaseEvidence(new Date(now.getTime() + 60_000).toISOString()),
+      dnsVerifier: async () => dnsEvidence(),
+    }),
+    /must not predate the final cutover approval/i,
   );
 });
 
