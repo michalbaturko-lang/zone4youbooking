@@ -10,14 +10,14 @@ Read-only kontrola propojeného Vercel projektu potvrdila:
 
 - projekt `zone4youbooking` existuje v aktuálním Vercel týmu;
 - projekt používá Node.js 24.x; repozitář deklaruje framework `nextjs` ve `vercel.json`;
-- CI i balíček jsou uzamčené na stejnou Node.js 24.x větev a CI před E2E výslovně instaluje Chromium se systémovými závislostmi;
+- CI i balíček jsou uzamčené na stejnou Node.js 24.x větev a CI před E2E výslovně instaluje Chromium i WebKit se systémovými závislostmi;
 - v projektu není nastavená žádná runtime environment variable;
 - `booking.zone4you.cz` není k projektu připojená ani dostupná jako jeho alias;
 - veřejné DNS pro `booking.zone4you.cz` i `staging.booking.zone4you.cz` už vrací A/AAAA na existující server mimo Vercel; HTTPS certifikát neplatí pro požadovaný hostname a HTTP vrací nginx 404;
 - kontrola 11. 9. znovu potvrdila, že `booking.zone4you.cz` nemá CNAME, má současně A i AAAA, HTTP vrací nginx 404 a prezentovaný certifikát je pro `*.nameserver.sk`; samotná existence záznamů proto není důkaz připraveného hostingu;
 - historický produkční alias je 84 dní starý a není důkazem současného buildu;
 - 11. 9. vznikl nový izolovaný Vercel Preview pro klientskou prezentaci. Vrací HTTPS bezpečnostní hlavičky, `noindex`, zdravý `/api/health` a `/api/readiness`, který výslovně potvrzuje pouze `mode=demo`, `luxart=mock`, `schedule=mock`, paměťový rate limit, přesný Git commit a systémový region `fra1`;
-- nový Preview prošel nízkoobjemovou browser regresí ve všech pěti viewports: 20/20 provedených scénářů včetně jediného přihlášení, rezervace a následného storna, 5 záměrných skipů kvůli login limiteru a desktopové duplicitě mobilní ergonomie;
+- předchozí Preview prošel nízkoobjemovou Chromium regresí ve všech pěti viewports: 20/20 provedených scénářů včetně jediného přihlášení, rezervace a následného storna, 5 záměrných skipů kvůli login limiteru a desktopové duplicitě mobilní ergonomie; aktuální CI matice navíc přidává read-only mobilní WebKit 390 × 844 bez loginu a mutací;
 - read-only kontrola 12. 9. znovu potvrdila A/AAAA mimo Vercel, nginx HTTP 404, neplatný HTTPS hostname a nepřipojenou doménu v aktuálním Vercel týmu; nový `npm run probe:production-domain` tento stav opakovaně kontroluje bez vypsání DNS adres a vždy vrací `authorizesCutover=false`; společný resolver nyní dotazuje A, AAAA a CNAME samostatně, protože DNS `ANY` na této doméně vracelo jen IPv4 a mohlo by vynechat rollback pro IPv6;
 - Preview nemá Luxart ani jiné live runtime secrets a není live stagingem, UAT důkazem ani kandidátem pro release dossier. Externí browser regrese vyžaduje samostatně zadaný očekávaný commit a odmítne chybějící či rozdílný commit, jiný region i obecné `unverified` údaje ještě před přihlášením.
 

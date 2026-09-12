@@ -4,6 +4,7 @@ const port = 3011;
 const localBaseURL = `http://127.0.0.1:${port}`;
 const externalDemoBaseURL = process.env.PLAYWRIGHT_EXTERNAL_DEMO_URL?.trim();
 const baseURL = externalDemoBaseURL || localBaseURL;
+const chromiumLaunchOptions = { args: ["--disable-gpu"] };
 
 export default defineConfig({
   testDir: "./e2e",
@@ -25,10 +26,6 @@ export default defineConfig({
     baseURL,
     locale: "cs-CZ",
     timezoneId: "Europe/Prague",
-    // The macOS headless SwiftShader process intermittently stalls during
-    // actionability checks/context teardown; CPU rendering is deterministic
-    // for these layout, flow and accessibility assertions.
-    launchOptions: { args: ["--disable-gpu"] },
     screenshot: "only-on-failure",
     // Recording a full trace for every successful test adds renderer/screencast
     // pressure. Capture it on the isolated retry, where it is actionable.
@@ -39,6 +36,11 @@ export default defineConfig({
     {
       name: "mobile-small-320x568",
       use: {
+        browserName: "chromium",
+        // The macOS headless SwiftShader process intermittently stalls during
+        // actionability checks/context teardown; CPU rendering is deterministic
+        // for these layout, flow and accessibility assertions.
+        launchOptions: chromiumLaunchOptions,
         viewport: { width: 320, height: 568 },
         isMobile: true,
         hasTouch: true,
@@ -47,6 +49,8 @@ export default defineConfig({
     {
       name: "mobile-standard-390x844",
       use: {
+        browserName: "chromium",
+        launchOptions: chromiumLaunchOptions,
         viewport: { width: 390, height: 844 },
         isMobile: true,
         hasTouch: true,
@@ -55,6 +59,8 @@ export default defineConfig({
     {
       name: "mobile-tablet-768x1024",
       use: {
+        browserName: "chromium",
+        launchOptions: chromiumLaunchOptions,
         viewport: { width: 768, height: 1024 },
         isMobile: true,
         hasTouch: true,
@@ -63,6 +69,8 @@ export default defineConfig({
     {
       name: "landscape-phone-844x390",
       use: {
+        browserName: "chromium",
+        launchOptions: chromiumLaunchOptions,
         viewport: { width: 844, height: 390 },
         isMobile: true,
         hasTouch: true,
@@ -70,7 +78,24 @@ export default defineConfig({
     },
     {
       name: "desktop-1440x900",
-      use: { viewport: { width: 1440, height: 900 } },
+      use: {
+        browserName: "chromium",
+        launchOptions: chromiumLaunchOptions,
+        viewport: { width: 1440, height: 900 },
+      },
+    },
+    {
+      name: "mobile-webkit-390x844",
+      // A second rendering engine covers the public mobile UI without
+      // repeating login or booking mutations. Authenticated WebKit UAT stays
+      // a deliberate staging step once the real Luxart endpoint is available.
+      grep: /@preview(?!-auth)/,
+      use: {
+        browserName: "webkit",
+        viewport: { width: 390, height: 844 },
+        isMobile: true,
+        hasTouch: true,
+      },
     },
   ],
   webServer: externalDemoBaseURL ? undefined : {

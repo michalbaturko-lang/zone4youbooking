@@ -24,9 +24,13 @@ async function openCleanDemo(page: Page) {
     "x-forwarded-for": `198.51.100.${isolatedTestClient}`,
     ...externalDemoRequestHeaders(),
   });
+  await page.addInitScript(() => {
+    const initializationKey = "zone4youbooking.e2e.initialized";
+    if (window.sessionStorage.getItem(initializationKey)) return;
+    window.localStorage.clear();
+    window.sessionStorage.setItem(initializationKey, "true");
+  });
   await page.goto("/");
-  await page.evaluate(() => window.localStorage.clear());
-  await page.reload();
   await expect(page.getByRole("button", { name: "Přihlásit se" }).first()).toBeVisible();
 }
 
@@ -366,7 +370,8 @@ test("rozvrh a dialogy projdou WCAG scanem i klávesnicovým focus flow", { tag:
 
   await page.getByLabel("Filtr místnosti").getByRole("button", { name: "Reformer", exact: true }).click();
   const reformerTrigger = page.locator(".lesson-row").filter({ hasText: "REFORMER" }).first();
-  await reformerTrigger.click();
+  await reformerTrigger.focus();
+  await page.keyboard.press("Enter");
   const lessonDialog = page.getByRole("dialog", { name: "REFORMER" });
   await expect(lessonDialog).toBeVisible();
   await expect(lessonDialog.locator(".modal-close")).toBeFocused();
@@ -385,7 +390,8 @@ test("rozvrh a dialogy projdou WCAG scanem i klávesnicovým focus flow", { tag:
   await expect(reformerTrigger).toBeFocused();
 
   const loginTrigger = page.getByRole("button", { name: "Přihlásit se" }).first();
-  await loginTrigger.click();
+  await loginTrigger.focus();
+  await page.keyboard.press("Enter");
   const loginDialog = page.getByRole("dialog", { name: "Přihlášení" });
   const usernameInput = loginDialog.getByLabel("Příjmení, e-mail nebo login");
   await expect(usernameInput).toBeFocused();
@@ -403,9 +409,10 @@ test("rozvrh a dialogy projdou WCAG scanem i klávesnicovým focus flow", { tag:
   });
   expect(loginScan.violations).toEqual([]);
 
-  await page.keyboard.press("Shift+Tab");
+  const backwardTab = testInfo.project.name.includes("webkit") ? "Alt+Shift+Tab" : "Shift+Tab";
+  await page.keyboard.press(backwardTab);
   await expect(loginDialog.locator(".modal-close")).toBeFocused();
-  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press(backwardTab);
   await expect(loginDialog.getByRole("button", { name: "Přihlásit se" })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(loginDialog).toHaveCount(0);

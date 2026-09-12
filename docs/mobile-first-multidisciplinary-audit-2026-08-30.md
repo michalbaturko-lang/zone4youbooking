@@ -41,7 +41,7 @@ Datový model Reformeru už není omezený na „stejné jako skupinová lekce�
 
 | Perspektiva | Verdikt | Důkaz / nález | Nutná další akce |
 |---|---|---|---|
-| Klient na mobilu | zelená lokálně | 320 × 568, 390 × 844, 768 × 1024 a 844 × 390: 0 page overflow, 24/24 lekcí v týdnu, ovládání ≥ 44 px, dialog uvnitř viewportu, scroll lock | zopakovat na stagingu v iOS Safari a Android Chrome |
+| Klient na mobilu | zelená lokálně ve dvou enginech | Chromium 320 × 568, 390 × 844, 768 × 1024 a 844 × 390 plus WebKit 390 × 844: 0 page overflow, 24/24 lekcí v týdnu, ovládání ≥ 44 px, dialog uvnitř viewportu, scroll lock; WebKit navíc ověřuje WCAG/focus, EN a oblíbené | zopakovat autentizovaný průchod na stagingu na skutečném iOS Safari a Android Chrome |
 | Klient na desktopu | zelená lokálně | 1440 × 900: 24/24 lekcí, týdenní tabulka, dialog bez overflow | staging smoke |
 | Přístupnost | zelená automaticky, manuálně otevřeno | WCAG A/AA axe scan, focus trap, počáteční i vrácený focus, Escape, reduced-motion, 44px touch targets | krátký VoiceOver/TalkBack UAT se skutečným uživatelem |
 | Angličtina | zelená lokálně | navigace, rozvrh, sály, login a klientské chyby jsou EN; serverová čeština se v EN režimu nepropustí | ověřit živé `lang=en` odpovědi Luxartu a všechny názvy sálů/služeb |
