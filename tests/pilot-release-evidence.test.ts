@@ -19,6 +19,8 @@ const luxartTarget = "https://luxart-test.example.com:9443";
 const luxartTargetFingerprint = createHash("sha256").update(luxartTarget).digest("hex");
 const occurrenceSetSha256 = "a".repeat(64);
 const roomPlacementSetSha256 = "b".repeat(64);
+const czechLessonContentSetSha256 = "c".repeat(64);
+const englishLessonContentSetSha256 = "d".repeat(64);
 const resourceMapJson = JSON.stringify({ 1: 101, 2: 102, 3: 203 });
 const resourceMapSha256 = luxartResourceMappingSha256(resourceMapJson);
 
@@ -80,6 +82,7 @@ function validFixture() {
         count: 24,
         occurrenceSetSha256,
         roomPlacementSetSha256,
+        lessonContentSetSha256: czechLessonContentSetSha256,
         rooms: ["Sál 1", "Sál 2", "Reformer"],
         roomNumbers: [1, 2, 3],
         reformer: 3,
@@ -91,6 +94,7 @@ function validFixture() {
         count: 24,
         occurrenceSetSha256,
         roomPlacementSetSha256,
+        lessonContentSetSha256: englishLessonContentSetSha256,
         rooms: ["Studio 1", "Studio 2", "Reformer"],
         roomNumbers: [1, 2, 3],
         reformer: 3,
@@ -101,8 +105,22 @@ function validFixture() {
       authenticated: { checked: true, userLoaded: true, reservations: 0, creditTransactions: 2 },
       personalized: {
         checked: true,
-        czech: { count: 24, occurrenceSetSha256, roomPlacementSetSha256, eligible: 22, ineligible: 2 },
-        english: { count: 24, occurrenceSetSha256, roomPlacementSetSha256, eligible: 22, ineligible: 2 },
+        czech: {
+          count: 24,
+          occurrenceSetSha256,
+          roomPlacementSetSha256,
+          lessonContentSetSha256: czechLessonContentSetSha256,
+          eligible: 22,
+          ineligible: 2,
+        },
+        english: {
+          count: 24,
+          occurrenceSetSha256,
+          roomPlacementSetSha256,
+          lessonContentSetSha256: englishLessonContentSetSha256,
+          eligible: 22,
+          ineligible: 2,
+        },
       },
     },
     runtimeProbe: {
@@ -152,6 +170,7 @@ function validFixture() {
             count: 24,
             occurrenceSetSha256,
             roomPlacementSetSha256,
+            lessonContentSetSha256: czechLessonContentSetSha256,
             roomNumbers: [1, 2, 3],
             reformer: 3,
             earliestStartsAt: "2026-09-05T08:00:00.000Z",
@@ -163,6 +182,7 @@ function validFixture() {
             count: 24,
             occurrenceSetSha256,
             roomPlacementSetSha256,
+            lessonContentSetSha256: englishLessonContentSetSha256,
             roomNumbers: [1, 2, 3],
             reformer: 3,
             earliestStartsAt: "2026-09-05T08:00:00.000Z",
@@ -351,6 +371,10 @@ test("pilot release dossier binds live Luxart, UAT, application and DNS rollback
     count: 24,
     occurrenceSetSha256,
     roomPlacementSetSha256,
+    localizedContentSha256: {
+      czech: czechLessonContentSetSha256,
+      english: englishLessonContentSetSha256,
+    },
     resourceMapSha256,
     roomNumbers: [1, 2, 3],
     reformer: 3,
@@ -664,6 +688,22 @@ test("pilot release dossier binds every lesson to the same Luxart room in live a
         checks.lessons.english.roomNumbers = [1, 2, 4];
       },
       /approved Luxart room-number set/i,
+    ],
+    [
+      "luxartReadOnly",
+      (artifact: Record<string, unknown>) => {
+        const personalized = artifact.personalized as { english: Record<string, unknown> };
+        personalized.english.lessonContentSetSha256 = "e".repeat(64);
+      },
+      /personalized English lesson-content digest/i,
+    ],
+    [
+      "runtimeProbe",
+      (artifact: Record<string, unknown>) => {
+        const checks = artifact.checks as { lessons: { czech: Record<string, unknown> } };
+        checks.lessons.czech.lessonContentSetSha256 = "e".repeat(64);
+      },
+      /runtime Czech lesson-content digest/i,
     ],
   ] as const) {
     const fixture = validFixture();

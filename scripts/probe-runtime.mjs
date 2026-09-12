@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { lessonContentSetSha256 } from "./lesson-content-evidence.mjs";
 
 const baseUrl = process.env.APP_BASE_URL;
 const requireReformer = process.env.PROBE_REQUIRE_REFORMER !== "false";
@@ -128,6 +129,7 @@ function lessonFeedEvidence(result, language, requireLuxartRoomNumbers) {
     durationMs: result.durationMs,
     count: lessons.length,
     occurrenceSetSha256: createHash("sha256").update([...ids].sort().join("\n"), "utf8").digest("hex"),
+    lessonContentSetSha256: lessonContentSetSha256(lessons, `${language} runtime lesson feed`),
     ...(requireLuxartRoomNumbers ? {
       roomPlacementSetSha256: createHash("sha256").update(roomPlacements.sort().join("\n"), "utf8").digest("hex"),
     } : {}),

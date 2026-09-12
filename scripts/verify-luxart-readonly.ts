@@ -6,6 +6,7 @@ import { loadLuxartGatewayAuthConfig } from "../src/lib/luxartGatewayAuth";
 import { assertSupportedLuxartApiContract } from "../src/lib/luxartApiContract";
 import { bookingRules } from "../src/lib/bookingRules";
 import { zone4YouDateKey, zone4YouScheduleRange, zone4YouTimeZone } from "../src/lib/zone4YouTime";
+import { lessonContentSetSha256 } from "./lesson-content-evidence.mjs";
 import { lessonPlacementEvidence } from "./lesson-placement-evidence";
 
 type Environment = Record<string, string | undefined>;
@@ -60,6 +61,7 @@ function lessonEvidence(lessons: Lesson[], range: { from: string; to: string }) 
     count: lessons.length,
     occurrenceSetSha256: createHash("sha256").update(ids.join("\n")).digest("hex"),
     roomPlacementSetSha256: placement.roomPlacementSetSha256,
+    lessonContentSetSha256: lessonContentSetSha256(lessons, "Luxart lesson feed"),
     rooms: [...new Set(lessons.map((lesson) => lesson.roomName))].sort(),
     roomNumbers: placement.roomNumbers,
     reformer,
@@ -83,14 +85,25 @@ function personalizedLessonEvidence(lessons: Lesson[], range: { from: string; to
 }
 
 function assertSameLessonOccurrences(
-  actual: { count: number; occurrenceSetSha256: string; roomPlacementSetSha256: string },
-  expected: { count: number; occurrenceSetSha256: string; roomPlacementSetSha256: string },
+  actual: {
+    count: number;
+    occurrenceSetSha256: string;
+    roomPlacementSetSha256: string;
+    lessonContentSetSha256: string;
+  },
+  expected: {
+    count: number;
+    occurrenceSetSha256: string;
+    roomPlacementSetSha256: string;
+    lessonContentSetSha256: string;
+  },
   label: string,
 ) {
   if (
     actual.count !== expected.count ||
     actual.occurrenceSetSha256 !== expected.occurrenceSetSha256 ||
-    actual.roomPlacementSetSha256 !== expected.roomPlacementSetSha256
+    actual.roomPlacementSetSha256 !== expected.roomPlacementSetSha256 ||
+    actual.lessonContentSetSha256 !== expected.lessonContentSetSha256
   ) {
     throw new Error(`${label} does not contain the complete anonymous Luxart lesson set.`);
   }

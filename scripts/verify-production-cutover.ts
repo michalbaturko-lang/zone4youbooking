@@ -3,6 +3,7 @@ import type { AnyRecord } from "node:dns";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { BookingCapabilities, Lesson } from "../src/lib/domain";
+import { lessonContentSetSha256 } from "./lesson-content-evidence.mjs";
 import { lessonPlacementEvidence } from "./lesson-placement-evidence";
 import {
   addZone4YouCalendarDays,
@@ -30,6 +31,10 @@ export interface ApprovedLessonFeedEvidence {
   count: number;
   occurrenceSetSha256: string;
   roomPlacementSetSha256: string;
+  localizedContentSha256: {
+    czech: string;
+    english: string;
+  };
   resourceMapSha256: string;
   roomNumbers: number[];
   reformer: number;
@@ -116,6 +121,7 @@ function approvedLessonFeed(value: unknown): ApprovedLessonFeedEvidence {
   const reformer = evidence.reformer;
   const occurrenceSetSha256 = evidence.occurrenceSetSha256;
   const roomPlacementSetSha256 = evidence.roomPlacementSetSha256;
+  const localizedContentSha256 = evidence.localizedContentSha256;
   const resourceMapSha256 = evidence.resourceMapSha256;
   const roomNumbers = evidence.roomNumbers;
   const rangeValue = evidence.range;
@@ -127,6 +133,7 @@ function approvedLessonFeed(value: unknown): ApprovedLessonFeedEvidence {
     !Number.isSafeInteger(reformer) || Number(reformer) < 1 || Number(reformer) > Number(count) ||
     typeof occurrenceSetSha256 !== "string" || !/^[a-f0-9]{64}$/.test(occurrenceSetSha256) ||
     typeof roomPlacementSetSha256 !== "string" || !/^[a-f0-9]{64}$/.test(roomPlacementSetSha256) ||
+    !localizedContentSha256 || typeof localizedContentSha256 !== "object" || Array.isArray(localizedContentSha256) ||
     typeof resourceMapSha256 !== "string" || !/^[a-f0-9]{64}$/.test(resourceMapSha256) ||
     !Array.isArray(roomNumbers) || roomNumbers.length === 0 ||
     !rangeValue || typeof rangeValue !== "object" || Array.isArray(rangeValue) ||
@@ -134,6 +141,13 @@ function approvedLessonFeed(value: unknown): ApprovedLessonFeedEvidence {
     !Array.isArray(dateKeys) || dateKeys.length === 0
   ) {
     throw new Error("Pre-cutover approved lesson feed is incomplete or invalid.");
+  }
+  const localizedContent = localizedContentSha256 as Record<string, unknown>;
+  if (
+    typeof localizedContent.czech !== "string" || !/^[a-f0-9]{64}$/.test(localizedContent.czech) ||
+    typeof localizedContent.english !== "string" || !/^[a-f0-9]{64}$/.test(localizedContent.english)
+  ) {
+    throw new Error("Pre-cutover approved localized lesson-content digests are incomplete or invalid.");
   }
   const normalizedRoomNumbers = roomNumbers.map(Number);
   if (
@@ -177,6 +191,10 @@ function approvedLessonFeed(value: unknown): ApprovedLessonFeedEvidence {
     count: Number(count),
     occurrenceSetSha256,
     roomPlacementSetSha256,
+    localizedContentSha256: {
+      czech: localizedContent.czech,
+      english: localizedContent.english,
+    },
     resourceMapSha256,
     roomNumbers: normalizedRoomNumbers,
     reformer: Number(reformer),
@@ -472,6 +490,7 @@ function lessonFeedEvidence(
       .update([...ids].sort().join("\n"), "utf8")
       .digest("hex"),
     roomPlacementSetSha256: placement.roomPlacementSetSha256,
+    lessonContentSetSha256: lessonContentSetSha256(lessons, `${language} production lesson feed`),
     roomNumbers: placement.roomNumbers,
     rooms: [...rooms].sort(),
     reformer,
@@ -499,11 +518,13 @@ function sameOccurrences(
 function matchesApprovedLessonFeed(
   observed: ReturnType<typeof lessonFeedEvidence>,
   approved: ApprovedLessonFeedEvidence,
+  language: "czech" | "english",
 ) {
   return (
     observed.count === approved.count &&
     observed.occurrenceSetSha256 === approved.occurrenceSetSha256 &&
     observed.roomPlacementSetSha256 === approved.roomPlacementSetSha256 &&
+    observed.lessonContentSetSha256 === approved.localizedContentSha256[language] &&
     JSON.stringify(observed.roomNumbers) === JSON.stringify(approved.roomNumbers) &&
     observed.reformer === approved.reformer &&
     observed.earliestStartsAt === approved.earliestStartsAt &&
@@ -605,8 +626,8 @@ export async function runProductionCutoverVerification(
     throw new Error("Czech and English production feeds do not contain the same lesson occurrences and range.");
   }
   if (
-    !matchesApprovedLessonFeed(czech, approvedFeed) ||
-    !matchesApprovedLessonFeed(english, approvedFeed)
+    !matchesApprovedLessonFeed(czech, approvedFeed, "czech") ||
+    !matchesApprovedLessonFeed(english, approvedFeed, "english")
   ) {
     throw new Error(
       "Production lesson feed does not exactly match the approved live Luxart and staging lesson evidence.",
@@ -664,6 +685,10 @@ export async function runProductionCutoverVerification(
       count: czech.count,
       occurrenceSetSha256: czech.occurrenceSetSha256,
       roomPlacementSetSha256: czech.roomPlacementSetSha256,
+      localizedContentSha256: {
+        czech: czech.lessonContentSetSha256,
+        english: english.lessonContentSetSha256,
+      },
       roomNumbers: czech.roomNumbers,
       rooms: czech.rooms,
       reformer: czech.reformer,

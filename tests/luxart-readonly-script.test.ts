@@ -156,6 +156,7 @@ test("standalone Luxart evidence remains diagnostic while D1-attested evidence s
   assert.equal(evidence.czech.reformer, 1);
   assert.equal(evidence.czech.occurrenceSetSha256, evidence.english.occurrenceSetSha256);
   assert.equal(evidence.czech.roomPlacementSetSha256, evidence.english.roomPlacementSetSha256);
+  assert.notEqual(evidence.czech.lessonContentSetSha256, evidence.english.lessonContentSetSha256);
   assert.deepEqual(evidence.czech.roomNumbers, [4]);
   assert.equal(evidence.personalized.checked, true);
   if (evidence.personalized.checked) {
@@ -164,6 +165,8 @@ test("standalone Luxart evidence remains diagnostic while D1-attested evidence s
     assert.equal(evidence.personalized.czech.ineligible, 0);
     assert.equal(evidence.personalized.czech.occurrenceSetSha256, evidence.czech.occurrenceSetSha256);
     assert.equal(evidence.personalized.czech.roomPlacementSetSha256, evidence.czech.roomPlacementSetSha256);
+    assert.equal(evidence.personalized.czech.lessonContentSetSha256, evidence.czech.lessonContentSetSha256);
+    assert.equal(evidence.personalized.english.lessonContentSetSha256, evidence.english.lessonContentSetSha256);
     assert.equal(evidence.personalized.english.eligible, evidence.personalized.czech.eligible);
   }
   assert.equal(JSON.stringify(evidence).includes("release-test-password"), false);

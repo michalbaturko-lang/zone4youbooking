@@ -8,6 +8,7 @@ import {
   loadProductionCutoverConfig,
   runProductionCutoverVerification,
 } from "../scripts/verify-production-cutover";
+import { lessonContentSetSha256 } from "../scripts/lesson-content-evidence.mjs";
 import type { Lesson } from "../src/lib/domain";
 import { zone4YouScheduleRange } from "../src/lib/zone4YouTime";
 
@@ -42,6 +43,10 @@ function preCutoverFixture(
       count: 1,
       occurrenceSetSha256: approvedOccurrenceSetSha256,
       roomPlacementSetSha256: approvedRoomPlacementSetSha256,
+      localizedContentSha256: {
+        czech: approvedLessonContentSetSha256,
+        english: approvedLessonContentSetSha256,
+      },
       resourceMapSha256: approvedResourceMapSha256,
       roomNumbers: [4],
       reformer: 1,
@@ -65,16 +70,6 @@ function preCutoverFixture(
   return { path, receipt, sha256 };
 }
 
-const approvedPreCutover = preCutoverFixture();
-const baseEnvironment = {
-  ZONE4YOU_PRODUCTION_APP_URL: target,
-  ZONE4YOU_PRODUCTION_EXPECTED_COMMIT: commit,
-  ZONE4YOU_PRODUCTION_EXPECTED_PHASE: "booking_without_payments",
-  ZONE4YOU_PRECUTOVER_EVIDENCE_PATH: approvedPreCutover.path,
-  ZONE4YOU_RELEASE_DOSSIER_CONFIRMATION: `VERIFY_ZONE4YOU_RELEASE_DOSSIER:${dossierSha256}`,
-  ZONE4YOU_PRODUCTION_CUTOVER_CONFIRMATION: `VERIFY_ZONE4YOU_PRODUCTION_CUTOVER:${approvedPreCutover.sha256}`,
-} satisfies Record<string, string | undefined>;
-
 test.after(() => rmSync(fixtureDirectory, { recursive: true, force: true }));
 
 function lesson(id: string, startsAt = `${range.from.slice(0, 10)}T10:00:00.000Z`): Lesson {
@@ -96,6 +91,20 @@ function lesson(id: string, startsAt = `${range.from.slice(0, 10)}T10:00:00.000Z
     waitlistEnabled: false,
   };
 }
+
+const approvedLessonContentSetSha256 = lessonContentSetSha256(
+  [lesson("lesson-1")],
+  "Approved production test lesson feed",
+);
+const approvedPreCutover = preCutoverFixture();
+const baseEnvironment = {
+  ZONE4YOU_PRODUCTION_APP_URL: target,
+  ZONE4YOU_PRODUCTION_EXPECTED_COMMIT: commit,
+  ZONE4YOU_PRODUCTION_EXPECTED_PHASE: "booking_without_payments",
+  ZONE4YOU_PRECUTOVER_EVIDENCE_PATH: approvedPreCutover.path,
+  ZONE4YOU_RELEASE_DOSSIER_CONFIRMATION: `VERIFY_ZONE4YOU_RELEASE_DOSSIER:${dossierSha256}`,
+  ZONE4YOU_PRODUCTION_CUTOVER_CONFIRMATION: `VERIFY_ZONE4YOU_PRODUCTION_CUTOVER:${approvedPreCutover.sha256}`,
+} satisfies Record<string, string | undefined>;
 
 function response(body: unknown, requestId: string, status = 200, html = false) {
   return new Response(html ? String(body) : JSON.stringify(body), {
@@ -176,6 +185,7 @@ test("production cutover configuration is pinned to the exact host, commit, phas
   assert.equal(config.cutoverApprovedAt, new Date(checkedAt.getTime() - 5 * 60_000).toISOString());
   assert.equal(config.approvedLessonFeed.occurrenceSetSha256, approvedOccurrenceSetSha256);
   assert.equal(config.approvedLessonFeed.roomPlacementSetSha256, approvedRoomPlacementSetSha256);
+  assert.equal(config.approvedLessonFeed.localizedContentSha256.czech, approvedLessonContentSetSha256);
   assert.equal(config.approvedLessonFeed.resourceMapSha256, approvedResourceMapSha256);
   assert.deepEqual(config.approvedLessonFeed.roomNumbers, [4]);
   assert.equal(config.approvedLessonFeed.count, 1);
@@ -362,6 +372,15 @@ test("production verifier rejects any lesson omission or drift from the approved
         now: () => checkedAt,
       },
     ),
+    /does not exactly match the approved live Luxart and staging lesson evidence/i,
+  );
+
+  await assert.rejects(
+    runProductionCutoverVerification(config, {
+      fetchImpl: liveFetch([{ ...lesson("lesson-1"), priceKc: 250 }]),
+      resolveAnyImpl: async () => [{ type: "A", address: "203.0.113.10", ttl: 60 }],
+      now: () => checkedAt,
+    }),
     /does not exactly match the approved live Luxart and staging lesson evidence/i,
   );
 });

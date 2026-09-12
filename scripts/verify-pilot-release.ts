@@ -345,6 +345,15 @@ export function validateLuxartEvidence(
   ) {
     throw new Error("Czech and English Luxart room-placement digests must be the same full SHA-256.");
   }
+  const localizedContentSha256 = {
+    czech: stringValue(czech.lessonContentSetSha256, "Luxart Czech lesson-content digest"),
+    english: stringValue(english.lessonContentSetSha256, "Luxart English lesson-content digest"),
+  };
+  for (const [language, digest] of Object.entries(localizedContentSha256)) {
+    if (!/^[a-f0-9]{64}$/.test(digest)) {
+      throw new Error(`Luxart ${language} lesson-content digest must be a full lowercase SHA-256.`);
+    }
+  }
   const reformer = integerValue(czech.reformer, "artifacts.luxartReadOnly.czech.reformer", 1);
   if (integerValue(english.reformer, "artifacts.luxartReadOnly.english.reformer", 1) !== reformer) {
     throw new Error("Czech and English Reformer counts differ.");
@@ -390,6 +399,11 @@ export function validateLuxartEvidence(
       roomPlacementSha,
       `Luxart personalized ${label} room-placement digest`,
     );
+    exactString(
+      localized.lessonContentSetSha256,
+      localizedContentSha256[language],
+      `Luxart personalized ${label} lesson-content digest`,
+    );
     const eligible = integerValue(localized.eligible, `Luxart personalized ${label} eligible count`);
     const ineligible = integerValue(localized.ineligible, `Luxart personalized ${label} ineligible count`);
     if (eligible + ineligible !== count) {
@@ -406,6 +420,7 @@ export function validateLuxartEvidence(
     reformer,
     occurrenceSha,
     roomPlacementSha,
+    localizedContentSha256,
     observedRooms: [...new Set(observedRooms)].sort((left, right) => left - right),
     range,
     lessonRange: czechRange,
@@ -481,6 +496,11 @@ function validateRuntimeEvidence(
       localized.roomPlacementSetSha256,
       luxart.roomPlacementSha,
       `runtime ${label} lesson room-placement digest`,
+    );
+    exactString(
+      localized.lessonContentSetSha256,
+      luxart.localizedContentSha256[language],
+      `runtime ${label} lesson-content digest`,
     );
     const runtimeRoomNumbers = Array.isArray(localized.roomNumbers)
       ? localized.roomNumbers.map((room, index) =>
@@ -833,6 +853,7 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
       count: luxart.count,
       occurrenceSetSha256: luxart.occurrenceSha,
       roomPlacementSetSha256: luxart.roomPlacementSha,
+      localizedContentSha256: luxart.localizedContentSha256,
       resourceMapSha256: resources.sha256,
       roomNumbers: luxart.observedRooms,
       reformer: luxart.reformer,

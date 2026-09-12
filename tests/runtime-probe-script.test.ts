@@ -88,9 +88,17 @@ test("runtime probe verifies the same lesson occurrences through Czech and Engli
           id: "lesson-1",
           luxartRoomNumber: lessonRoomNumber,
           name: locale === "en" ? "Reformer Basics" : "Reformer základy",
+          description: "",
           roomName: "Reformer",
           category: "Reformer",
           startsAt: lessonStartsAt,
+          endsAt: new Date(new Date(lessonStartsAt).getTime() + 60 * 60_000).toISOString(),
+          durationMinutes: 60,
+          instructorName: "Pilot instructor",
+          instructorSpecialization: "Pilates",
+          capacity: 8,
+          priceKc: 200,
+          waitlistEnabled: false,
         }],
       });
       return;
@@ -117,8 +125,18 @@ test("runtime probe verifies the same lesson occurrences through Czech and Engli
         };
         lessons: {
           range: { from: string; to: string; days: number; timeZone: string };
-          czech: { occurrenceSetSha256: string; roomPlacementSetSha256: string; roomNumbers: number[] };
-          english: { occurrenceSetSha256: string; roomPlacementSetSha256: string; roomNumbers: number[] };
+          czech: {
+            occurrenceSetSha256: string;
+            roomPlacementSetSha256: string;
+            lessonContentSetSha256: string;
+            roomNumbers: number[];
+          };
+          english: {
+            occurrenceSetSha256: string;
+            roomPlacementSetSha256: string;
+            lessonContentSetSha256: string;
+            roomNumbers: number[];
+          };
         };
       };
     };
@@ -141,6 +159,10 @@ test("runtime probe verifies the same lesson occurrences through Czech and Engli
     assert.equal(
       evidence.checks.lessons.czech.roomPlacementSetSha256,
       evidence.checks.lessons.english.roomPlacementSetSha256,
+    );
+    assert.notEqual(
+      evidence.checks.lessons.czech.lessonContentSetSha256,
+      evidence.checks.lessons.english.lessonContentSetSha256,
     );
     assert.deepEqual(evidence.checks.lessons.czech.roomNumbers, [4]);
 

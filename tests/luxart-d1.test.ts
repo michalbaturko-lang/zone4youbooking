@@ -40,6 +40,7 @@ function readonlyEvidence(gatewayAuthMode: "none" | "basic" = "none") {
     count: 24,
     occurrenceSetSha256: "a".repeat(64),
     roomPlacementSetSha256: "d".repeat(64),
+    lessonContentSetSha256: "e".repeat(64),
     rooms: ["Sál 1", "Sál 2", "Sál 3", "Reformer"],
     roomNumbers: [1, 2, 3, 4],
     reformer: 3,
