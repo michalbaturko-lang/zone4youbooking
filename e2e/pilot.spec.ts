@@ -41,7 +41,9 @@ test("zobrazí všech 24 lekcí, všechny sály a Reformer bez browser chyby", {
   await openCleanDemo(page);
 
   const logo = page.locator("button.logo");
-  await expect(logo).toHaveAccessibleName(/Z4Y Zone4You/);
+  const visibleLogoLabel = (await logo.innerText()).trim().replace(/\s+/g, " ");
+  expect(visibleLogoLabel).toMatch(/^Z4Y(?: Zone4You)?$/);
+  await expect(logo).toHaveAccessibleName(visibleLogoLabel);
 
   const iconHref = await page.locator('link[rel~="icon"]').first().getAttribute("href");
   expect(iconHref).toBeTruthy();

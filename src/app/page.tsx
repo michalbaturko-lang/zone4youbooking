@@ -665,7 +665,7 @@ export default function Home() {
     <>
       <header className="header">
         <div className="header-content">
-          <button className="logo" onClick={() => setSection("schedule")} aria-label={t("nav.logoLabel")}>
+          <button className="logo" onClick={() => setSection("schedule")}>
             <div className="logo-icon">Z4Y</div>
             <span>Zone4You</span>
           </button>
