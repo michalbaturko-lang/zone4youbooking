@@ -15,6 +15,7 @@ Každý bod označte `PASS`, `FAIL` nebo `N/A — funkce bezpečně vypnutá`. K
 - [ ] Čas bez explicitního `Z` / UTC offsetu a neexistující kalendářní datum v lekci, rezervaci, kreditu nebo watchdogu vyvolají bezpečný stav nedostupnosti; desktop, mobil ani hostingová časová zóna je nesmí interpretovat rozdílně.
 - [ ] Všechny sály a Reformer jsou viditelné a filtrovatelné.
 - [ ] Luxart read-only důkaz, staging runtime a post-cutover produkce mají stejný SHA-256 vazeb každého výskytu lekce na `cislo_salu`; změna sálu při zachovaném ID lekce je NO-GO.
+- [ ] `resourceMapSha256` ve staging readiness, release dossieru, pre-cutover receipt a produkční readiness je shodný s úplnou mapou `cislo_salu → id_resource` použitou při UAT; samotná interní resource ID nejsou ve veřejné evidenci.
 - [ ] Zobrazený počet volných míst i stav plno odpovídají přímo Luxart poli `volno`; test s rozdílem mezi `volno` a prostým `kapacita - obsazeno` nesmí použít dopočítanou hodnotu.
 - [ ] Neznámý sál nebo typ lekce nezpůsobí zmizení lekce ani pád stránky.
 - [ ] CS i EN mají srozumitelný rozvrh, detail, stav míst a instrukce.
@@ -45,7 +46,7 @@ Každý bod označte `PASS`, `FAIL` nebo `N/A — funkce bezpečně vypnutá`. K
 - [ ] Storno/Reformer poplatek odpovídá písemně potvrzenému pravidlu.
 - [ ] Při chybě Luxartu UI neukáže falešný úspěch.
 - [ ] Timeout po odeslání Luxart mutace skončí jako `uncertain`, další pokus se zablokuje a projde ruční reconciliation drill.
-- [ ] Guarded `verify:booking-mutations` proběhl pouze na schválené test DB, odmítl produkční origin a před loginem svázal `/api/readiness` s přesným commitem, launch fází, regionem `fra1` a capability profilem; před prvním POSTem ověřil personalizované povolení, autoritativní `volno`, mapovaný sál, rezervační okno, možnost online storna a očekávaný poplatek; uložil privacy-safe JSON důkaz.
+- [ ] Guarded `verify:booking-mutations` proběhl pouze na schválené test DB, odmítl produkční origin a před loginem svázal `/api/readiness` s přesným commitem, launch fází, regionem `fra1`, capability profilem a `resourceMapSha256` úplné operátorské mapy; před prvním POSTem ověřil personalizované povolení, autoritativní `volno`, mapovaný sál, rezervační okno, možnost online storna a očekávaný poplatek; uložil privacy-safe JSON důkaz.
 - [ ] Read-only režim zobrazí rozvrh, ale bezpečně zablokuje rezervaci, storno a watchdog hlídání místa.
 
 ## Waitlist a platby

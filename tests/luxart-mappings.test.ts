@@ -6,6 +6,7 @@ import {
   validLuxartResourceMapping,
   validLuxartTextMapping,
 } from "../src/lib/luxartMappings";
+import { luxartResourceMappingSha256 } from "../src/lib/luxartResourceMappingFingerprint";
 
 test("normalizes bounded Luxart room and lesson-type display mappings", () => {
   assert.deepEqual(
@@ -46,4 +47,17 @@ test("accepts only complete positive room-to-resource mappings", () => {
   ]) {
     assert.equal(validLuxartResourceMapping(mapping), false);
   }
+});
+
+test("resource mapping fingerprint is canonical and changes when a resource binding changes", () => {
+  const expected = luxartResourceMappingSha256(JSON.stringify({ 1: 101, 2: 207 }));
+  assert.match(expected, /^[a-f0-9]{64}$/);
+  assert.equal(
+    luxartResourceMappingSha256('{"2":"207","1":101}'),
+    expected,
+  );
+  assert.notEqual(
+    luxartResourceMappingSha256(JSON.stringify({ 1: 101, 2: 208 })),
+    expected,
+  );
 });

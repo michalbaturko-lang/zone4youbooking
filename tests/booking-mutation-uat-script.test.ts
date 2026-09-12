@@ -7,14 +7,18 @@ import {
   runBookingMutationUat,
 } from "../scripts/verify-booking-mutations";
 import { validateBookingUatEvidence } from "../scripts/verify-pilot-release";
+import { luxartResourceMappingSha256 } from "../src/lib/luxartResourceMappingFingerprint";
 
 const target = "https://staging.booking.zone4you.cz/";
 const commit = "1234567890abcdef1234567890abcdef12345678";
+const resourceMapJson = JSON.stringify({ 1: 101 });
+const resourceMapSha256 = luxartResourceMappingSha256(resourceMapJson);
 const baseEnvironment = {
   ZONE4YOU_UAT_APP_URL: target,
   ZONE4YOU_UAT_MUTATION_CONFIRMATION: "ZONE4YOU_TEST_DB_ONLY:https://staging.booking.zone4you.cz",
   ZONE4YOU_UAT_EXPECTED_COMMIT: commit,
   ZONE4YOU_UAT_EXPECTED_PHASE: "booking_without_payments",
+  LUXART_RESOURCE_MAP_JSON: resourceMapJson,
   ZONE4YOU_UAT_LOGIN: "approved-test-user",
   ZONE4YOU_UAT_PASSWORD: "test-secret",
   ZONE4YOU_UAT_EXPECTED_USER_ID: "42",
@@ -127,6 +131,7 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
   let personalizedEligibility = true;
   let authoritativeAvailableCount = 8;
   let readinessCommit = commit;
+  let readinessResourceMapSha256 = resourceMapSha256;
   let corruptPreExistingReservation = false;
   let failSnapshotAfterCancellation = false;
   let cleanupRequests = 0;
@@ -151,6 +156,7 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
         schedule: "ready",
         booking: "ready",
         payments: "disabled",
+        resourceMapSha256: readinessResourceMapSha256,
         capabilities,
       });
     }
@@ -233,6 +239,7 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
     evidence,
     config.target.origin,
     new Map([["1", 101]]),
+    resourceMapSha256,
     config.expectedCommit,
     config.expectedPhase,
   );
@@ -245,6 +252,7 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
   assert.equal(evidence.authoritativeAvailabilityVerified, true);
   assert.equal(evidence.reservationWindowVerified, true);
   assert.equal(evidence.onlineCancellationVerified, true);
+  assert.equal(evidence.resourceMapSha256, resourceMapSha256);
   assert.equal(evidence.lessonRoomNumber, 1);
   assert.equal(evidence.expectedCancellationFeeKc, 0);
   assert.equal(evidence.cancellationStateVerified, true);
@@ -280,6 +288,15 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
     /exact approved ready live staging runtime/i,
   );
   assert.equal(createWrites, writesAfterSuccessfulUat);
+
+  readinessCommit = commit;
+  readinessResourceMapSha256 = "f".repeat(64);
+  await assert.rejects(
+    runBookingMutationUat(config, fakeFetch),
+    /exact approved ready live staging runtime/i,
+  );
+  assert.equal(createWrites, writesAfterSuccessfulUat);
+  readinessResourceMapSha256 = resourceMapSha256;
 
   reservations = [preExistingReservation];
   cancelledReservation = undefined;

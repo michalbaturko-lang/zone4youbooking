@@ -15,6 +15,7 @@ import { paymentMutationsRequested } from "@/lib/paymentConfig";
 import { getPostgresRateLimiter } from "@/lib/rateLimit";
 import { assertLessonFeedReady, pilotLessonQuery } from "@/lib/bookingService";
 import { BookingApiError } from "@/lib/errors";
+import { luxartResourceMappingSha256 } from "@/lib/luxartResourceMappingFingerprint";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +78,10 @@ export async function GET() {
     );
   }
 
+  const resourceMapSha256 = bookingMutationsRequested()
+    ? luxartResourceMappingSha256(process.env.LUXART_RESOURCE_MAP_JSON)
+    : undefined;
+
   const rateLimitMode = process.env.RATE_LIMIT_MODE as "memory" | "postgres";
   if (rateLimitMode === "postgres") {
     try {
@@ -90,6 +95,7 @@ export async function GET() {
           luxart: "not_checked",
           schedule: "not_checked",
           bookingNotifications,
+          resourceMapSha256,
           rateLimit: "unready",
           capabilities: getPilotCapabilities(),
         },
@@ -112,6 +118,7 @@ export async function GET() {
         luxart: emptySchedule || invalidSchedule ? "reachable" : "unreachable",
         schedule: emptySchedule ? "empty" : invalidSchedule ? "invalid" : "unavailable",
         bookingNotifications,
+        resourceMapSha256,
         rateLimit: rateLimitMode,
         capabilities: getPilotCapabilities(),
       },
@@ -131,6 +138,7 @@ export async function GET() {
           luxart: "reachable",
           schedule: "ready",
           bookingNotifications,
+          resourceMapSha256,
           rateLimit: rateLimitMode,
           payments: "ledger_unready",
           capabilities: getPilotCapabilities(),
@@ -152,6 +160,7 @@ export async function GET() {
           luxart: "reachable",
           schedule: "ready",
           bookingNotifications,
+          resourceMapSha256,
           rateLimit: rateLimitMode,
           booking: "ledger_unready",
           payments: paymentMutationsRequested() ? "ready" : "disabled",
@@ -169,6 +178,7 @@ export async function GET() {
     luxart: "reachable",
     schedule: "ready",
     bookingNotifications,
+    resourceMapSha256,
     rateLimit: rateLimitMode,
     booking: bookingMutationsRequested() ? "ready" : "read_only",
     payments: paymentMutationsRequested() ? "ready" : "disabled",

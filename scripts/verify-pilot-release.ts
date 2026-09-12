@@ -3,6 +3,7 @@ import { dirname, isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { assertConfirmedLuxartGatewayAuth, type LuxartGatewayAuthMode } from "../src/lib/luxartGatewayAuth";
 import { parseLuxartResourceMapping } from "../src/lib/luxartMappings";
+import { luxartResourceMappingSha256 } from "../src/lib/luxartResourceMappingFingerprint";
 import { bookingRules } from "../src/lib/bookingRules";
 import { rateLimitRuntimeReady } from "../src/lib/rateLimit";
 import { zone4YouDateKey, zone4YouScheduleRange, zone4YouTimeZone } from "../src/lib/zone4YouTime";
@@ -218,9 +219,13 @@ function requireApprovalAfter(
   }
 }
 
-function roomMap(environment: Environment) {
-  const mapping = parseLuxartResourceMapping(required(environment, "LUXART_RESOURCE_MAP_JSON"));
-  return new Map(Object.entries(mapping));
+function resourceMapping(environment: Environment) {
+  const raw = required(environment, "LUXART_RESOURCE_MAP_JSON");
+  const mapping = parseLuxartResourceMapping(raw);
+  return {
+    rooms: new Map(Object.entries(mapping)),
+    sha256: luxartResourceMappingSha256(raw),
+  };
 }
 
 export function validateLuxartEvidence(
@@ -380,6 +385,7 @@ function validateRuntimeEvidence(
   rateLimitMode: "memory" | "postgres",
   releaseCommit: string,
   launchMode: string,
+  resourceMapSha256: string,
 ) {
   exactString(cleanHttpsOrigin(evidence.target, "artifacts.runtimeProbe.target"), stagingOrigin, "Runtime evidence target");
   const checks = objectValue(evidence.checks, "artifacts.runtimeProbe.checks");
@@ -394,6 +400,11 @@ function validateRuntimeEvidence(
   exactString(readiness.luxart, "reachable", "runtime readiness.luxart");
   exactString(readiness.schedule, "ready", "runtime readiness.schedule");
   exactString(readiness.bookingNotifications, "ready", "runtime readiness.bookingNotifications");
+  exactString(
+    readiness.resourceMapSha256,
+    resourceMapSha256,
+    "runtime readiness.resourceMapSha256",
+  );
   exactString(readiness.rateLimit, rateLimitMode, "runtime readiness.rateLimit");
   exactString(readiness.booking, "ready", "runtime readiness.booking");
   const capabilities = objectValue(readiness.capabilities, "runtime readiness.capabilities");
@@ -459,6 +470,7 @@ export function validateBookingUatEvidence(
   evidence: JsonObject,
   stagingOrigin: string,
   resourceMap: Map<string, number>,
+  resourceMapSha256: string,
   expectedCommit: string,
   launchMode: string,
 ) {
@@ -476,6 +488,11 @@ export function validateBookingUatEvidence(
   trueValue(evidence.authoritativeAvailabilityVerified, "booking UAT authoritativeAvailabilityVerified");
   trueValue(evidence.reservationWindowVerified, "booking UAT reservationWindowVerified");
   trueValue(evidence.onlineCancellationVerified, "booking UAT onlineCancellationVerified");
+  exactString(
+    evidence.resourceMapSha256,
+    resourceMapSha256,
+    "booking UAT resourceMapSha256",
+  );
   const lessonRoomNumber = integerValue(evidence.lessonRoomNumber, "booking UAT lessonRoomNumber", 1);
   if (!resourceMap.has(String(lessonRoomNumber))) {
     throw new Error("The booking UAT lesson room is missing from LUXART_RESOURCE_MAP_JSON.");
@@ -638,8 +655,8 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
   if (!rateLimitRuntimeReady({ ...environment, LUXART_MOCK: "false" })) {
     throw new Error("The configured production rate limiter is not ready for the verified pilot release.");
   }
-  const resources = roomMap(environment);
-  const luxart = validateLuxartEvidence(load("luxartReadOnly"), luxartOrigin, resources, gatewayAuth.mode);
+  const resources = resourceMapping(environment);
+  const luxart = validateLuxartEvidence(load("luxartReadOnly"), luxartOrigin, resources.rooms, gatewayAuth.mode);
   validateRuntimeEvidence(
     load("runtimeProbe"),
     stagingTarget,
@@ -647,8 +664,16 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
     rateLimitMode as "memory" | "postgres",
     expectedCommit,
     launchMode,
+    resources.sha256,
   );
-  validateBookingUatEvidence(load("bookingMutationUat"), stagingTarget, resources, expectedCommit, launchMode);
+  validateBookingUatEvidence(
+    load("bookingMutationUat"),
+    stagingTarget,
+    resources.rooms,
+    resources.sha256,
+    expectedCommit,
+    launchMode,
+  );
   validateRollbackEvidence(load("rollback", Math.min(24, maximumAgeHours)), stagingTarget);
   validateProductionDomainBaselineEvidence(load("dnsRollbackBaseline", Math.min(24, maximumAgeHours)));
   const alertEventId = validateAlertEvidence(load("alertDelivery"), stagingTarget);
@@ -718,6 +743,7 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
       count: luxart.count,
       occurrenceSetSha256: luxart.occurrenceSha,
       roomPlacementSetSha256: luxart.roomPlacementSha,
+      resourceMapSha256: resources.sha256,
       roomNumbers: luxart.observedRooms,
       reformer: luxart.reformer,
       range: {

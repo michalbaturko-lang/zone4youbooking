@@ -9,6 +9,7 @@ import { zone4YouScheduleRange } from "../src/lib/zone4YouTime";
 const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const script = join(repositoryRoot, "scripts", "probe-runtime.mjs");
 const commit = "1234567890abcdef1234567890abcdef12345678";
+const resourceMapSha256 = "e".repeat(64);
 
 function runProbe(port: number) {
   return new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve) => {
@@ -45,6 +46,7 @@ test("runtime probe verifies the same lesson occurrences through Czech and Engli
   let readinessRegion = "fra1";
   let bookingNotifications = "ready";
   let readinessMode = "live";
+  let readinessResourceMapSha256: string | undefined = resourceMapSha256;
   let lessonRoomNumber: number | undefined = 4;
   const server = createServer((request, response) => {
     if (request.url === "/") {
@@ -70,6 +72,7 @@ test("runtime probe verifies the same lesson occurrences through Czech and Engli
         luxart: "reachable",
         schedule: readinessSchedule,
         bookingNotifications,
+        ...(readinessResourceMapSha256 ? { resourceMapSha256: readinessResourceMapSha256 } : {}),
         rateLimit: "memory",
         booking: "ready",
         payments: "disabled",
@@ -110,6 +113,7 @@ test("runtime probe verifies the same lesson occurrences through Czech and Engli
           bookingNotifications: string;
           booking: string;
           payments: string;
+          resourceMapSha256: string;
         };
         lessons: {
           range: { from: string; to: string; days: number; timeZone: string };
@@ -124,6 +128,7 @@ test("runtime probe verifies the same lesson occurrences through Czech and Engli
     assert.equal(evidence.checks.readiness.region, "fra1");
     assert.equal(evidence.checks.readiness.booking, "ready");
     assert.equal(evidence.checks.readiness.payments, "disabled");
+    assert.equal(evidence.checks.readiness.resourceMapSha256, resourceMapSha256);
     assert.deepEqual(evidence.checks.lessons.range, {
       ...expectedRange,
       days: 7,
@@ -163,12 +168,19 @@ test("runtime probe verifies the same lesson occurrences through Czech and Engli
     assert.match(wrongRegion.stderr, /does not prove the approved fra1 deployment region/i);
 
     readinessRegion = "fra1";
+    readinessResourceMapSha256 = undefined;
+    const missingResourceMap = await runProbe(address.port);
+    assert.equal(missingResourceMap.code, 1);
+    assert.match(missingResourceMap.stderr, /does not identify the exact Luxart resource mapping/i);
+
+    readinessResourceMapSha256 = resourceMapSha256;
     lessonRoomNumber = undefined;
     const liveMissingRoom = await runProbe(address.port);
     assert.equal(liveMissingRoom.code, 1);
     assert.match(liveMissingRoom.stderr, /without a positive Luxart room number/i);
 
     readinessMode = "demo";
+    readinessResourceMapSha256 = undefined;
     const demoWithoutInternalRoom = await runProbe(address.port);
     assert.equal(demoWithoutInternalRoom.code, 0, demoWithoutInternalRoom.stderr);
   } finally {

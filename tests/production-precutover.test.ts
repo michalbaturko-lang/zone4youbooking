@@ -34,6 +34,7 @@ function releaseEvidence(cutoverApprovedAt = now.toISOString()) {
       count: 24,
       occurrenceSetSha256: "c".repeat(64),
       roomPlacementSetSha256: "d".repeat(64),
+      resourceMapSha256: "e".repeat(64),
       roomNumbers: [1, 2, 3],
       reformer: 3,
       range: {
@@ -98,6 +99,7 @@ test("pre-cutover gate binds the approved dossier to the unchanged live DNS roll
   assert.equal(result.explicitCutoverApproval, true);
   assert.equal(result.cutoverApprovedAt, now.toISOString());
   assert.equal(result.lessonFeed.occurrenceSetSha256, "c".repeat(64));
+  assert.equal(result.lessonFeed.resourceMapSha256, "e".repeat(64));
   assert.equal(result.lessonFeed.count, 24);
   assert.equal(receivedDnsConfirmation, `VERIFY_ZONE4YOU_DNS_BASELINE:${baselineSha256}`);
 });

@@ -153,8 +153,8 @@ Není-li E5 zelená, top-up se v pilotu skryje. Platby nesmí blokovat bezpečn�
 
 | Kritérium | GO práh | Povinný důkaz |
 |---|---|---|
-| Health/readiness | health 200; readiness ověří neprázdný validní sedmidenní feed a hlásí `schedule=ready`; při prázdném/vadném feedu, nedostupném Luxartu nebo neúplné live konfiguraci vrátí 503 | runtime test + probe JSON |
-| Provenience buildu | preflight, readiness a release dossier mají stejnou schválenou fázi a celý Git SHA | preflight + runtime JSON + dossier |
+| Health/readiness | health 200; readiness ověří neprázdný validní sedmidenní feed a hlásí `schedule=ready`; v booking fázi vrátí SHA-256 přesně nasazené resource mapy; při prázdném/vadném feedu, nedostupném Luxartu nebo neúplné live konfiguraci vrátí 503 | runtime test + probe JSON |
+| Provenience buildu a sálů | preflight, readiness a release dossier mají stejnou schválenou fázi, celý Git SHA a stejný `resourceMapSha256` jako mapa použitá pro UAT | preflight + runtime JSON + dossier |
 | Monitoring | privacy-safe `verify:alert-delivery` dostane 2xx a support ručně potvrdí stejné event ID; hosting monitor hlídá 5xx, Luxart timeout a neúspěšnou platbu | JSON důkaz + potvrzení supportu |
 | Rollback | návrat do read-only je do 5 minut automaticky ověřen `verify:readonly-rollback`; přesná HTTPS fallback URL Memberzone vrací neprázdný Zone4You rozvrh včetně Reformeru a dostupnost současně ručně potvrdí odpovědná osoba | privacy-safe owner-only JSON z `verify:memberzone-fallback`, celý SHA-256 a časovaný rollback záznam; bez uloženého HTML nebo osobních údajů |
 | UAT | 0 otevřených P0/P1; známé P2/P3 mají vlastníka a rozhodnutí | podepsaný checklist |

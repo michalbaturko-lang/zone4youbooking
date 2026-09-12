@@ -176,6 +176,10 @@ async function main() {
     if (readiness.body.bookingNotifications !== "ready") {
       throw new Error("Live runtime readiness does not confirm active Luxart booking notification templates.");
     }
+    const bookingPhase = ["booking_without_payments", "booking_with_stripe"].includes(readiness.body.phase);
+    if (bookingPhase && !/^[a-f0-9]{64}$/.test(readiness.body.resourceMapSha256 ?? "")) {
+      throw new Error("Live runtime readiness does not identify the exact Luxart resource mapping.");
+    }
   }
   evidence.checks.readiness = {
     ok: true,
@@ -187,6 +191,9 @@ async function main() {
     luxart: readiness.body.luxart,
     schedule: readiness.body.schedule,
     bookingNotifications: readiness.body.bookingNotifications,
+    ...(typeof readiness.body.resourceMapSha256 === "string"
+      ? { resourceMapSha256: readiness.body.resourceMapSha256 }
+      : {}),
     rateLimit: readiness.body.rateLimit,
     booking: readiness.body.booking,
     payments: readiness.body.payments,

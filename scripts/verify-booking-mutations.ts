@@ -7,6 +7,7 @@ import {
   cancellationPolicyForLesson,
   freeCancellationDeadlineForLesson,
 } from "../src/lib/bookingRules";
+import { luxartResourceMappingSha256 } from "../src/lib/luxartResourceMappingFingerprint";
 
 type FetchLike = typeof fetch;
 type Environment = Record<string, string | undefined>;
@@ -24,6 +25,7 @@ export interface BookingMutationUatConfig {
   target: URL;
   expectedCommit: string;
   expectedPhase: BookingMutationUatPhase;
+  expectedResourceMapSha256: string;
   login: string;
   password: string;
   memberCardNumber?: string;
@@ -106,6 +108,9 @@ export function loadBookingMutationUatConfig(environment: Environment = process.
     target,
     expectedCommit,
     expectedPhase: expectedPhase as BookingMutationUatPhase,
+    expectedResourceMapSha256: luxartResourceMappingSha256(
+      required(environment, "LUXART_RESOURCE_MAP_JSON"),
+    ),
     login: required(environment, "ZONE4YOU_UAT_LOGIN"),
     password: required(environment, "ZONE4YOU_UAT_PASSWORD"),
     memberCardNumber: environment.ZONE4YOU_UAT_MEMBER_CARD_NUMBER?.trim() || undefined,
@@ -266,6 +271,7 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
     schedule?: string;
     booking?: string;
     payments?: string;
+    resourceMapSha256?: string;
     capabilities?: Partial<BookingCapabilities>;
   }>(config, fetchImpl, "/api/readiness");
   const noPayments = config.expectedPhase === "booking_without_payments";
@@ -278,6 +284,7 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
     readiness.body.luxart !== "reachable" ||
     readiness.body.schedule !== "ready" ||
     readiness.body.booking !== "ready" ||
+    readiness.body.resourceMapSha256 !== config.expectedResourceMapSha256 ||
     readiness.body.capabilities?.reservationsEnabled !== true ||
     readiness.body.capabilities?.waitlistEnabled !== false ||
     readiness.body.capabilities?.businessRulesStatus !== "confirmed" ||
@@ -461,6 +468,7 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
       authoritativeAvailabilityVerified: true,
       reservationWindowVerified: true,
       onlineCancellationVerified: true,
+      resourceMapSha256: config.expectedResourceMapSha256,
       lessonRoomNumber: lesson.luxartRoomNumber,
       lessonIdSha256: shortHash(config.lessonId),
       reservationIdSha256: shortHash(verifiedReservation.id),

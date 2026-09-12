@@ -30,6 +30,7 @@ export interface ApprovedLessonFeedEvidence {
   count: number;
   occurrenceSetSha256: string;
   roomPlacementSetSha256: string;
+  resourceMapSha256: string;
   roomNumbers: number[];
   reformer: number;
   range: {
@@ -115,6 +116,7 @@ function approvedLessonFeed(value: unknown): ApprovedLessonFeedEvidence {
   const reformer = evidence.reformer;
   const occurrenceSetSha256 = evidence.occurrenceSetSha256;
   const roomPlacementSetSha256 = evidence.roomPlacementSetSha256;
+  const resourceMapSha256 = evidence.resourceMapSha256;
   const roomNumbers = evidence.roomNumbers;
   const rangeValue = evidence.range;
   const earliestStartsAt = evidence.earliestStartsAt;
@@ -125,6 +127,7 @@ function approvedLessonFeed(value: unknown): ApprovedLessonFeedEvidence {
     !Number.isSafeInteger(reformer) || Number(reformer) < 1 || Number(reformer) > Number(count) ||
     typeof occurrenceSetSha256 !== "string" || !/^[a-f0-9]{64}$/.test(occurrenceSetSha256) ||
     typeof roomPlacementSetSha256 !== "string" || !/^[a-f0-9]{64}$/.test(roomPlacementSetSha256) ||
+    typeof resourceMapSha256 !== "string" || !/^[a-f0-9]{64}$/.test(resourceMapSha256) ||
     !Array.isArray(roomNumbers) || roomNumbers.length === 0 ||
     !rangeValue || typeof rangeValue !== "object" || Array.isArray(rangeValue) ||
     typeof earliestStartsAt !== "string" || typeof latestStartsAt !== "string" ||
@@ -174,6 +177,7 @@ function approvedLessonFeed(value: unknown): ApprovedLessonFeedEvidence {
     count: Number(count),
     occurrenceSetSha256,
     roomPlacementSetSha256,
+    resourceMapSha256,
     roomNumbers: normalizedRoomNumbers,
     reformer: Number(reformer),
     range: { from, to, days: 7, timeZone: zone4YouTimeZone },
@@ -367,6 +371,7 @@ function assertReadiness(
     luxart?: string;
     schedule?: string;
     bookingNotifications?: string;
+    resourceMapSha256?: string;
     rateLimit?: string;
     booking?: string;
     payments?: string;
@@ -385,6 +390,7 @@ function assertReadiness(
     result.body.luxart !== "reachable" ||
     result.body.schedule !== "ready" ||
     result.body.bookingNotifications !== "ready" ||
+    result.body.resourceMapSha256 !== config.approvedLessonFeed.resourceMapSha256 ||
     result.body.rateLimit !== "postgres" ||
     result.body.booking !== "ready" ||
     result.body.payments !== (paymentReady ? "ready" : "disabled") ||
@@ -398,7 +404,7 @@ function assertReadiness(
     capabilities.topupMode !== (paymentReady ? "stripe" : "disabled")
   ) {
     throw new Error(
-      "Production readiness does not match the approved commit, phase, fra1 region, Luxart, booking notifications, PostgreSQL or pilot capabilities.",
+      "Production readiness does not match the approved commit, phase, fra1 region, Luxart, resource mapping, booking notifications, PostgreSQL or pilot capabilities.",
     );
   }
 }
@@ -578,6 +584,7 @@ export async function runProductionCutoverVerification(
     luxart?: string;
     schedule?: string;
     bookingNotifications?: string;
+    resourceMapSha256?: string;
     rateLimit?: string;
     booking?: string;
     payments?: string;
@@ -645,6 +652,7 @@ export async function runProductionCutoverVerification(
       luxart: readiness.body.luxart,
       schedule: readiness.body.schedule,
       bookingNotifications: readiness.body.bookingNotifications,
+      resourceMapSha256: readiness.body.resourceMapSha256,
       rateLimit: readiness.body.rateLimit,
       booking: readiness.body.booking,
       payments: readiness.body.payments,

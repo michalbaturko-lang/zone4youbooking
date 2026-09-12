@@ -22,6 +22,7 @@ let fixtureCounter = 0;
 const range = zone4YouScheduleRange(checkedAt, 7);
 const approvedOccurrenceSetSha256 = createHash("sha256").update("lesson-1").digest("hex");
 const approvedRoomPlacementSetSha256 = createHash("sha256").update("lesson-1\0" + 4).digest("hex");
+const approvedResourceMapSha256 = "e".repeat(64);
 
 function preCutoverFixture(
   overrides: Record<string, unknown> = {},
@@ -41,6 +42,7 @@ function preCutoverFixture(
       count: 1,
       occurrenceSetSha256: approvedOccurrenceSetSha256,
       roomPlacementSetSha256: approvedRoomPlacementSetSha256,
+      resourceMapSha256: approvedResourceMapSha256,
       roomNumbers: [4],
       reformer: 1,
       range: { ...range, days: 7, timeZone: "Europe/Prague" },
@@ -126,6 +128,7 @@ function liveFetch(lessons = [lesson("lesson-1")]): typeof fetch {
         luxart: "reachable",
         schedule: "ready",
         bookingNotifications: "ready",
+        resourceMapSha256: approvedResourceMapSha256,
         rateLimit: "postgres",
         booking: "ready",
         payments: "disabled",
@@ -173,6 +176,7 @@ test("production cutover configuration is pinned to the exact host, commit, phas
   assert.equal(config.cutoverApprovedAt, new Date(checkedAt.getTime() - 5 * 60_000).toISOString());
   assert.equal(config.approvedLessonFeed.occurrenceSetSha256, approvedOccurrenceSetSha256);
   assert.equal(config.approvedLessonFeed.roomPlacementSetSha256, approvedRoomPlacementSetSha256);
+  assert.equal(config.approvedLessonFeed.resourceMapSha256, approvedResourceMapSha256);
   assert.deepEqual(config.approvedLessonFeed.roomNumbers, [4]);
   assert.equal(config.approvedLessonFeed.count, 1);
 });
@@ -289,6 +293,7 @@ test("production cutover verifier proves DNS, security, runtime provenance and m
   assert.equal(evidence.readiness.region, "fra1");
   assert.equal(evidence.readiness.schedule, "ready");
   assert.equal(evidence.readiness.bookingNotifications, "ready");
+  assert.equal(evidence.readiness.resourceMapSha256, approvedResourceMapSha256);
   assert.deepEqual(evidence.dns.recordTypes, ["A"]);
   assert.equal(evidence.requestIds.lessonsCs, "lessons-cs");
   assert.equal(evidence.requestIds.lessonsEn, "lessons-en");
@@ -446,6 +451,22 @@ test("production cutover verifier fails closed on DNS, runtime or schedule diver
       now: () => checkedAt,
     }),
     /booking notifications/i,
+  );
+
+  const wrongResourceMapFetch: typeof fetch = async (input, init) => {
+    const result = await liveFetch()(input, init);
+    const url = new URL(typeof input === "string" ? input : input instanceof URL ? input : input.url);
+    if (url.pathname !== "/api/readiness") return result;
+    const body = await result.json() as Record<string, unknown>;
+    return response({ ...body, resourceMapSha256: "f".repeat(64) }, "readiness-wrong-resource-map");
+  };
+  await assert.rejects(
+    runProductionCutoverVerification(config, {
+      fetchImpl: wrongResourceMapFetch,
+      resolveAnyImpl: async () => [{ type: "CNAME", value: "pilot.invalid" }],
+      now: () => checkedAt,
+    }),
+    /resource mapping/i,
   );
 
   const outsideRange = lesson("lesson-outside", `${range.to.slice(0, 10)}T10:00:00.000Z`);

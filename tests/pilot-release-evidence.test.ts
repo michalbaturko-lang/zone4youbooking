@@ -10,6 +10,7 @@ import {
   luxartPublicContractEndpoints,
 } from "../scripts/verify-luxart-public-contract";
 import { memberzoneFallbackUrl } from "../scripts/verify-memberzone-fallback";
+import { luxartResourceMappingSha256 } from "../src/lib/luxartResourceMappingFingerprint";
 
 const now = new Date("2026-09-05T08:00:00.000Z");
 const commit = "1234567890abcdef1234567890abcdef12345678";
@@ -18,6 +19,8 @@ const luxartTarget = "https://luxart-test.example.com:9443";
 const luxartTargetFingerprint = createHash("sha256").update(luxartTarget).digest("hex");
 const occurrenceSetSha256 = "a".repeat(64);
 const roomPlacementSetSha256 = "b".repeat(64);
+const resourceMapJson = JSON.stringify({ 1: 101, 2: 102, 3: 203 });
+const resourceMapSha256 = luxartResourceMappingSha256(resourceMapJson);
 
 function writeJson(path: string, value: unknown) {
   const body = `${JSON.stringify(value, null, 2)}\n`;
@@ -105,6 +108,7 @@ function validFixture() {
           luxart: "reachable",
           schedule: "ready",
           bookingNotifications: "ready",
+          resourceMapSha256,
           rateLimit: "memory",
           booking: "ready",
           payments: "disabled",
@@ -168,6 +172,7 @@ function validFixture() {
       authoritativeAvailabilityVerified: true,
       reservationWindowVerified: true,
       onlineCancellationVerified: true,
+      resourceMapSha256,
       lessonRoomNumber: 1,
       lessonIdSha256: "c".repeat(16),
       reservationIdSha256: "d".repeat(16),
@@ -296,7 +301,7 @@ function validFixture() {
     ZONE4YOU_RELEASE_DOSSIER_PATH: dossierPath,
     ZONE4YOU_RELEASE_DOSSIER_CONFIRMATION: `VERIFY_ZONE4YOU_RELEASE_DOSSIER:${dossierSha}`,
     ZONE4YOU_RELEASE_COMMIT: commit,
-    LUXART_RESOURCE_MAP_JSON: JSON.stringify({ 1: 101, 2: 102, 3: 203 }),
+    LUXART_RESOURCE_MAP_JSON: resourceMapJson,
     LUXART_API_CONTRACT: "memberzone_rest_v1",
     LUXART_API_AUTH_MODE: "none",
     LUXART_API_AUTH_CONFIRMED: "true",
@@ -321,6 +326,7 @@ test("pilot release dossier binds live Luxart, UAT, application and DNS rollback
     count: 24,
     occurrenceSetSha256,
     roomPlacementSetSha256,
+    resourceMapSha256,
     roomNumbers: [1, 2, 3],
     reformer: 3,
     range: {
@@ -433,6 +439,13 @@ test("pilot release dossier rejects evidence that cannot come from the real guar
         artifact.commit = "b".repeat(40);
       },
       /booking UAT commit must exactly equal/i,
+    ],
+    [
+      "bookingMutationUat",
+      (artifact: Record<string, unknown>) => {
+        artifact.resourceMapSha256 = "f".repeat(64);
+      },
+      /booking UAT resourceMapSha256 must exactly equal/i,
     ],
     [
       "bookingMutationUat",
@@ -663,6 +676,7 @@ test("pilot release dossier binds runtime readiness to the exact release commit 
     ["region", "iad1", /runtime readiness\.region must exactly equal fra1/i],
     ["schedule", "empty", /runtime readiness\.schedule must exactly equal ready/i],
     ["bookingNotifications", "unconfirmed", /runtime readiness\.bookingNotifications must exactly equal ready/i],
+    ["resourceMapSha256", "f".repeat(64), /runtime readiness\.resourceMapSha256 must exactly equal/i],
   ] as const) {
     const fixture = validFixture();
     const runtime = structuredClone(fixture.files.runtimeProbe) as {

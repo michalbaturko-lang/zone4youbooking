@@ -7,6 +7,7 @@ import {
   runtimeDeploymentRegion,
 } from "../src/lib/deploymentPreflight";
 import { paymentProductProfileSha256 } from "../src/lib/paymentProductProfile";
+import { luxartResourceMappingSha256 } from "../src/lib/luxartResourceMappingFingerprint";
 import {
   confirmedBusinessRulesEnvironment,
   confirmedBusinessRulesProfile,
@@ -89,6 +90,39 @@ test("read-only staging preflight and live runtime region gate fail closed", asy
     else process.env.LUXART_MOCK = previousMock;
     if (previousRegion === undefined) delete process.env.VERCEL_REGION;
     else process.env.VERCEL_REGION = previousRegion;
+  }
+});
+
+test("incomplete booking readiness does not publish an unverified resource mapping", async () => {
+  const resourceMapJson = JSON.stringify({ 1: 101, 2: 102, 3: 203 });
+  const environment = bookingStagingEnvironment({
+    LUXART_RESOURCE_MAP_JSON: resourceMapJson,
+    RATE_LIMIT_MODE: "postgres",
+    RATE_LIMIT_DATABASE_URL: "postgresql://test:test@127.0.0.1:1/zone4you?sslmode=require",
+    VERCEL_REGION: "fra1",
+  });
+  const previous = new Map<string, string | undefined>();
+  for (const [name, value] of Object.entries(environment)) {
+    previous.set(name, process.env[name]);
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
+
+  try {
+    const { GET } = await import("../src/app/api/readiness/route");
+    const response = await GET();
+    const body = await response.json() as Record<string, unknown>;
+    assert.equal(response.status, 503);
+    assert.equal(body.status, "not_ready");
+    assert.equal(body.configuration, "incomplete");
+    assert.equal(body.resourceMapSha256, undefined);
+    assert.match(luxartResourceMappingSha256(resourceMapJson), /^[a-f0-9]{64}$/);
+    assert.equal(JSON.stringify(body).includes(resourceMapJson), false);
+  } finally {
+    for (const [name, value] of previous) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
   }
 });
 
