@@ -28,6 +28,7 @@ test("demo readiness exposes immutable deployment provenance without claiming li
     assert.equal(body.region, "fra1");
     assert.equal(body.luxart, "mock");
     assert.equal(body.schedule, "mock");
+    assert.equal(body.bookingNotifications, "mock");
   } finally {
     for (const name of environmentNames) {
       const value = previous[name];

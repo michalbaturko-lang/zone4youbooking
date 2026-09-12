@@ -111,6 +111,7 @@ function liveFetch(lessons = [lesson("lesson-1")]): typeof fetch {
         region: "fra1",
         luxart: "reachable",
         schedule: "ready",
+        bookingNotifications: "ready",
         rateLimit: "postgres",
         booking: "ready",
         payments: "disabled",
@@ -227,6 +228,7 @@ test("production cutover verifier proves DNS, security, runtime provenance and m
   assert.equal(evidence.lessons.reformer, 1);
   assert.equal(evidence.readiness.region, "fra1");
   assert.equal(evidence.readiness.schedule, "ready");
+  assert.equal(evidence.readiness.bookingNotifications, "ready");
   assert.deepEqual(evidence.dns.recordTypes, ["A"]);
   assert.equal(evidence.requestIds.lessonsCs, "lessons-cs");
   assert.equal(evidence.requestIds.lessonsEn, "lessons-en");
@@ -290,6 +292,22 @@ test("production cutover verifier fails closed on DNS, runtime or schedule diver
       now: () => checkedAt,
     }),
     /readiness does not match/i,
+  );
+
+  const unconfirmedNotificationsFetch: typeof fetch = async (input, init) => {
+    const result = await liveFetch()(input, init);
+    const url = new URL(typeof input === "string" ? input : input instanceof URL ? input : input.url);
+    if (url.pathname !== "/api/readiness") return result;
+    const body = await result.json() as Record<string, unknown>;
+    return response({ ...body, bookingNotifications: "unconfirmed" }, "readiness-unconfirmed-notifications");
+  };
+  await assert.rejects(
+    runProductionCutoverVerification(config, {
+      fetchImpl: unconfirmedNotificationsFetch,
+      resolveAnyImpl: async () => [{ type: "CNAME", value: "pilot.invalid" }],
+      now: () => checkedAt,
+    }),
+    /booking notifications/i,
   );
 
   const outsideRange = lesson("lesson-outside", `${range.to.slice(0, 10)}T10:00:00.000Z`);

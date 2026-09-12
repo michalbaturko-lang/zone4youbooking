@@ -328,6 +328,7 @@ function validateRuntimeEvidence(
   exactString(readiness.region, "fra1", "runtime readiness.region");
   exactString(readiness.luxart, "reachable", "runtime readiness.luxart");
   exactString(readiness.schedule, "ready", "runtime readiness.schedule");
+  exactString(readiness.bookingNotifications, "ready", "runtime readiness.bookingNotifications");
   exactString(readiness.rateLimit, rateLimitMode, "runtime readiness.rateLimit");
   exactString(readiness.booking, "ready", "runtime readiness.booking");
   const capabilities = objectValue(readiness.capabilities, "runtime readiness.capabilities");

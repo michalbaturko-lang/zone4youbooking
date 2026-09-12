@@ -92,6 +92,7 @@ function validFixture() {
           region: "fra1",
           luxart: "reachable",
           schedule: "ready",
+          bookingNotifications: "ready",
           rateLimit: "memory",
           booking: "ready",
           payments: "disabled",
@@ -519,6 +520,7 @@ test("pilot release dossier binds runtime readiness to the exact release commit 
     ["phase", "booking_with_stripe", /runtime readiness\.phase must exactly equal booking_without_payments/i],
     ["region", "iad1", /runtime readiness\.region must exactly equal fra1/i],
     ["schedule", "empty", /runtime readiness\.schedule must exactly equal ready/i],
+    ["bookingNotifications", "unconfirmed", /runtime readiness\.bookingNotifications must exactly equal ready/i],
   ] as const) {
     const fixture = validFixture();
     const runtime = structuredClone(fixture.files.runtimeProbe) as {

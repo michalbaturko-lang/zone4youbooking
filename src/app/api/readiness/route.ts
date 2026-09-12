@@ -30,6 +30,7 @@ export async function GET() {
       luxart: "mock",
       schedule: "mock",
       rateLimit: "memory",
+      bookingNotifications: "mock",
       capabilities: getPilotCapabilities(),
     });
   }
@@ -37,6 +38,11 @@ export async function GET() {
   const phase = deploymentPhase();
   const commit = runtimeDeploymentCommit();
   const region = runtimeDeploymentRegion();
+  const bookingNotifications =
+    process.env.NOTIFICATION_PROVIDER === "luxart" &&
+    process.env.LUXART_NOTIFICATION_TEMPLATES_CONFIRMED === "true"
+      ? "ready"
+      : "unconfirmed";
   const deployment = { phase, ...(commit ? { commit } : {}), region };
 
   if (region !== approvedRuntimeRegion) {
@@ -47,6 +53,7 @@ export async function GET() {
         ...deployment,
         luxart: "not_checked",
         schedule: "not_checked",
+        bookingNotifications,
         deployment: "unapproved_region",
         capabilities: getPilotCapabilities(),
       },
@@ -62,6 +69,7 @@ export async function GET() {
         ...deployment,
         luxart: "not_checked",
         schedule: "not_checked",
+        bookingNotifications,
         configuration: "incomplete",
         capabilities: getPilotCapabilities(),
       },
@@ -81,6 +89,7 @@ export async function GET() {
           ...deployment,
           luxart: "not_checked",
           schedule: "not_checked",
+          bookingNotifications,
           rateLimit: "unready",
           capabilities: getPilotCapabilities(),
         },
@@ -102,6 +111,7 @@ export async function GET() {
         ...deployment,
         luxart: emptySchedule || invalidSchedule ? "reachable" : "unreachable",
         schedule: emptySchedule ? "empty" : invalidSchedule ? "invalid" : "unavailable",
+        bookingNotifications,
         rateLimit: rateLimitMode,
         capabilities: getPilotCapabilities(),
       },
@@ -120,6 +130,7 @@ export async function GET() {
           ...deployment,
           luxart: "reachable",
           schedule: "ready",
+          bookingNotifications,
           rateLimit: rateLimitMode,
           payments: "ledger_unready",
           capabilities: getPilotCapabilities(),
@@ -140,6 +151,7 @@ export async function GET() {
           ...deployment,
           luxart: "reachable",
           schedule: "ready",
+          bookingNotifications,
           rateLimit: rateLimitMode,
           booking: "ledger_unready",
           payments: paymentMutationsRequested() ? "ready" : "disabled",
@@ -156,6 +168,7 @@ export async function GET() {
     ...deployment,
     luxart: "reachable",
     schedule: "ready",
+    bookingNotifications,
     rateLimit: rateLimitMode,
     booking: bookingMutationsRequested() ? "ready" : "read_only",
     payments: paymentMutationsRequested() ? "ready" : "disabled",

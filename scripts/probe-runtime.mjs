@@ -159,6 +159,9 @@ async function main() {
     if (readiness.body.luxart !== "reachable" || readiness.body.schedule !== "ready") {
       throw new Error("Live runtime readiness does not confirm a valid non-empty seven-day Luxart schedule.");
     }
+    if (readiness.body.bookingNotifications !== "ready") {
+      throw new Error("Live runtime readiness does not confirm active Luxart booking notification templates.");
+    }
   }
   evidence.checks.readiness = {
     ok: true,
@@ -169,6 +172,7 @@ async function main() {
     region: readiness.body.region,
     luxart: readiness.body.luxart,
     schedule: readiness.body.schedule,
+    bookingNotifications: readiness.body.bookingNotifications,
     rateLimit: readiness.body.rateLimit,
     booking: readiness.body.booking,
     payments: readiness.body.payments,

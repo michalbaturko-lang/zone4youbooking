@@ -43,6 +43,7 @@ test("runtime probe verifies the same lesson occurrences through Czech and Engli
   let lessonStartsAt = new Date(new Date(expectedRange.from).getTime() + 10 * 60 * 60_000).toISOString();
   let readinessSchedule = "ready";
   let readinessRegion = "fra1";
+  let bookingNotifications = "ready";
   const server = createServer((request, response) => {
     if (request.url === "/") {
       response.writeHead(200, {
@@ -66,6 +67,7 @@ test("runtime probe verifies the same lesson occurrences through Czech and Engli
         region: readinessRegion,
         luxart: "reachable",
         schedule: readinessSchedule,
+        bookingNotifications,
         rateLimit: "memory",
         booking: "ready",
         payments: "disabled",
@@ -99,7 +101,13 @@ test("runtime probe verifies the same lesson occurrences through Czech and Engli
     assert.equal(result.code, 0, result.stderr);
     const evidence = JSON.parse(result.stdout) as {
       checks: {
-        readiness: { region: string; schedule: string; booking: string; payments: string };
+        readiness: {
+          region: string;
+          schedule: string;
+          bookingNotifications: string;
+          booking: string;
+          payments: string;
+        };
         lessons: {
           range: { from: string; to: string; days: number; timeZone: string };
           czech: { occurrenceSetSha256: string };
@@ -109,6 +117,7 @@ test("runtime probe verifies the same lesson occurrences through Czech and Engli
     };
     assert.deepEqual(observedLocales.sort(), ["cs", "en"]);
     assert.equal(evidence.checks.readiness.schedule, "ready");
+    assert.equal(evidence.checks.readiness.bookingNotifications, "ready");
     assert.equal(evidence.checks.readiness.region, "fra1");
     assert.equal(evidence.checks.readiness.booking, "ready");
     assert.equal(evidence.checks.readiness.payments, "disabled");
@@ -134,6 +143,12 @@ test("runtime probe verifies the same lesson occurrences through Czech and Engli
     assert.match(emptyReadiness.stderr, /does not confirm a valid non-empty seven-day Luxart schedule/i);
 
     readinessSchedule = "ready";
+    bookingNotifications = "unconfirmed";
+    const unconfirmedNotifications = await runProbe(address.port);
+    assert.equal(unconfirmedNotifications.code, 1);
+    assert.match(unconfirmedNotifications.stderr, /does not confirm active Luxart booking notification templates/i);
+
+    bookingNotifications = "ready";
     readinessRegion = "iad1";
     const wrongRegion = await runProbe(address.port);
     assert.equal(wrongRegion.code, 1);

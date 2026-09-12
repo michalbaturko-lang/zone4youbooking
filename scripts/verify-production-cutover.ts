@@ -282,6 +282,7 @@ function assertReadiness(
     region?: string;
     luxart?: string;
     schedule?: string;
+    bookingNotifications?: string;
     rateLimit?: string;
     booking?: string;
     payments?: string;
@@ -299,6 +300,7 @@ function assertReadiness(
     result.body.region !== "fra1" ||
     result.body.luxart !== "reachable" ||
     result.body.schedule !== "ready" ||
+    result.body.bookingNotifications !== "ready" ||
     result.body.rateLimit !== "postgres" ||
     result.body.booking !== "ready" ||
     result.body.payments !== (paymentReady ? "ready" : "disabled") ||
@@ -312,7 +314,7 @@ function assertReadiness(
     capabilities.topupMode !== (paymentReady ? "stripe" : "disabled")
   ) {
     throw new Error(
-      "Production readiness does not match the approved commit, phase, fra1 region, Luxart, PostgreSQL or pilot capabilities.",
+      "Production readiness does not match the approved commit, phase, fra1 region, Luxart, booking notifications, PostgreSQL or pilot capabilities.",
     );
   }
 }
@@ -451,6 +453,7 @@ export async function runProductionCutoverVerification(
     region?: string;
     luxart?: string;
     schedule?: string;
+    bookingNotifications?: string;
     rateLimit?: string;
     booking?: string;
     payments?: string;
@@ -509,6 +512,7 @@ export async function runProductionCutoverVerification(
       region: readiness.body.region,
       luxart: readiness.body.luxart,
       schedule: readiness.body.schedule,
+      bookingNotifications: readiness.body.bookingNotifications,
       rateLimit: readiness.body.rateLimit,
       booking: readiness.body.booking,
       payments: readiness.body.payments,
