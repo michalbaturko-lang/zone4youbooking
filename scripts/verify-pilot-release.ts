@@ -13,6 +13,7 @@ import {
   approvedLuxartReferenceSemanticContractSha256,
   luxartPublicContractEndpoints,
 } from "./verify-luxart-public-contract";
+import { memberzoneFallbackUrl } from "./verify-memberzone-fallback";
 
 type Environment = Record<string, string | undefined>;
 type JsonObject = Record<string, unknown>;
@@ -127,7 +128,11 @@ function artifact(
   if (!/^[a-f0-9]{64}$/.test(expectedSha256)) {
     throw new Error(`artifacts.${name}.sha256 must be a full SHA-256 digest.`);
   }
-  const loaded = readBoundedJson(path, `artifacts.${name}`, name === "dnsRollbackBaseline");
+  const loaded = readBoundedJson(
+    path,
+    `artifacts.${name}`,
+    name === "dnsRollbackBaseline" || name === "memberzoneFallback",
+  );
   if (loaded.sha256 !== expectedSha256) throw new Error(`artifacts.${name} SHA-256 does not match the dossier.`);
   trueValue(loaded.data.ok, `artifacts.${name}.ok`);
   checkedAt(loaded.data.checkedAt, `artifacts.${name}`, now, maximumAgeHours);
@@ -481,6 +486,33 @@ export function validateAlertEvidence(evidence: JsonObject, stagingOrigin: strin
   return eventId;
 }
 
+export function validateMemberzoneFallbackEvidence(evidence: JsonObject) {
+  if (evidence.schemaVersion !== 1) {
+    throw new Error("Memberzone fallback evidence schemaVersion must be 1.");
+  }
+  exactString(evidence.target, memberzoneFallbackUrl.href, "Memberzone fallback target");
+  exactString(
+    evidence.targetFingerprintSha256,
+    createHash("sha256").update(memberzoneFallbackUrl.href).digest("hex"),
+    "Memberzone fallback targetFingerprintSha256",
+  );
+  exactString(evidence.transport, "https", "Memberzone fallback transport");
+  if (integerValue(evidence.httpStatus, "Memberzone fallback httpStatus", 200) !== 200) {
+    throw new Error("Memberzone fallback httpStatus must be 200.");
+  }
+  exactString(evidence.contentType, "text/html", "Memberzone fallback contentType");
+  const bodyBytes = integerValue(evidence.bodyBytes, "Memberzone fallback bodyBytes", 1);
+  if (bodyBytes > 512 * 1024) {
+    throw new Error("Memberzone fallback bodyBytes exceeds the verified limit.");
+  }
+  if (!/^[a-f0-9]{64}$/.test(stringValue(evidence.bodySha256, "Memberzone fallback bodySha256"))) {
+    throw new Error("Memberzone fallback bodySha256 must be a full lowercase SHA-256 digest.");
+  }
+  for (const key of ["schedulerDetected", "signInPathDetected", "nonEmptyScheduleDetected", "reformerDetected"] as const) {
+    trueValue(evidence[key], `Memberzone fallback ${key}`);
+  }
+}
+
 function validateStripeUatEvidence(evidence: JsonObject, stagingOrigin: string) {
   exactString(cleanHttpsOrigin(evidence.target, "artifacts.stripeUat.target"), stagingOrigin, "Stripe UAT target");
   for (const key of ["paidSessionCreditedExactlyOnce", "duplicateWebhookIgnored", "failedPaymentLeftCreditUnchanged", "finalStateReconciled"]) {
@@ -497,7 +529,7 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
   }
 
   const dossier = dossierFile.data;
-  if (dossier.schemaVersion !== 3) throw new Error("release dossier schemaVersion must be 3.");
+  if (dossier.schemaVersion !== 4) throw new Error("release dossier schemaVersion must be 4.");
   falseValue(dossier.draft, "release dossier draft");
   const releaseId = stringValue(dossier.releaseId, "releaseId");
   const target = cleanHttpsOrigin(dossier.target, "target");
@@ -563,6 +595,7 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
   validateRollbackEvidence(load("rollback", Math.min(24, maximumAgeHours)), stagingTarget);
   validateProductionDomainBaselineEvidence(load("dnsRollbackBaseline", Math.min(24, maximumAgeHours)));
   const alertEventId = validateAlertEvidence(load("alertDelivery"), stagingTarget);
+  validateMemberzoneFallbackEvidence(load("memberzoneFallback", Math.min(24, maximumAgeHours)));
   if (launchMode === "booking_with_stripe") validateStripeUatEvidence(load("stripeUat"), stagingTarget);
 
   const approvals = objectValue(dossier.approvals, "approvals");

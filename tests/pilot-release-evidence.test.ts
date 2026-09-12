@@ -9,6 +9,7 @@ import {
   approvedLuxartReferenceSemanticContractSha256,
   luxartPublicContractEndpoints,
 } from "../scripts/verify-luxart-public-contract";
+import { memberzoneFallbackUrl } from "../scripts/verify-memberzone-fallback";
 
 const now = new Date("2026-09-05T08:00:00.000Z");
 const commit = "1234567890abcdef1234567890abcdef12345678";
@@ -209,6 +210,22 @@ function validFixture() {
       responseStatus: 202,
       manualReceiptConfirmationRequired: true,
     },
+    memberzoneFallback: {
+      schemaVersion: 1,
+      ok: true,
+      checkedAt,
+      target: memberzoneFallbackUrl.href,
+      targetFingerprintSha256: createHash("sha256").update(memberzoneFallbackUrl.href).digest("hex"),
+      transport: "https",
+      httpStatus: 200,
+      contentType: "text/html",
+      bodyBytes: 153_976,
+      bodySha256: "e".repeat(64),
+      schedulerDetected: true,
+      signInPathDetected: true,
+      nonEmptyScheduleDetected: true,
+      reformerDetected: true,
+    },
   };
 
   const artifacts = Object.fromEntries(
@@ -218,8 +235,9 @@ function validFixture() {
     }),
   );
   chmodSync(artifacts.dnsRollbackBaseline.path, 0o600);
+  chmodSync(artifacts.memberzoneFallback.path, 0o600);
   const dossier = {
-    schemaVersion: 3,
+    schemaVersion: 4,
     draft: false,
     releaseId: "zone4you-pilot-2026-09-05",
     target: "https://booking.zone4you.cz/",
@@ -286,13 +304,20 @@ test("pilot release dossier binds live Luxart, UAT, application and DNS rollback
   assert.equal(result.conditions.dnsRollbackBaselineReady, true);
   assert.equal(result.conditions.explicitCutoverApproval, true);
   assert.equal(result.paymentsIncluded, false);
-  assert.equal(result.artifacts.length, 6);
+  assert.equal(result.artifacts.length, 7);
   assert.equal(JSON.stringify(result).includes("approvedBy"), false);
   assert.equal(JSON.stringify(result).includes(fixture.dossierPath), false);
   chmodSync(fixture.dossier.artifacts.dnsRollbackBaseline.path, 0o644);
   assert.throws(
     () => verifyPilotReleaseEvidence(fixture.environment, now),
     /dnsRollbackBaseline must not be accessible/i,
+  );
+
+  const readableFallback = validFixture();
+  chmodSync(readableFallback.dossier.artifacts.memberzoneFallback.path, 0o640);
+  assert.throws(
+    () => verifyPilotReleaseEvidence(readableFallback.environment, now),
+    /memberzoneFallback must not be accessible/i,
   );
 });
 
@@ -420,6 +445,27 @@ test("pilot release dossier rejects evidence that cannot come from the real guar
         artifact.supportOwnerConfigured = false;
       },
       /alert supportOwnerConfigured must be true/i,
+    ],
+    [
+      "memberzoneFallback",
+      (artifact: Record<string, unknown>) => {
+        artifact.target = "https://memberzone.cz/zone4you/";
+      },
+      /Memberzone fallback target must exactly equal/i,
+    ],
+    [
+      "memberzoneFallback",
+      (artifact: Record<string, unknown>) => {
+        artifact.nonEmptyScheduleDetected = false;
+      },
+      /Memberzone fallback nonEmptyScheduleDetected must be true/i,
+    ],
+    [
+      "memberzoneFallback",
+      (artifact: Record<string, unknown>) => {
+        artifact.bodySha256 = "not-a-digest";
+      },
+      /Memberzone fallback bodySha256 must be a full lowercase SHA-256 digest/i,
     ],
   ] as const) {
     const fixture = validFixture();

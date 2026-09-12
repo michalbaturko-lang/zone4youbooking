@@ -97,6 +97,11 @@ export function buildPilotReleaseDossier(environment: Environment = process.env)
       true,
     ),
     alertDelivery: evidenceFile(required(environment, "ZONE4YOU_ALERT_EVIDENCE_PATH"), "alert evidence"),
+    memberzoneFallback: evidenceFile(
+      required(environment, "ZONE4YOU_MEMBERZONE_FALLBACK_EVIDENCE_PATH"),
+      "Memberzone fallback evidence",
+      true,
+    ),
   };
   const artifacts: Record<string, { path: string; sha256: string }> = Object.fromEntries(
     Object.entries(files).map(([name, file]) => [name, file.reference]),
@@ -114,7 +119,7 @@ export function buildPilotReleaseDossier(environment: Environment = process.env)
   const pendingAt = startsAt.toISOString();
 
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     draft: true,
     releaseId: required(environment, "ZONE4YOU_RELEASE_ID"),
     target: `${productionTarget}/`,

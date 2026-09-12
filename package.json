@@ -27,6 +27,7 @@
     "verify:production-precutover": "tsx scripts/verify-production-precutover.ts",
     "verify:production-cutover": "tsx scripts/verify-production-cutover.ts",
     "verify:alert-delivery": "tsx scripts/verify-alert-delivery.ts",
+    "verify:memberzone-fallback": "tsx scripts/verify-memberzone-fallback.ts",
     "prepare:pilot-release": "tsx scripts/prepare-pilot-release-dossier.ts",
     "verify:pilot-release": "tsx scripts/verify-pilot-release.ts",
     "inspect:business-rules": "node scripts/inspect-business-rules.mjs",
