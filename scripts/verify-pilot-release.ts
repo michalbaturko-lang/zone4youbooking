@@ -639,7 +639,7 @@ function validateStripeUatEvidence(evidence: JsonObject, stagingOrigin: string) 
 
 export function verifyPilotReleaseEvidence(environment: Environment = process.env, now = new Date()) {
   const dossierPath = resolve(required(environment, "ZONE4YOU_RELEASE_DOSSIER_PATH"));
-  const dossierFile = readBoundedJson(dossierPath, "release dossier");
+  const dossierFile = readBoundedJson(dossierPath, "release dossier", true);
   const expectedConfirmation = `VERIFY_ZONE4YOU_RELEASE_DOSSIER:${dossierFile.sha256}`;
   if (environment.ZONE4YOU_RELEASE_DOSSIER_CONFIRMATION !== expectedConfirmation) {
     throw new Error(`ZONE4YOU_RELEASE_DOSSIER_CONFIRMATION must exactly equal ${expectedConfirmation}.`);

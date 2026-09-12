@@ -1,7 +1,6 @@
-import { createHash } from "node:crypto";
-import { statSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { existsSync, lstatSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { readStableReleaseJson } from "./release-evidence-file";
 import { assertSupportedLuxartApiContract } from "../src/lib/luxartApiContract";
 
@@ -10,6 +9,7 @@ type JsonObject = Record<string, unknown>;
 
 const productionTarget = "https://booking.zone4you.cz";
 const maximumJsonBytes = 256 * 1024;
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 function required(environment: Environment, name: string) {
   const value = environment[name]?.trim();
@@ -64,6 +64,28 @@ function evidenceFile(rawPath: string, label: string, ownerOnly = false) {
       sha256: loaded.sha256,
     },
   };
+}
+
+function protectedDossierOutputPath(rawPath: string) {
+  const outputPath = resolve(rawPath);
+  if (!outputPath.endsWith(".json")) {
+    throw new Error("ZONE4YOU_RELEASE_DOSSIER_OUTPUT_PATH must end in .json.");
+  }
+  const fromRepository = relative(repositoryRoot, outputPath);
+  if (fromRepository === "" || (!fromRepository.startsWith("..") && !isAbsolute(fromRepository))) {
+    throw new Error("Pilot release dossier must be stored outside the repository.");
+  }
+  if (existsSync(outputPath)) {
+    throw new Error("Pilot release dossier already exists and will not be overwritten.");
+  }
+  const parent = lstatSync(dirname(outputPath));
+  if (!parent.isDirectory() || parent.isSymbolicLink()) {
+    throw new Error("Pilot release dossier parent must be a real directory.");
+  }
+  if ((parent.mode & 0o077) !== 0) {
+    throw new Error("Pilot release dossier parent must not be accessible by group or other users.");
+  }
+  return outputPath;
 }
 
 export function buildPilotReleaseDossier(environment: Environment = process.env) {
@@ -179,20 +201,25 @@ export function buildPilotReleaseDossier(environment: Environment = process.env)
 }
 
 export function writePilotReleaseDossier(environment: Environment = process.env) {
-  const outputPath = resolve(required(environment, "ZONE4YOU_RELEASE_DOSSIER_OUTPUT_PATH"));
-  if (!outputPath.endsWith(".json")) throw new Error("ZONE4YOU_RELEASE_DOSSIER_OUTPUT_PATH must end in .json.");
-  if (!statSync(dirname(outputPath)).isDirectory()) {
-    throw new Error("ZONE4YOU_RELEASE_DOSSIER_OUTPUT_PATH parent must already be a directory.");
-  }
+  const outputPath = protectedDossierOutputPath(
+    required(environment, "ZONE4YOU_RELEASE_DOSSIER_OUTPUT_PATH"),
+  );
   const dossier = buildPilotReleaseDossier(environment);
   const body = `${JSON.stringify(dossier, null, 2)}\n`;
   writeFileSync(outputPath, body, { encoding: "utf8", flag: "wx", mode: 0o600 });
+  const stored = readStableReleaseJson(outputPath, "Pilot release dossier", {
+    maximumBytes: maximumJsonBytes,
+    ownerOnly: true,
+  });
+  if (!stored.bytes.equals(Buffer.from(body, "utf8"))) {
+    throw new Error("Pilot release dossier changed while it was being stored.");
+  }
   return {
     ok: true,
     checkedAt: new Date().toISOString(),
     releaseId: dossier.releaseId,
     draft: true,
-    dossierSha256: createHash("sha256").update(body, "utf8").digest("hex"),
+    dossierSha256: stored.sha256,
     artifactCount: Object.keys(dossier.artifacts).length,
   };
 }

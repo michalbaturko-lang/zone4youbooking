@@ -423,11 +423,15 @@ check(
   existsSync(join(repositoryRoot, "docs/operations-runbook.md")) &&
     existsSync(join(repositoryRoot, "docs/pilot-uat-checklist.md")) &&
     existsSync(join(repositoryRoot, "scripts/probe-runtime.mjs")) &&
-    existsSync(join(repositoryRoot, "scripts/verify-luxart-readonly.ts")) &&
+    existsSync(join(repositoryRoot, "scripts/verify-luxart-d1.ts")) &&
     existsSync(join(repositoryRoot, "scripts/verify-booking-mutations.ts")) &&
+    existsSync(join(repositoryRoot, "scripts/start-readonly-rollback.ts")) &&
     existsSync(join(repositoryRoot, "scripts/verify-readonly-rollback.ts")) &&
+    existsSync(join(repositoryRoot, "scripts/prepare-pilot-release-dossier.ts")) &&
+    existsSync(join(repositoryRoot, "scripts/verify-pilot-release.ts")) &&
+    existsSync(join(repositoryRoot, "scripts/verify-production-precutover.ts")) &&
     existsSync(join(repositoryRoot, "scripts/verify-production-cutover.ts")),
-  "The runtime/Luxart probes, rollback and post-cutover verifiers, runbook and pilot UAT checklist are required.",
+  "The live D1, runtime, UAT, immutable rollback, dossier, pre-cutover and post-cutover chain plus its runbook and checklist are required.",
 );
 check(
   "Verified pilot release dossier",

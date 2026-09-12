@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmodSync, mkdtempSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -94,7 +94,7 @@ test("dossier preparation hashes real evidence but remains an explicit human-app
     createHash("sha256").update(readFileSync(evidencePaths.luxart)).digest("hex"),
   );
   assert.equal(statSync(outputPath).mode & 0o777, 0o600);
-  assert.throws(() => writePilotReleaseDossier(environment), /EEXIST|file already exists/i);
+  assert.throws(() => writePilotReleaseDossier(environment), /already exists/i);
 });
 
 test("dossier preparation refuses failed evidence and unsafe origins", () => {
@@ -157,5 +157,27 @@ test("dossier preparation refuses failed evidence and unsafe origins", () => {
       ZONE4YOU_RUNTIME_EVIDENCE_PATH: runtimeLink,
     }),
     /runtime evidence must be an existing regular file, not a symlink/i,
+  );
+});
+
+test("dossier preparation requires a protected external output directory", () => {
+  const readableParent = fixture();
+  chmodSync(readableParent.directory, 0o750);
+  assert.throws(
+    () => writePilotReleaseDossier(readableParent.environment),
+    /dossier parent must not be accessible by group or other users/i,
+  );
+
+  const symlinkedParent = fixture();
+  const realParent = join(symlinkedParent.directory, "real-output");
+  const linkedParent = join(symlinkedParent.directory, "linked-output");
+  mkdirSync(realParent, { mode: 0o700 });
+  symlinkSync(realParent, linkedParent);
+  assert.throws(
+    () => writePilotReleaseDossier({
+      ...symlinkedParent.environment,
+      ZONE4YOU_RELEASE_DOSSIER_OUTPUT_PATH: join(linkedParent, "dossier.json"),
+    }),
+    /dossier parent must be a real directory/i,
   );
 });

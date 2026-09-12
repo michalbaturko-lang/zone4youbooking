@@ -321,6 +321,7 @@ function validFixture() {
   };
   const dossierPath = join(directory, "pilot-release-dossier.json");
   const dossierSha = writeJson(dossierPath, dossier);
+  chmodSync(dossierPath, 0o600);
   const environment = {
     ZONE4YOU_RELEASE_DOSSIER_PATH: dossierPath,
     ZONE4YOU_RELEASE_DOSSIER_CONFIRMATION: `VERIFY_ZONE4YOU_RELEASE_DOSSIER:${dossierSha}`,
@@ -400,7 +401,14 @@ test("pilot release dossier refuses writable or symlinked release evidence", () 
   chmodSync(writableDossier.dossierPath, 0o660);
   assert.throws(
     () => verifyPilotReleaseEvidence(writableDossier.environment, now),
-    /release dossier must not be writable by group or other users/i,
+    /release dossier must not be accessible by group or other users/i,
+  );
+
+  const readableDossier = validFixture();
+  chmodSync(readableDossier.dossierPath, 0o640);
+  assert.throws(
+    () => verifyPilotReleaseEvidence(readableDossier.environment, now),
+    /release dossier must not be accessible by group or other users/i,
   );
 
   const symlinkedArtifact = validFixture();
