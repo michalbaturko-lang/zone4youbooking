@@ -35,6 +35,7 @@ test("launch gate treats Stripe as out of scope only for booking_without_payment
   assert.match(withoutPayments.output, /PASS  Payment mutation release switch/);
   assert.match(withoutPayments.output, /PASS  Runtime readiness and region contract/);
   assert.match(withoutPayments.output, /PASS  Watchdog mutation release switch/);
+  assert.match(withoutPayments.output, /PASS  Operations and UAT artifacts/);
   assert.match(withoutPayments.output, /SKIP  Luxart Stripe payment mapping/);
   assert.match(withoutPayments.output, /4 Stripe checks are explicitly not applicable/);
 

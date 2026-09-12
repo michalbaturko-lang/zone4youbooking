@@ -19,6 +19,7 @@ const rateLimitPath = join(repositoryRoot, "src/lib/rateLimit.ts");
 const rateLimitMigrationPath = join(repositoryRoot, "migrations/003_rate_limit.sql");
 const readinessRoutePath = join(repositoryRoot, "src/app/api/readiness/route.ts");
 const vercelConfigPath = join(repositoryRoot, "vercel.json");
+const packageConfigPath = join(repositoryRoot, "package.json");
 const businessRulesProfilePath = join(repositoryRoot, "config/business-rules-profile.json");
 const paymentProductProfilePath = join(repositoryRoot, "config/payment-product-profile.json");
 const bookingRulesImplementationPath = join(repositoryRoot, "config/booking-rules-implementation.json");
@@ -43,6 +44,9 @@ const paymentProductProfile = existsSync(paymentProductProfilePath)
   : {};
 const vercelConfig = existsSync(vercelConfigPath)
   ? JSON.parse(readFileSync(vercelConfigPath, "utf8"))
+  : {};
+const packageConfig = existsSync(packageConfigPath)
+  ? JSON.parse(readFileSync(packageConfigPath, "utf8"))
   : {};
 const businessRulesProfileSha256 = createHash("sha256")
   .update(JSON.stringify(businessRulesProfile), "utf8")
@@ -128,6 +132,32 @@ function validTlsPostgresUrl(value) {
   } catch {
     return false;
   }
+}
+
+const requiredOperationsChain = [
+  ["probe:runtime", "node scripts/probe-runtime.mjs", "scripts/probe-runtime.mjs"],
+  ["verify:luxart-d1", "tsx scripts/verify-luxart-d1.ts", "scripts/verify-luxart-d1.ts"],
+  ["verify:booking-mutations", "tsx scripts/verify-booking-mutations.ts", "scripts/verify-booking-mutations.ts"],
+  ["start:readonly-rollback", "tsx scripts/start-readonly-rollback.ts", "scripts/start-readonly-rollback.ts"],
+  ["verify:readonly-rollback", "tsx scripts/verify-readonly-rollback.ts", "scripts/verify-readonly-rollback.ts"],
+  ["capture:production-domain-baseline", "tsx scripts/capture-production-domain-baseline.ts", "scripts/capture-production-domain-baseline.ts"],
+  ["verify:production-domain-baseline", "tsx scripts/verify-production-domain-baseline.ts", "scripts/verify-production-domain-baseline.ts"],
+  ["verify:alert-delivery", "tsx scripts/verify-alert-delivery.ts", "scripts/verify-alert-delivery.ts"],
+  ["verify:memberzone-fallback", "tsx scripts/verify-memberzone-fallback.ts", "scripts/verify-memberzone-fallback.ts"],
+  ["prepare:pilot-release", "tsx scripts/prepare-pilot-release-dossier.ts", "scripts/prepare-pilot-release-dossier.ts"],
+  ["verify:pilot-release", "tsx scripts/verify-pilot-release.ts", "scripts/verify-pilot-release.ts"],
+  ["verify:production-precutover", "tsx scripts/verify-production-precutover.ts", "scripts/verify-production-precutover.ts"],
+  ["verify:production-cutover", "tsx scripts/verify-production-cutover.ts", "scripts/verify-production-cutover.ts"],
+];
+
+function operationsChainReady() {
+  const scripts = packageConfig.scripts;
+  return (
+    typeof scripts === "object" &&
+    scripts !== null &&
+    requiredOperationsChain.every(([name, command, file]) =>
+      scripts[name] === command && existsSync(join(repositoryRoot, file)))
+  );
 }
 
 function verifiedPilotReleaseDossier() {
@@ -422,16 +452,8 @@ check(
   "Operations and UAT artifacts",
   existsSync(join(repositoryRoot, "docs/operations-runbook.md")) &&
     existsSync(join(repositoryRoot, "docs/pilot-uat-checklist.md")) &&
-    existsSync(join(repositoryRoot, "scripts/probe-runtime.mjs")) &&
-    existsSync(join(repositoryRoot, "scripts/verify-luxart-d1.ts")) &&
-    existsSync(join(repositoryRoot, "scripts/verify-booking-mutations.ts")) &&
-    existsSync(join(repositoryRoot, "scripts/start-readonly-rollback.ts")) &&
-    existsSync(join(repositoryRoot, "scripts/verify-readonly-rollback.ts")) &&
-    existsSync(join(repositoryRoot, "scripts/prepare-pilot-release-dossier.ts")) &&
-    existsSync(join(repositoryRoot, "scripts/verify-pilot-release.ts")) &&
-    existsSync(join(repositoryRoot, "scripts/verify-production-precutover.ts")) &&
-    existsSync(join(repositoryRoot, "scripts/verify-production-cutover.ts")),
-  "The live D1, runtime, UAT, immutable rollback, dossier, pre-cutover and post-cutover chain plus its runbook and checklist are required.",
+    operationsChainReady(),
+  "The runbook, UAT checklist and exact npm command chain for live D1, runtime, mutation UAT, immutable rollback, DNS baseline, alert, Memberzone fallback, dossier, pre-cutover and post-cutover verification are required.",
 );
 check(
   "Verified pilot release dossier",
