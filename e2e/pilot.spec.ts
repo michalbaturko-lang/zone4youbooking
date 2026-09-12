@@ -40,6 +40,15 @@ test("zobrazí všech 24 lekcí, všechny sály a Reformer bez browser chyby", {
   const browserErrors = captureUnexpectedBrowserErrors(page);
   await openCleanDemo(page);
 
+  const logo = page.locator("button.logo");
+  await expect(logo).toHaveAccessibleName(/Z4Y Zone4You/);
+
+  const iconHref = await page.locator('link[rel~="icon"]').first().getAttribute("href");
+  expect(iconHref).toBeTruthy();
+  const iconResponse = await page.request.get(iconHref!);
+  expect(iconResponse.status()).toBe(200);
+  expect(iconResponse.headers()["content-type"]).toContain("image/svg+xml");
+
   const documentResponse = await page.request.get("/");
   expect(documentResponse.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
   expect(documentResponse.headers()["strict-transport-security"]).toContain("max-age=63072000");
