@@ -8,7 +8,7 @@ Tento záznam je pouze neosobní read-only evidence veřejné referenční dokum
 - Neautentizovaný `GET /api/Lesson` odpověděl 401; žádné přihlašovací údaje ani osobní data nebyly odeslány.
 - Ve 21:04 CEST byl proti stejnému referenčnímu originu spuštěn i skutečný projektový read-only adapter v explicitním staging diagnostickém režimu. Anonymní CZ/EN načtení skončilo očekávaným `401`; tím je ověřeno, že veřejný kontrakt sice odpovídá implementaci, ale datová cesta vyžaduje autentizaci. Testovací login nebyl přes HTTP odeslán a ověřovač nyní takový pokus technicky odmítne ještě před vytvořením adapteru nebo síťovým požadavkem.
 - Dokumentace uvádí potřebné kontrakty pro login, všechny `Lesson` položky, seznam/vytvoření/storno rezervace a watchdog.
-- Automatický `verify:luxart-public-contract` ověřuje 11 používaných endpointů podle jejich HTTP metody, přesného titulku a povinných polí. Výstup je vždy `referenceOnly=true`, `launchAuthority=false` a neobsahuje cílový hostname ani syrové HTML.
+- Automatický `verify:luxart-public-contract` ověřuje 11 používaných endpointů podle jejich HTTP metody, přesného titulku a povinných polí. Výstup je vždy `referenceOnly=true`, `launchAuthority=false` a neobsahuje cílový hostname ani syrové HTML. Celý sémantický otisk je navíc porovnán se schválenou verzovanou hodnotou; jakákoli změna skončí fail-closed chybou `CONTRACT_DRIFT` a vyžaduje vědomou revizi.
 - Aktuální dokumentace rozlišuje dvě podoby členské karty: odpověď `POST api/Login` uvádí `member_card`, zatímco `GET api/User` uvádí také `member_card_number`. Adaptér přijímá obě varianty a při jejich současné přítomnosti dává přednost `member_card_number`.
 - Storno odpověď obsahuje `storno_poplatek`; UI proto nesmí částku domýšlet a ukazuje hodnotu vrácenou Luxartem.
 - Veřejná ukázka storna vrací `success: 1`, ale význam ostatních celočíselných hodnot nepopisuje. Adapter proto pro rezervaci i watchdog přijímá pouze dříve používané úspěšné kódy `1`/`2`; `0`, záporná i jiná kladná hodnota jsou odmítnuty. Přesný enum musí potvrdit živý UAT, nikdy se však nesmí ukázat falešné úspěšné storno.
@@ -49,6 +49,7 @@ npm run verify:luxart-public-contract
 - ověřeno: `11/11` endpointů;
 - chybějící pole nebo neočekávaný dokument: `0`;
 - sémantický SHA-256 nad názvy endpointů a jejich dokumentovanými poli: `869beb3af67e648854462982b15f099aad622992dbbc81c2ec5bb4c9afc7bf20`.
+- stejný SHA-256 je schválený baseline přímo v ověřovači; odlišný kompletní kontrakt už nemůže projít jen proto, že stále obsahuje minimální povinná pole.
 
 První běh ve 21:38 CEST krátce vrátil `500` pouze pro dokumentační stránku `POST api/Reservations/watchdog_III`. Tři bezprostřední read-only kontroly stejné stránky následně shodně vrátily HTTP 200 a celý 11endpointový verifier znovu prošel se stejným sémantickým hashem. Jde o pozorovanou přechodnou nestabilitu referenční dokumentace, nikoli živý Zone4You důkaz; release autoritu má nadále až D1 proti potvrzenému šifrovanému test originu.
 

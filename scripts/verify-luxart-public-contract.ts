@@ -7,6 +7,7 @@ interface LuxartPublicContractOptions {
   fetchImpl?: FetchLike;
   now?: Date;
   timeoutMs?: number;
+  expectedSemanticContractSha256?: string;
 }
 
 interface ContractEndpoint {
@@ -18,13 +19,23 @@ interface ContractEndpoint {
 
 interface ContractIssue {
   endpoint: string;
-  code: "HTTP_STATUS" | "MISSING_FIELDS" | "NETWORK_UNAVAILABLE" | "RESPONSE_TOO_LARGE" | "UNEXPECTED_DOCUMENT";
+  code:
+    | "CONTRACT_DRIFT"
+    | "HTTP_STATUS"
+    | "MISSING_FIELDS"
+    | "NETWORK_UNAVAILABLE"
+    | "RESPONSE_TOO_LARGE"
+    | "UNEXPECTED_DOCUMENT";
   httpStatus?: number;
   missingFields?: string[];
+  expectedSha256?: string;
+  actualSha256?: string;
 }
 
 const referenceOrigin = "http://api.memberzone.online:9295";
 const maximumDocumentBytes = 512 * 1024;
+export const approvedLuxartReferenceSemanticContractSha256 =
+  "869beb3af67e648854462982b15f099aad622992dbbc81c2ec5bb4c9afc7bf20";
 
 export const luxartPublicContractEndpoints: readonly ContractEndpoint[] = [
   {
@@ -183,9 +194,13 @@ export async function verifyLuxartPublicContract({
   fetchImpl = fetch,
   now = new Date(),
   timeoutMs = 8_000,
+  expectedSemanticContractSha256 = approvedLuxartReferenceSemanticContractSha256,
 }: LuxartPublicContractOptions = {}) {
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1_000 || timeoutMs > 30_000) {
     throw new Error("Luxart public contract timeout must be an integer from 1000 to 30000.");
+  }
+  if (!/^[a-f0-9]{64}$/.test(expectedSemanticContractSha256)) {
+    throw new Error("The expected Luxart reference contract digest must be a full lowercase SHA-256.");
   }
 
   const issues: ContractIssue[] = [];
@@ -234,10 +249,22 @@ export async function verifyLuxartPublicContract({
   }));
 
   observed.sort((left, right) => left.id.localeCompare(right.id));
-  issues.sort((left, right) => left.endpoint.localeCompare(right.endpoint));
   const semanticContractSha256 = observed.length === luxartPublicContractEndpoints.length
     ? createHash("sha256").update(JSON.stringify(observed)).digest("hex")
     : undefined;
+  if (
+    issues.length === 0 &&
+    semanticContractSha256 &&
+    semanticContractSha256 !== expectedSemanticContractSha256
+  ) {
+    issues.push({
+      endpoint: "contract",
+      code: "CONTRACT_DRIFT",
+      expectedSha256: expectedSemanticContractSha256,
+      actualSha256: semanticContractSha256,
+    });
+  }
+  issues.sort((left, right) => left.endpoint.localeCompare(right.endpoint));
 
   return {
     ok: issues.length === 0,
@@ -247,6 +274,7 @@ export async function verifyLuxartPublicContract({
     targetFingerprintSha256: createHash("sha256").update(referenceOrigin).digest("hex"),
     expectedEndpointCount: luxartPublicContractEndpoints.length,
     verifiedEndpointCount: observed.length,
+    expectedSemanticContractSha256,
     semanticContractSha256,
     issues,
   };
