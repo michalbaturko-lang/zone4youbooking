@@ -190,10 +190,17 @@ function validFixture() {
       requestIds: Array.from({ length: 16 }, (_, index) => `request-${index}`),
     },
     rollback: {
+      schemaVersion: 2,
       ok: true,
       checkedAt,
+      rollbackStartedAt: "2026-09-05T07:29:46.000Z",
+      readOnlyVerifiedAt: checkedAt,
       target: stagingTarget,
-      durationMs: 14_000,
+      commit,
+      phase: "read_only",
+      region: "fra1",
+      recoveryDurationMs: 14_000,
+      verificationDurationMs: 7_000,
       maximumDurationMs: 300_000,
       lessonCount: 24,
       healthReady: true,
@@ -474,6 +481,20 @@ test("pilot release dossier rejects evidence that cannot come from the real guar
         delete artifact.requestIds;
       },
       /rollback requestIds must be an array/i,
+    ],
+    [
+      "rollback",
+      (artifact: Record<string, unknown>) => {
+        artifact.recoveryDurationMs = 1;
+      },
+      /recoveryDurationMs does not match/i,
+    ],
+    [
+      "rollback",
+      (artifact: Record<string, unknown>) => {
+        artifact.commit = "f".repeat(40);
+      },
+      /rollback commit must exactly equal/i,
     ],
     [
       "dnsRollbackBaseline",
@@ -799,6 +820,8 @@ test("pilot release cutover cannot predate the latest artifact", () => {
   const fixture = validFixture();
   const rollback = structuredClone(fixture.files.rollback) as Record<string, unknown>;
   rollback.checkedAt = "2026-09-05T07:51:00.000Z";
+  rollback.readOnlyVerifiedAt = "2026-09-05T07:51:00.000Z";
+  rollback.rollbackStartedAt = "2026-09-05T07:50:46.000Z";
   const dossier = structuredClone(fixture.dossier);
   dossier.artifacts.rollback.sha256 = writeJson(dossier.artifacts.rollback.path, rollback);
   const dossierSha = writeJson(fixture.dossierPath, dossier);

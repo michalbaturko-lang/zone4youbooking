@@ -70,8 +70,8 @@ Každý bod označte `PASS`, `FAIL` nebo `N/A — funkce bezpečně vypnutá`. K
 - [ ] Readiness hlásí `rateLimit=postgres` a migrace `003` je aplikovaná; paměťový režim je přípustný jen s doloženou single-instance topologií.
 - [ ] Souběžné požadavky přes dvě aplikační instance sdílejí jeden limit; při odpojené rate-limit databázi login a mutace selžou bezpečně bez volání Luxartu/Stripe.
 - [ ] `verify:alert-delivery` vrátil HTTP 2xx a určený support kontakt ručně potvrdil stejné event ID.
-- [ ] Rollback drill do read-only/Memberzone proběhl do 5 minut.
-- [ ] `verify:readonly-rollback` doložil neprázdný rozvrh a kódy `BOOKING_READ_ONLY` / `PAYMENTS_DISABLED` pro všechny mutační cesty.
+- [ ] Rollback drill do read-only/Memberzone proběhl do 5 minut měřených od UTC času zachyceného bezprostředně před změnou konfigurace.
+- [ ] `verify:readonly-rollback` doložil stejný commit, fázi `read_only`, region `fra1`, neprázdný rozvrh a kódy `BOOKING_READ_ONLY` / `PAYMENTS_DISABLED` pro všechny mutační cesty.
 - [ ] Neexistuje otevřený P0/P1.
 - [ ] Michal / Zone4You výslovně schválil cutover.
 - [ ] `verify:pilot-release` prošel pro přesný nasazovaný commit, aktivní launch okno a nezměněné SHA-256 všech živých důkazů.

@@ -164,7 +164,7 @@ Konkrétní opravný SQL příkaz není záměrně součástí automatického b�
 
 Před pilotem proveďte na stagingu:
 
-1. začátek měření;
+1. bezprostředně před změnou uložit UTC čas začátku měření;
 2. `BOOKING_MUTATIONS_ENABLED=false`;
 3. `PAYMENT_MUTATIONS_ENABLED=false`;
 4. potvrzení, že lekce se načítají, ale rezervace/storno vrací `BOOKING_READ_ONLY` a Checkout `PAYMENTS_DISABLED`;
@@ -178,7 +178,9 @@ Po přepnutí a novém deployi spusťte bez přihlašovacích údajů:
 ```bash
 ZONE4YOU_ROLLBACK_APP_URL=https://staging.booking.zone4you.cz/ \
 ZONE4YOU_ROLLBACK_CONFIRMATION=READ_ONLY_ROLLBACK:https://staging.booking.zone4you.cz \
+ZONE4YOU_ROLLBACK_EXPECTED_COMMIT=<přesný-40znakový-git-commit> \
+ZONE4YOU_ROLLBACK_STARTED_AT=<UTC-čas-uložený-před-změnou> \
 npm run verify:readonly-rollback
 ```
 
-Příkaz vyžaduje přesnou potvrzovací frázi pro cílový origin. Ověří `health`, živé read-only `readiness`, neprázdný rozvrh a bezpečné odmítnutí vytvoření rezervace, storna, watchdogu a Stripe Checkout. Nepoužívá login, cookie ani reálné ID lekce/rezervace; záměrně posílá sentinelové hodnoty, které musí být odmítnuty dříve, než se zavolá Luxart nebo Stripe. Celý privacy-safe JSON výstup s `X-Request-ID` uložte jako časovaný rollback důkaz. Skript skončí chybou, pokud cílový stav není read-only nebo trvá déle než pět minut.
+Příkaz vyžaduje přesnou potvrzovací frázi pro cílový origin, celý očekávaný commit a neměnný čas zachycený ještě před přepnutím konfigurace. Ověří `health`, živé read-only `readiness`, fázi `read_only`, commit, region `fra1`, neprázdný rozvrh a bezpečné odmítnutí vytvoření rezervace, storna, watchdogu a Stripe Checkout. Nepoužívá login, cookie ani reálné ID lekce/rezervace; záměrně posílá sentinelové hodnoty, které musí být odmítnuty dříve, než se zavolá Luxart nebo Stripe. Celý privacy-safe JSON výstup s `X-Request-ID`, začátkem rollbacku, časem dosažení read-only a oběma odvozenými délkami uložte jako časovaný rollback důkaz. Skript skončí ještě před sentinelovými požadavky při nesprávném commitu/fázi nebo pokud od zachyceného začátku do ověřeného read-only stavu uplynulo více než pět minut.

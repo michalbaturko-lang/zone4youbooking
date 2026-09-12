@@ -523,11 +523,44 @@ export function validateBookingUatEvidence(
   }
 }
 
-export function validateRollbackEvidence(evidence: JsonObject, stagingOrigin: string) {
+export function validateRollbackEvidence(
+  evidence: JsonObject,
+  stagingOrigin: string,
+  expectedCommit: string,
+) {
+  if (evidence.schemaVersion !== 2) {
+    throw new Error("Rollback evidence schemaVersion must be 2.");
+  }
   exactString(cleanHttpsOrigin(evidence.target, "artifacts.rollback.target"), stagingOrigin, "Rollback target");
-  const durationMs = integerValue(evidence.durationMs, "rollback durationMs");
+  exactString(
+    stringValue(evidence.commit, "rollback commit").toLowerCase(),
+    expectedCommit,
+    "rollback commit",
+  );
+  exactString(evidence.phase, "read_only", "rollback phase");
+  exactString(evidence.region, "fra1", "rollback region");
+  const checkedAtValue = stringValue(evidence.checkedAt, "rollback checkedAt");
+  exactString(evidence.readOnlyVerifiedAt, checkedAtValue, "rollback readOnlyVerifiedAt");
+  const rollbackStartedAt = new Date(stringValue(evidence.rollbackStartedAt, "rollback rollbackStartedAt"));
+  const readOnlyVerifiedAt = new Date(checkedAtValue);
+  if (!Number.isFinite(rollbackStartedAt.getTime()) || !Number.isFinite(readOnlyVerifiedAt.getTime())) {
+    throw new Error("Rollback evidence timestamps must be valid.");
+  }
+  const measuredRecoveryDurationMs = readOnlyVerifiedAt.getTime() - rollbackStartedAt.getTime();
+  if (measuredRecoveryDurationMs < 0) {
+    throw new Error("Rollback evidence cannot verify read-only before rollback started.");
+  }
+  const recoveryDurationMs = integerValue(evidence.recoveryDurationMs, "rollback recoveryDurationMs");
+  if (recoveryDurationMs !== measuredRecoveryDurationMs) {
+    throw new Error("Rollback recoveryDurationMs does not match its timestamps.");
+  }
+  const verificationDurationMs = integerValue(evidence.verificationDurationMs, "rollback verificationDurationMs");
   const maximumDurationMs = integerValue(evidence.maximumDurationMs, "rollback maximumDurationMs", 1);
-  if (maximumDurationMs > 300_000 || durationMs > maximumDurationMs) {
+  if (
+    maximumDurationMs > 300_000 ||
+    recoveryDurationMs > maximumDurationMs ||
+    verificationDurationMs > recoveryDurationMs
+  ) {
     throw new Error("Rollback evidence does not prove the five-minute recovery objective.");
   }
   integerValue(evidence.lessonCount, "rollback lessonCount", 1);
@@ -674,7 +707,11 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
     expectedCommit,
     launchMode,
   );
-  validateRollbackEvidence(load("rollback", Math.min(24, maximumAgeHours)), stagingTarget);
+  validateRollbackEvidence(
+    load("rollback", Math.min(24, maximumAgeHours)),
+    stagingTarget,
+    expectedCommit,
+  );
   validateProductionDomainBaselineEvidence(load("dnsRollbackBaseline", Math.min(24, maximumAgeHours)));
   const alertEventId = validateAlertEvidence(load("alertDelivery"), stagingTarget);
   validateMemberzoneFallbackEvidence(load("memberzoneFallback", Math.min(24, maximumAgeHours)));

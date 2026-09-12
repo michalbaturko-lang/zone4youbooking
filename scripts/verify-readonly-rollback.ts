@@ -1,11 +1,14 @@
 import { pathToFileURL } from "node:url";
 import type { BookingCapabilities } from "../src/lib/domain";
+import { approvedRuntimeRegion } from "../src/lib/deploymentPreflight";
 
 type Environment = Record<string, string | undefined>;
 type FetchLike = typeof fetch;
 
 export interface ReadonlyRollbackConfig {
   target: URL;
+  expectedCommit: string;
+  rollbackStartedAt: Date;
   timeoutMs: number;
   maxDurationMs: number;
 }
@@ -36,7 +39,25 @@ function boundedInteger(
   return value;
 }
 
-export function loadReadonlyRollbackConfig(environment: Environment = process.env): ReadonlyRollbackConfig {
+function timestamp(rawValue: string, name: string) {
+  const value = new Date(rawValue);
+  if (!Number.isFinite(value.getTime())) throw new Error(`${name} must be a valid timestamp.`);
+  return value;
+}
+
+function assertWithinRecoveryWindow(startedAt: Date, now: Date, maximumDurationMs: number) {
+  const elapsedMs = now.getTime() - startedAt.getTime();
+  if (elapsedMs < 0) throw new Error("ZONE4YOU_ROLLBACK_STARTED_AT must not be in the future.");
+  if (elapsedMs > maximumDurationMs) {
+    throw new Error("The five-minute rollback recovery objective was already exceeded.");
+  }
+  return elapsedMs;
+}
+
+export function loadReadonlyRollbackConfig(
+  environment: Environment = process.env,
+  now = new Date(),
+): ReadonlyRollbackConfig {
   const target = new URL(required(environment, "ZONE4YOU_ROLLBACK_APP_URL"));
   if (target.username || target.password || target.pathname !== "/" || target.search || target.hash) {
     throw new Error("ZONE4YOU_ROLLBACK_APP_URL must be a clean origin ending in / without credentials, query or hash.");
@@ -54,7 +75,17 @@ export function loadReadonlyRollbackConfig(environment: Environment = process.en
 
   const timeoutMs = boundedInteger(environment, "ZONE4YOU_ROLLBACK_TIMEOUT_MS", 12_000, 1_000, 30_000);
   const maxDurationSeconds = boundedInteger(environment, "ZONE4YOU_ROLLBACK_MAX_SECONDS", 300, 10, 300);
-  return { target, timeoutMs, maxDurationMs: maxDurationSeconds * 1_000 };
+  const maxDurationMs = maxDurationSeconds * 1_000;
+  const expectedCommit = required(environment, "ZONE4YOU_ROLLBACK_EXPECTED_COMMIT").toLowerCase();
+  if (!/^[a-f0-9]{40}$/.test(expectedCommit)) {
+    throw new Error("ZONE4YOU_ROLLBACK_EXPECTED_COMMIT must be a full 40-character Git SHA.");
+  }
+  const rollbackStartedAt = timestamp(
+    required(environment, "ZONE4YOU_ROLLBACK_STARTED_AT"),
+    "ZONE4YOU_ROLLBACK_STARTED_AT",
+  );
+  assertWithinRecoveryWindow(rollbackStartedAt, now, maxDurationMs);
+  return { target, expectedCommit, rollbackStartedAt, timeoutMs, maxDurationMs };
 }
 
 async function api<T>(
@@ -100,8 +131,10 @@ function assertBlocked(
 export async function runReadonlyRollbackDrill(
   config: ReadonlyRollbackConfig,
   fetchImpl: FetchLike = fetch,
+  clock: () => Date = () => new Date(),
 ) {
-  const startedAt = Date.now();
+  const verificationStartedAt = clock();
+  assertWithinRecoveryWindow(config.rollbackStartedAt, verificationStartedAt, config.maxDurationMs);
   const requestIds: string[] = [];
 
   const health = await api<{ status?: string }>(config, fetchImpl, "/api/health");
@@ -111,7 +144,11 @@ export async function runReadonlyRollbackDrill(
   const readiness = await api<{
     status?: string;
     mode?: string;
+    phase?: string;
+    commit?: string;
+    region?: string;
     luxart?: string;
+    schedule?: string;
     booking?: string;
     payments?: string;
     capabilities?: Partial<BookingCapabilities>;
@@ -122,7 +159,11 @@ export async function runReadonlyRollbackDrill(
     readiness.status !== 200 ||
     readiness.body.status !== "ready" ||
     readiness.body.mode !== "live" ||
+    readiness.body.phase !== "read_only" ||
+    readiness.body.commit?.toLowerCase() !== config.expectedCommit ||
+    readiness.body.region !== approvedRuntimeRegion ||
     readiness.body.luxart !== "reachable" ||
+    readiness.body.schedule !== "ready" ||
     readiness.body.booking !== "read_only" ||
     readiness.body.payments !== "disabled" ||
     capabilities?.reservationsEnabled !== false ||
@@ -130,7 +171,9 @@ export async function runReadonlyRollbackDrill(
     capabilities.topupsEnabled !== false ||
     capabilities.topupMode !== "disabled"
   ) {
-    throw new Error("Target is not a healthy live read-only runtime with booking, waitlist and payments disabled.");
+    throw new Error(
+      "Target is not the expected healthy live read-only commit in fra1 with schedule available and all mutations disabled.",
+    );
   }
 
   const snapshot = await api<{ lessons?: unknown[] }>(config, fetchImpl, "/api/booking/snapshot");
@@ -169,16 +212,27 @@ export async function runReadonlyRollbackDrill(
   requestIds.push(checkout.requestId);
   assertBlocked(checkout, "Stripe Checkout", "PAYMENTS_DISABLED");
 
-  const durationMs = Date.now() - startedAt;
-  if (durationMs > config.maxDurationMs) {
-    throw new Error(`Rollback verification took ${durationMs} ms, above the ${config.maxDurationMs} ms limit.`);
-  }
+  const readOnlyVerifiedAt = clock();
+  const verificationDurationMs = readOnlyVerifiedAt.getTime() - verificationStartedAt.getTime();
+  if (verificationDurationMs < 0) throw new Error("Rollback verification clock moved backwards.");
+  const recoveryDurationMs = assertWithinRecoveryWindow(
+    config.rollbackStartedAt,
+    readOnlyVerifiedAt,
+    config.maxDurationMs,
+  );
 
   return {
+    schemaVersion: 2,
     ok: true,
-    checkedAt: new Date().toISOString(),
+    checkedAt: readOnlyVerifiedAt.toISOString(),
+    rollbackStartedAt: config.rollbackStartedAt.toISOString(),
+    readOnlyVerifiedAt: readOnlyVerifiedAt.toISOString(),
     target: config.target.origin,
-    durationMs,
+    commit: config.expectedCommit,
+    phase: "read_only",
+    region: approvedRuntimeRegion,
+    recoveryDurationMs,
+    verificationDurationMs,
     maximumDurationMs: config.maxDurationMs,
     lessonCount: snapshot.body.lessons.length,
     healthReady: true,
