@@ -1,6 +1,6 @@
 # Zone4You IT — příjem a vyhodnocení odpovědi
 
-Aktualizace: 2026-09-11
+Aktualizace: 2026-09-12
 
 Tento checklist slouží pouze k vyhodnocení technické odpovědi. Není souhlasem s deployem, DNS změnou ani živou Luxart mutací. Hesla, tokeny, privátní klíče a klientské přihlašovací údaje se do tohoto souboru ani do repozitáře nevkládají.
 
@@ -9,9 +9,9 @@ Tento checklist slouží pouze k vyhodnocení technické odpovědi. Není souhla
 | Položka | Přijatá odpověď | Stav |
 |---|---|---|
 | Datum a technický kontakt | 11. 9. 2026, odpověď Zone4You IT | přijato |
-| API kontrakt a root | objednaný kontrakt je REST na interním portu `9759`; IT potvrdilo zveřejnění `9191`, ale neuvedlo veřejný hostname/IP ani překlad na `9759` | blokuje test |
+| API kontrakt a root | objednaný kontrakt je REST na interním portu `9759`; IT potvrdilo zveřejnění `9191`. Z dřívější zprávy Luxartu lze odvodit kandidátní hostname `api.memberzone.online`, ale IT nepotvrdilo, že jeho `9191` překládá na Zone4You `9759` | blokuje test |
 | Testovací databáze potvrzena | Luxart 1. 4. potvrdil test DB za interním portem `9759`; IT nepotvrdilo, že veřejný `9191` vede právě na ni | blokuje test |
-| Síťová cesta | veřejná Zone4You adresa chybí; `api.memberzone.online:9191/Service1.svc` je jiný SOAP kontrakt a nelze jej použít jako důkaz | nepotvrzeno |
+| Síťová cesta | kandidátní `api.memberzone.online:9191` je dosažitelný, ale aktuálně publikuje jiný SOAP kontrakt; Zone4You REST `/Help` a `/api/Lesson` na něm nejsou dostupné | chybné nebo nepotvrzené směrování |
 | Gateway autentizace | v odpovědi neuvedena; nelze z toho odvodit režim `none` | nepotvrzeno |
 | Bezpečný kanál pro secrets | secret store / jiný schválený kanál | čeká se |
 | Read-only test povolen | výslovně neuvedeno | nepotvrzeno |
@@ -29,7 +29,7 @@ Tento checklist slouží pouze k vyhodnocení technické odpovědi. Není souhla
 - Historický port `9759` proto nelze dál automaticky považovat za externí vstupní port.
 - Podle celé e-mailové historie má `9191` pravděpodobně být veřejný překlad na interní REST port `9759`, ale přesný hostitel a vazbu musí potvrdit IT; konfigurace ji nesmí předpokládat.
 - Formulace „zveřejnění portu“ neprokazuje veřejný hostname/IP, překlad na interní REST port, HTTPS ani gateway režim.
-- URL `api.memberzone.online:9191` není kandidátní Zone4You cíl: vrací jiný SOAP kontrakt a e-mailová historie klientskou instanci umisťuje na server Zone4You.
+- `api.memberzone.online:9191` může být zamýšlený veřejný Zone4You cíl, ale v současné podobě není použitelný: vrací jiný SOAP kontrakt a nikoli REST aplikaci popsanou Luxartem. Nejpravděpodobnější je chybné přesměrování, jiný cílový web v IIS nebo chybějící path binding; potvrdit a opravit to musí IT.
 
 ### A — lze spustit read-only Luxart ověření
 
@@ -71,7 +71,7 @@ Read-only test se nespouští, pokud chybí síťová cesta, gateway režim, pot
 6. Teprve po samostatné autoritě připravit staging, alert, rollback a jedno řízené UAT.
 7. Produkční deploy, DNS a cutover zůstávají samostatně schvalované akce.
 
-### Síťové pozorování 11. 9. 2026
+### Síťové pozorování 11.–12. 9. 2026
 
 - Neautentizovaný probe veřejné referenční dokumentace Luxartu na portu `9295` prošel: HTTP 200 a rozpoznaná stránka `API dokumentace`.
 - Obvyklé veřejné Zone4You hostname varianty na portu `9191` při HTTP i HTTPS z tohoto vývojového připojení timeoutovaly.
