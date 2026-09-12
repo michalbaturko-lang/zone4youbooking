@@ -237,7 +237,7 @@ function validFixture() {
   chmodSync(artifacts.dnsRollbackBaseline.path, 0o600);
   chmodSync(artifacts.memberzoneFallback.path, 0o600);
   const dossier = {
-    schemaVersion: 4,
+    schemaVersion: 5,
     draft: false,
     releaseId: "zone4you-pilot-2026-09-05",
     target: "https://booking.zone4you.cz/",
@@ -271,6 +271,11 @@ function validFixture() {
         approvedBy: "Zone4You reception",
         approvedAt: "2026-09-05T07:40:00.000Z",
       },
+      luxartNotifications: {
+        confirmed: true,
+        approvedBy: "Luxart integration owner",
+        approvedAt: "2026-09-05T07:40:00.000Z",
+      },
       cutover: {
         approved: true,
         approvedBy: "Zone4You release owner",
@@ -302,6 +307,7 @@ test("pilot release dossier binds live Luxart, UAT, application and DNS rollback
   assert.equal(result.conditions.personalizedEligibilityVerified, true);
   assert.equal(result.conditions.exactSevenDayPragueRangeVerified, true);
   assert.equal(result.conditions.dnsRollbackBaselineReady, true);
+  assert.equal(result.conditions.luxartNotificationTemplatesConfirmed, true);
   assert.equal(result.conditions.explicitCutoverApproval, true);
   assert.equal(result.paymentsIncluded, false);
   assert.equal(result.artifacts.length, 7);
@@ -670,6 +676,18 @@ test("pilot release dossier rejects stale evidence and missing live approval", (
       ZONE4YOU_RELEASE_DOSSIER_CONFIRMATION: `VERIFY_ZONE4YOU_RELEASE_DOSSIER:${dossierSha}`,
     }, now),
     /cutover\.approved must be true/i,
+  );
+
+  const missingNotificationApproval = validFixture();
+  const notificationDossier = structuredClone(missingNotificationApproval.dossier);
+  notificationDossier.approvals.luxartNotifications.confirmed = false;
+  const notificationDossierSha = writeJson(missingNotificationApproval.dossierPath, notificationDossier);
+  assert.throws(
+    () => verifyPilotReleaseEvidence({
+      ...missingNotificationApproval.environment,
+      ZONE4YOU_RELEASE_DOSSIER_CONFIRMATION: `VERIFY_ZONE4YOU_RELEASE_DOSSIER:${notificationDossierSha}`,
+    }, now),
+    /luxartNotifications\.confirmed must be true/i,
   );
 });
 

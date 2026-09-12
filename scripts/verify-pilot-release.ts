@@ -529,7 +529,7 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
   }
 
   const dossier = dossierFile.data;
-  if (dossier.schemaVersion !== 4) throw new Error("release dossier schemaVersion must be 4.");
+  if (dossier.schemaVersion !== 5) throw new Error("release dossier schemaVersion must be 5.");
   falseValue(dossier.draft, "release dossier draft");
   const releaseId = stringValue(dossier.releaseId, "releaseId");
   const target = cleanHttpsOrigin(dossier.target, "target");
@@ -609,6 +609,8 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
   exactString(alertReceipt.eventId, alertEventId, "approvals.alertReceipt.eventId");
   const fallback = requireApproval(approvals, "memberzoneFallback", now, Math.min(24, maximumAgeHours));
   trueValue(fallback.available, "approvals.memberzoneFallback.available");
+  const notifications = requireApproval(approvals, "luxartNotifications", now, maximumAgeHours);
+  trueValue(notifications.confirmed, "approvals.luxartNotifications.confirmed");
   const cutover = requireApproval(approvals, "cutover", now, Math.min(24, maximumAgeHours));
   trueValue(cutover.approved, "approvals.cutover.approved");
 
@@ -634,6 +636,7 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
       alertReceiptConfirmed: true,
       noOpenP0P1: true,
       memberzoneFallbackAvailable: true,
+      luxartNotificationTemplatesConfirmed: true,
       explicitCutoverApproval: true,
     },
     artifacts: loadedArtifacts,

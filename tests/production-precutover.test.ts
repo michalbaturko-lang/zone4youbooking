@@ -41,6 +41,7 @@ function releaseEvidence() {
       alertReceiptConfirmed: true,
       noOpenP0P1: true,
       memberzoneFallbackAvailable: true,
+      luxartNotificationTemplatesConfirmed: true,
       explicitCutoverApproval: true,
     },
     artifacts: [

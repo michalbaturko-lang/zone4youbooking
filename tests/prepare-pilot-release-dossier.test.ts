@@ -66,6 +66,7 @@ test("dossier preparation hashes real evidence but remains an explicit human-app
     approvals: {
       uat: { decision: string; approvedBy: string };
       alertReceipt: { confirmed: boolean; eventId: string };
+      luxartNotifications: { confirmed: boolean; approvedBy: string };
       cutover: { approved: boolean };
     };
   };
@@ -74,12 +75,14 @@ test("dossier preparation hashes real evidence but remains an explicit human-app
   assert.equal(result.draft, true);
   assert.equal(result.artifactCount, 7);
   assert.equal(result.dossierSha256, createHash("sha256").update(body).digest("hex"));
-  assert.equal(dossier.schemaVersion, 4);
+  assert.equal(dossier.schemaVersion, 5);
   assert.equal(dossier.draft, true);
   assert.equal(dossier.luxartApiContract, "memberzone_rest_v1");
   assert.equal(dossier.approvals.uat.decision, "NO-GO");
   assert.equal(dossier.approvals.uat.approvedBy, "pending-human-approval");
   assert.equal(dossier.approvals.alertReceipt.confirmed, false);
+  assert.equal(dossier.approvals.luxartNotifications.confirmed, false);
+  assert.equal(dossier.approvals.luxartNotifications.approvedBy, "pending-human-approval");
   assert.equal(dossier.approvals.cutover.approved, false);
   assert.equal(dossier.artifacts.luxartReadOnly.path, evidencePaths.luxart);
   assert.equal(dossier.artifacts.memberzoneFallback.path, evidencePaths.memberzone);

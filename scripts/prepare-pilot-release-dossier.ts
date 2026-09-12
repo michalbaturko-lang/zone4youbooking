@@ -119,7 +119,7 @@ export function buildPilotReleaseDossier(environment: Environment = process.env)
   const pendingAt = startsAt.toISOString();
 
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     draft: true,
     releaseId: required(environment, "ZONE4YOU_RELEASE_ID"),
     target: `${productionTarget}/`,
@@ -156,6 +156,11 @@ export function buildPilotReleaseDossier(environment: Environment = process.env)
       },
       memberzoneFallback: {
         available: false,
+        approvedBy: "pending-human-approval",
+        approvedAt: pendingAt,
+      },
+      luxartNotifications: {
+        confirmed: false,
         approvedBy: "pending-human-approval",
         approvedAt: pendingAt,
       },

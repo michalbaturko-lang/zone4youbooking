@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "draft": true,
   "releaseId": "zone4you-pilot-2026-09-05",
   "target": "https://booking.zone4you.cz/",
@@ -60,6 +60,11 @@
     "memberzoneFallback": {
       "available": false,
       "approvedBy": "replace-with-support-owner",
+      "approvedAt": "2026-09-05T00:00:00+02:00"
+    },
+    "luxartNotifications": {
+      "confirmed": false,
+      "approvedBy": "replace-with-luxart-or-zone4you-owner",
       "approvedAt": "2026-09-05T00:00:00+02:00"
     },
     "cutover": {
