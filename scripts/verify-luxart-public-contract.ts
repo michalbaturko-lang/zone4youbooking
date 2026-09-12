@@ -3,12 +3,19 @@ import { pathToFileURL } from "node:url";
 
 type FetchLike = (input: URL, init?: RequestInit) => Promise<Response>;
 
-interface LuxartPublicContractOptions {
+interface LuxartContractDocumentationOptions {
+  origin: string;
   fetchImpl?: FetchLike;
   now?: Date;
+  requestHeaders?: HeadersInit;
   timeoutMs?: number;
   expectedSemanticContractSha256?: string;
 }
+
+type LuxartPublicContractOptions = Omit<
+  LuxartContractDocumentationOptions,
+  "origin" | "requestHeaders"
+>;
 
 interface ContractEndpoint {
   id: string;
@@ -190,26 +197,53 @@ function networkCode(error: unknown) {
   return "NETWORK_UNAVAILABLE" as const;
 }
 
-export async function verifyLuxartPublicContract({
+function cleanContractOrigin(raw: string) {
+  const url = new URL(raw);
+  if (
+    !["http:", "https:"].includes(url.protocol) ||
+    !url.hostname ||
+    url.username ||
+    url.password ||
+    url.pathname !== "/" ||
+    url.search ||
+    url.hash
+  ) {
+    throw new Error("Luxart contract origin must be a clean HTTP(S) origin without credentials or a path.");
+  }
+  return url.origin;
+}
+
+export async function verifyLuxartContractDocumentation({
+  origin,
   fetchImpl = fetch,
   now = new Date(),
+  requestHeaders,
   timeoutMs = 8_000,
   expectedSemanticContractSha256 = approvedLuxartReferenceSemanticContractSha256,
-}: LuxartPublicContractOptions = {}) {
+}: LuxartContractDocumentationOptions) {
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1_000 || timeoutMs > 30_000) {
     throw new Error("Luxart public contract timeout must be an integer from 1000 to 30000.");
   }
   if (!/^[a-f0-9]{64}$/.test(expectedSemanticContractSha256)) {
     throw new Error("The expected Luxart reference contract digest must be a full lowercase SHA-256.");
   }
+  const targetOrigin = cleanContractOrigin(origin);
+  const headers = new Headers(requestHeaders);
+  if (headers.has("cookie")) {
+    throw new Error("Luxart contract documentation verification must not send cookies.");
+  }
+  if (targetOrigin.startsWith("http:") && [...headers].length > 0) {
+    throw new Error("Luxart contract documentation authentication headers require HTTPS.");
+  }
+  headers.set("Accept", "text/html,application/xhtml+xml");
 
   const issues: ContractIssue[] = [];
   const observed: Array<{ id: string; title: string; fields: string[] }> = [];
-  const request = async (path: string) => fetchImpl(new URL(path, referenceOrigin), {
+  const request = async (path: string) => fetchImpl(new URL(path, targetOrigin), {
     method: "GET",
     redirect: "manual",
     cache: "no-store",
-    headers: { Accept: "text/html,application/xhtml+xml" },
+    headers,
     signal: AbortSignal.timeout(timeoutMs),
   });
 
@@ -269,14 +303,24 @@ export async function verifyLuxartPublicContract({
   return {
     ok: issues.length === 0,
     checkedAt: now.toISOString(),
-    referenceOnly: true,
-    launchAuthority: false,
-    targetFingerprintSha256: createHash("sha256").update(referenceOrigin).digest("hex"),
+    targetFingerprintSha256: createHash("sha256").update(targetOrigin).digest("hex"),
     expectedEndpointCount: luxartPublicContractEndpoints.length,
     verifiedEndpointCount: observed.length,
     expectedSemanticContractSha256,
     semanticContractSha256,
     issues,
+  };
+}
+
+export async function verifyLuxartPublicContract(options: LuxartPublicContractOptions = {}) {
+  const report = await verifyLuxartContractDocumentation({
+    ...options,
+    origin: referenceOrigin,
+  });
+  return {
+    ...report,
+    referenceOnly: true,
+    launchAuthority: false,
   };
 }
 

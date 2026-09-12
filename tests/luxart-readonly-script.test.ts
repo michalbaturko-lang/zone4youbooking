@@ -7,6 +7,10 @@ import {
   loadLuxartTestCredentials,
   runLuxartReadonlyVerification,
 } from "../scripts/verify-luxart-readonly";
+import {
+  approvedLuxartReferenceSemanticContractSha256,
+  luxartPublicContractEndpoints,
+} from "../scripts/verify-luxart-public-contract";
 
 const now = new Date("2026-09-05T08:00:00.000Z");
 const target = "https://luxart-test.example.com:9191";
@@ -103,7 +107,7 @@ test("standalone Luxart evidence remains diagnostic while D1-attested evidence s
   validateLuxartEvidence({
     ...evidence,
     d1: {
-      schemaVersion: 2,
+      schemaVersion: 3,
       checkedAt: now.toISOString(),
       targetFingerprintSha256: createHash("sha256").update(target).digest("hex"),
       helpClassification: "ready",
@@ -113,6 +117,10 @@ test("standalone Luxart evidence remains diagnostic while D1-attested evidence s
       helpBodySha256: "b".repeat(64),
       gatewayAuthMode: "none",
       apiContract: "memberzone_rest_v1",
+      contractCheckedAt: now.toISOString(),
+      contractEndpointCount: luxartPublicContractEndpoints.length,
+      contractSemanticSha256: approvedLuxartReferenceSemanticContractSha256,
+      contractBaselineVerified: true,
       approvedOriginFingerprintVerified: true,
       authenticatedReadOnlyVerified: true,
       personalizedLessonSetVerified: true,

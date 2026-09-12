@@ -9,6 +9,10 @@ import { zone4YouDateKey, zone4YouScheduleRange, zone4YouTimeZone } from "../src
 import { validateProductionDomainBaselineEvidence } from "./capture-production-domain-baseline";
 import { readStableReleaseJson } from "./release-evidence-file";
 import { assertSupportedLuxartApiContract, supportedLuxartApiContract } from "../src/lib/luxartApiContract";
+import {
+  approvedLuxartReferenceSemanticContractSha256,
+  luxartPublicContractEndpoints,
+} from "./verify-luxart-public-contract";
 
 type Environment = Record<string, string | undefined>;
 type JsonObject = Record<string, unknown>;
@@ -205,8 +209,8 @@ export function validateLuxartEvidence(
   const expectedPort = expectedOrigin.port || (expectedOrigin.protocol === "https:" ? "443" : "80");
   const expectedFingerprint = createHash("sha256").update(expectedOrigin.origin).digest("hex");
   const d1 = objectValue(evidence.d1, "artifacts.luxartReadOnly.d1");
-  if (d1.schemaVersion !== 2) {
-    throw new Error("artifacts.luxartReadOnly.d1.schemaVersion must be 2.");
+  if (d1.schemaVersion !== 3) {
+    throw new Error("artifacts.luxartReadOnly.d1.schemaVersion must be 3.");
   }
   exactString(d1.apiContract, supportedLuxartApiContract, "Luxart D1 apiContract");
   exactString(evidence.apiContract, supportedLuxartApiContract, "Luxart evidence apiContract");
@@ -223,6 +227,20 @@ export function validateLuxartEvidence(
   exactString(d1.helpTransport, "https", "Luxart D1 helpTransport");
   exactString(d1.helpPort, expectedPort, "Luxart D1 helpPort");
   exactString(d1.gatewayAuthMode, gatewayAuthMode, "Luxart D1 gatewayAuthMode");
+  exactString(
+    stringValue(d1.contractCheckedAt, "Luxart D1 contractCheckedAt"),
+    stringValue(evidence.checkedAt, "Luxart evidence checkedAt"),
+    "Luxart D1 contractCheckedAt",
+  );
+  if (integerValue(d1.contractEndpointCount, "Luxart D1 contractEndpointCount", 1) !== luxartPublicContractEndpoints.length) {
+    throw new Error(`Luxart D1 contractEndpointCount must be ${luxartPublicContractEndpoints.length}.`);
+  }
+  exactString(
+    d1.contractSemanticSha256,
+    approvedLuxartReferenceSemanticContractSha256,
+    "Luxart D1 contractSemanticSha256",
+  );
+  trueValue(d1.contractBaselineVerified, "Luxart D1 contractBaselineVerified");
   trueValue(d1.approvedOriginFingerprintVerified, "Luxart D1 approvedOriginFingerprintVerified");
   trueValue(d1.authenticatedReadOnlyVerified, "Luxart D1 authenticatedReadOnlyVerified");
   trueValue(d1.personalizedLessonSetVerified, "Luxart D1 personalizedLessonSetVerified");

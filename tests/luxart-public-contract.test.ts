@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 import {
   luxartPublicContractEndpoints,
+  verifyLuxartContractDocumentation,
   verifyLuxartPublicContract,
 } from "../scripts/verify-luxart-public-contract";
 
@@ -123,5 +124,51 @@ test("public Luxart contract verifier fails closed on semantic contract drift", 
       expectedSemanticContractSha256: "ABC",
     }),
     /full lowercase SHA-256/i,
+  );
+});
+
+test("contract documentation verifier binds a clean custom origin and optional gateway header", async () => {
+  const fixture = contractFetch();
+  const observedOrigins = new Set<string>();
+  const observedAuthorization = new Set<string | null>();
+  const report = await verifyLuxartContractDocumentation({
+    origin: "https://zone4you-api.example.cz:9191",
+    expectedSemanticContractSha256: fixtureSemanticContractSha256(),
+    requestHeaders: { Authorization: "Bearer gateway-secret" },
+    fetchImpl: async (url, init) => {
+      observedOrigins.add(url.origin);
+      observedAuthorization.add(new Headers(init?.headers).get("authorization"));
+      return fixture.fetchImpl(url, init);
+    },
+  });
+
+  assert.equal(report.ok, true);
+  assert.deepEqual([...observedOrigins], ["https://zone4you-api.example.cz:9191"]);
+  assert.deepEqual([...observedAuthorization], ["Bearer gateway-secret"]);
+  assert.equal(JSON.stringify(report).includes("gateway-secret"), false);
+  assert.equal(JSON.stringify(report).includes("zone4you-api.example.cz"), false);
+
+  await assert.rejects(
+    verifyLuxartContractDocumentation({
+      origin: "https://zone4you-api.example.cz:9191/api",
+      fetchImpl: fixture.fetchImpl,
+    }),
+    /clean HTTP\(S\) origin/i,
+  );
+  await assert.rejects(
+    verifyLuxartContractDocumentation({
+      origin: "https://zone4you-api.example.cz:9191",
+      requestHeaders: { Cookie: "session=secret" },
+      fetchImpl: fixture.fetchImpl,
+    }),
+    /must not send cookies/i,
+  );
+  await assert.rejects(
+    verifyLuxartContractDocumentation({
+      origin: "http://zone4you-api.example.cz:9191",
+      requestHeaders: { Authorization: "Bearer gateway-secret" },
+      fetchImpl: fixture.fetchImpl,
+    }),
+    /authentication headers require HTTPS/i,
   );
 });

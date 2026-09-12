@@ -8,6 +8,10 @@ import {
   loadLuxartD1Configuration,
   runLuxartD1Verification,
 } from "../scripts/verify-luxart-d1";
+import {
+  approvedLuxartReferenceSemanticContractSha256,
+  luxartPublicContractEndpoints,
+} from "../scripts/verify-luxart-public-contract";
 
 const now = new Date("2026-09-11T14:00:00.000Z");
 const approvedOrigin = "https://zone4you-api.example.cz:9443";
@@ -70,6 +74,20 @@ function readonlyEvidence(gatewayAuthMode: "none" | "basic" = "none") {
   };
 }
 
+function contractEvidence(overrides: Record<string, unknown> = {}) {
+  return {
+    ok: true,
+    checkedAt: now.toISOString(),
+    targetFingerprintSha256: approvedOriginFingerprint,
+    expectedEndpointCount: luxartPublicContractEndpoints.length,
+    verifiedEndpointCount: luxartPublicContractEndpoints.length,
+    expectedSemanticContractSha256: approvedLuxartReferenceSemanticContractSha256,
+    semanticContractSha256: approvedLuxartReferenceSemanticContractSha256,
+    issues: [],
+    ...overrides,
+  };
+}
+
 test("D1 configuration is locked to the exact approved HTTPS REST origin and a protected external file", () => {
   const directory = mkdtempSync(join(tmpdir(), "zone4you-d1-"));
   try {
@@ -116,7 +134,7 @@ test("D1 configuration is locked to the exact approved HTTPS REST origin and a p
   }
 });
 
-test("D1 performs only transport, gateway and authenticated read-only checks before storing owner-only evidence", async () => {
+test("D1 binds transport, gateway, semantic contract and authenticated read-only checks before storing evidence", async () => {
   const directory = mkdtempSync(join(tmpdir(), "zone4you-d1-"));
   try {
     const outputPath = join(directory, "luxart.json");
@@ -151,13 +169,18 @@ test("D1 performs only transport, gateway and authenticated read-only checks bef
           bodySha256: "c".repeat(64),
         };
       },
+      contractVerifier: async ({ origin }) => {
+        calls.push("contract");
+        assert.equal(origin, approvedOrigin);
+        return contractEvidence();
+      },
       readonlyVerifier: async () => {
         calls.push("readonly");
         return readonlyEvidence();
       },
     });
 
-    assert.deepEqual(calls, ["gateway", "help", "readonly"]);
+    assert.deepEqual(calls, ["gateway", "help", "contract", "readonly"]);
     assert.equal(receipt.ok, true);
     assert.equal(receipt.apiContract, "memberzone_rest_v1");
     assert.equal(receipt.port, "9443");
@@ -167,6 +190,8 @@ test("D1 performs only transport, gateway and authenticated read-only checks bef
     assert.equal(receipt.eligibleLessonCount, 18);
     assert.equal(receipt.ineligibleLessonCount, 6);
     assert.equal(receipt.personalizedLessonSetMatched, true);
+    assert.equal(receipt.contractEndpointCount, 11);
+    assert.equal(receipt.contractSemanticSha256, approvedLuxartReferenceSemanticContractSha256);
     assert.equal(receipt.evidenceStoredOwnerOnly, true);
     assert.match(receipt.evidenceSha256, /^[a-f0-9]{64}$/);
     assert.equal(lstatSync(outputPath).mode & 0o777, 0o600);
@@ -177,7 +202,7 @@ test("D1 performs only transport, gateway and authenticated read-only checks bef
     delete parsed.d1;
     assert.deepEqual(parsed, readonlyEvidence());
     assert.deepEqual(d1, {
-      schemaVersion: 2,
+      schemaVersion: 3,
       checkedAt: now.toISOString(),
       targetFingerprintSha256: approvedOriginFingerprint,
       helpClassification: "ready",
@@ -187,6 +212,10 @@ test("D1 performs only transport, gateway and authenticated read-only checks bef
       helpBodySha256: "c".repeat(64),
       gatewayAuthMode: "none",
       apiContract: "memberzone_rest_v1",
+      contractCheckedAt: now.toISOString(),
+      contractEndpointCount: 11,
+      contractSemanticSha256: approvedLuxartReferenceSemanticContractSha256,
+      contractBaselineVerified: true,
       approvedOriginFingerprintVerified: true,
       authenticatedReadOnlyVerified: true,
       personalizedLessonSetVerified: true,
@@ -352,11 +381,59 @@ test("D1 accepts an authentication challenge only when a non-empty gateway mode 
         httpStatus: 401,
         classification: "authentication_required",
       }),
+      contractVerifier: async () => contractEvidence(),
       readonlyVerifier: async () => readonlyEvidence("basic"),
     });
     assert.equal(receipt.helpClassification, "authentication_required");
     assert.equal(receipt.gatewayAuthMode, "basic");
     assert.equal(lstatSync(outputPath).mode & 0o777, 0o600);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("D1 rejects semantic contract drift before authenticated reads or evidence storage", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "zone4you-d1-"));
+  try {
+    const outputPath = join(directory, "luxart.json");
+    let readonlyCalls = 0;
+    await assert.rejects(
+      runLuxartD1Verification({
+        environment: environment(outputPath),
+        now,
+        repositoryRoot: "/repository",
+        gatewayVerifier: () => ({
+          ok: true,
+          checkedAt: now.toISOString(),
+          gatewayAuthMode: "none",
+          authorizationHeaderConfigured: false,
+          gatewayDecisionConfirmed: true,
+        }),
+        helpProbe: async () => ({
+          ok: true,
+          checkedAt: now.toISOString(),
+          targetFingerprintSha256: approvedOriginFingerprint,
+          transport: "https",
+          port: "9443",
+          reached: true,
+          httpStatus: 200,
+          classification: "ready",
+          bodySha256: "c".repeat(64),
+        }),
+        contractVerifier: async () => contractEvidence({
+          ok: false,
+          semanticContractSha256: "f".repeat(64),
+          issues: [{ endpoint: "contract", code: "CONTRACT_DRIFT" }],
+        }),
+        readonlyVerifier: async () => {
+          readonlyCalls += 1;
+          return readonlyEvidence();
+        },
+      }),
+      /does not match the approved semantic baseline/i,
+    );
+    assert.equal(readonlyCalls, 0);
+    assert.equal(existsSync(outputPath), false);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

@@ -5,6 +5,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { verifyPilotReleaseEvidence } from "../scripts/verify-pilot-release";
+import {
+  approvedLuxartReferenceSemanticContractSha256,
+  luxartPublicContractEndpoints,
+} from "../scripts/verify-luxart-public-contract";
 
 const now = new Date("2026-09-05T08:00:00.000Z");
 const commit = "1234567890abcdef1234567890abcdef12345678";
@@ -30,7 +34,7 @@ function validFixture() {
       apiContract: "memberzone_rest_v1",
       gatewayAuthMode: "none",
       d1: {
-        schemaVersion: 2,
+        schemaVersion: 3,
         checkedAt,
         targetFingerprintSha256: luxartTargetFingerprint,
         helpClassification: "ready",
@@ -40,6 +44,10 @@ function validFixture() {
         helpBodySha256: "b".repeat(64),
         gatewayAuthMode: "none",
         apiContract: "memberzone_rest_v1",
+        contractCheckedAt: checkedAt,
+        contractEndpointCount: luxartPublicContractEndpoints.length,
+        contractSemanticSha256: approvedLuxartReferenceSemanticContractSha256,
+        contractBaselineVerified: true,
         approvedOriginFingerprintVerified: true,
         authenticatedReadOnlyVerified: true,
         personalizedLessonSetVerified: true,
@@ -333,6 +341,20 @@ test("pilot release dossier rejects evidence that cannot come from the real guar
         (artifact.d1 as Record<string, unknown>).targetFingerprintSha256 = "c".repeat(64);
       },
       /D1 targetFingerprintSha256 must exactly equal/i,
+    ],
+    [
+      "luxartReadOnly",
+      (artifact: Record<string, unknown>) => {
+        (artifact.d1 as Record<string, unknown>).contractSemanticSha256 = "c".repeat(64);
+      },
+      /D1 contractSemanticSha256 must exactly equal/i,
+    ],
+    [
+      "luxartReadOnly",
+      (artifact: Record<string, unknown>) => {
+        (artifact.d1 as Record<string, unknown>).contractEndpointCount = 10;
+      },
+      /D1 contractEndpointCount must be 11/i,
     ],
     [
       "luxartReadOnly",

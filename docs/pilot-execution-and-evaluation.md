@@ -74,6 +74,7 @@ Kritický externí deadline je přístup k Zone4You testovacímu API do konce D1
 |---|---|---|
 | Login/User/Lesson/kredit/Reservations | každý použitý endpoint odpovídá aktuálnímu `/Help` a živé test fixture | verzované anonymizované fixtures + kontraktní testy |
 | Referenční REST drift | úplný sémantický otisk 11 veřejně dokumentovaných endpointů odpovídá schválenému baseline; změna skončí fail-closed | `verify:luxart-public-contract`, chyba `CONTRACT_DRIFT` |
+| Klientský REST drift | D1 na schváleném Zone4You HTTPS originu před loginem ověří stejných 11 dokumentačních stránek a stejný sémantický baseline; odchylka nevytvoří evidence | D1 evidence verze 3 + finální dossier validace |
 | Chybějící/nové pole | mapper nespadne; povinná nevalidní data mají bezpečný chybový stav | negativní testy |
 | Secrets a osobní data | žádné heslo, hash, klíč ani neanonymizovaná odpověď v repozitáři/logu | diff scan + privacy review |
 | Historie secrets | známé uniklé testovací Luxart údaje, privátní klíče a živé tokeny nejsou ani v předchozích Git objektech | `npm run scan:release-secrets` nad úplnou historií |

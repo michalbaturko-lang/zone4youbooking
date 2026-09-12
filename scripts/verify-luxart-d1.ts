@@ -5,16 +5,28 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { runLuxartHelpProbe } from "./probe-luxart-help";
 import { verifyLuxartGatewayConfiguration } from "./verify-luxart-gateway-config";
 import { runLuxartReadonlyVerification } from "./verify-luxart-readonly";
+import {
+  approvedLuxartReferenceSemanticContractSha256,
+  luxartPublicContractEndpoints,
+  verifyLuxartContractDocumentation,
+} from "./verify-luxart-public-contract";
 import { assertSupportedLuxartApiContract } from "../src/lib/luxartApiContract";
+import { loadLuxartGatewayAuthConfig } from "../src/lib/luxartGatewayAuth";
 
 type Environment = Record<string, string | undefined>;
 type HelpEvidence = Awaited<ReturnType<typeof runLuxartHelpProbe>>;
 type ReadonlyEvidence = Awaited<ReturnType<typeof runLuxartReadonlyVerification>>;
 type GatewayEvidence = ReturnType<typeof verifyLuxartGatewayConfiguration>;
+type ContractEvidence = Awaited<ReturnType<typeof verifyLuxartContractDocumentation>>;
 
 interface LuxartD1Dependencies {
   helpProbe?: (options: { environment: Environment; now: Date }) => Promise<HelpEvidence>;
   gatewayVerifier?: (environment: Environment) => GatewayEvidence;
+  contractVerifier?: (options: {
+    environment: Environment;
+    origin: string;
+    now: Date;
+  }) => Promise<ContractEvidence>;
   readonlyVerifier?: (options: { environment: Environment; now: Date }) => Promise<ReadonlyEvidence>;
 }
 
@@ -129,12 +141,30 @@ function helpAccepted(help: HelpEvidence, gateway: GatewayEvidence) {
   return help.classification === "authentication_required" && gateway.gatewayAuthMode !== "none";
 }
 
+async function verifyD1ContractDocumentation({
+  environment,
+  origin,
+  now,
+}: {
+  environment: Environment;
+  origin: string;
+  now: Date;
+}) {
+  const gateway = loadLuxartGatewayAuthConfig(environment);
+  return verifyLuxartContractDocumentation({
+    origin,
+    now,
+    requestHeaders: gateway.headers,
+  });
+}
+
 export async function runLuxartD1Verification({
   environment = process.env,
   now = new Date(),
   repositoryRoot = repositoryRootDefault,
   helpProbe = runLuxartHelpProbe,
   gatewayVerifier = verifyLuxartGatewayConfiguration,
+  contractVerifier = verifyD1ContractDocumentation,
   readonlyVerifier = runLuxartReadonlyVerification,
 }: LuxartD1Options = {}) {
   const configuration = loadLuxartD1Configuration(environment, repositoryRoot);
@@ -168,6 +198,24 @@ export async function runLuxartD1Verification({
     throw new Error(`Luxart Help transport check did not pass safely (${help.classification}).`);
   }
 
+  const contract = await contractVerifier({
+    environment,
+    origin: configuration.apiOrigin,
+    now,
+  });
+  if (
+    contract.ok !== true ||
+    contract.checkedAt !== now.toISOString() ||
+    contract.targetFingerprintSha256 !== configuration.targetFingerprintSha256 ||
+    contract.expectedEndpointCount !== luxartPublicContractEndpoints.length ||
+    contract.verifiedEndpointCount !== luxartPublicContractEndpoints.length ||
+    contract.expectedSemanticContractSha256 !== approvedLuxartReferenceSemanticContractSha256 ||
+    contract.semanticContractSha256 !== approvedLuxartReferenceSemanticContractSha256 ||
+    contract.issues.length !== 0
+  ) {
+    throw new Error("Luxart REST contract documentation does not match the approved semantic baseline.");
+  }
+
   const evidence = await readonlyVerifier({ environment, now });
   if (!evidence.ok || evidence.target !== configuration.apiOrigin) {
     throw new Error("Luxart read-only evidence does not match the approved API origin.");
@@ -188,7 +236,7 @@ export async function runLuxartD1Verification({
   const d1Evidence = {
     ...evidence,
     d1: {
-      schemaVersion: 2,
+      schemaVersion: 3,
       checkedAt: help.checkedAt,
       targetFingerprintSha256: configuration.targetFingerprintSha256,
       helpClassification: help.classification,
@@ -198,6 +246,10 @@ export async function runLuxartD1Verification({
       ...(help.classification === "ready" ? { helpBodySha256 } : {}),
       gatewayAuthMode: gateway.gatewayAuthMode,
       apiContract: configuration.apiContract,
+      contractCheckedAt: contract.checkedAt,
+      contractEndpointCount: contract.verifiedEndpointCount,
+      contractSemanticSha256: contract.semanticContractSha256,
+      contractBaselineVerified: true,
       approvedOriginFingerprintVerified: true,
       authenticatedReadOnlyVerified: true,
       personalizedLessonSetVerified: true,
@@ -219,6 +271,8 @@ export async function runLuxartD1Verification({
     targetFingerprintSha256: configuration.targetFingerprintSha256,
     helpClassification: help.classification,
     gatewayAuthMode: gateway.gatewayAuthMode,
+    contractEndpointCount: contract.verifiedEndpointCount,
+    contractSemanticSha256: contract.semanticContractSha256,
     authenticated: true,
     czechLessonCount: evidence.czech.count,
     englishLessonCount: evidence.english.count,
