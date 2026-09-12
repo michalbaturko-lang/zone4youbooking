@@ -432,7 +432,7 @@ check(
 check(
   "Verified pilot release dossier",
   verifiedPilotReleaseDossier(),
-  "The exact release commit needs fresh hashed live Luxart, runtime, mutation UAT, rollback and alert evidence plus zero P0/P1, Memberzone fallback and explicit cutover approval.",
+  "The exact release commit needs fresh hashed live Luxart, runtime, mutation UAT, rollback, alert and Memberzone evidence plus zero P0/P1, named approval of active Luxart notification templates and explicit cutover approval.",
 );
 
 console.log("Zone4You production launch readiness\n");
