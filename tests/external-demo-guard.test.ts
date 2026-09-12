@@ -71,14 +71,31 @@ test("external browser regression requires an exact expected Preview commit", ()
 
 test("external browser regression ignores only Vercel toolbar CSP noise", () => {
   const toolbarCspError = "Loading the script 'https://vercel.live/_next-live/feedback/feedback.js' violates the following Content Security Policy directive: script-src. The action has been blocked.";
+  const webkitToolbarCspError = "Refused to load https://vercel.live/_next-live/feedback/feedback.js because it does not appear in the script-src directive of the Content Security Policy.";
   const previewEnvironment = { PLAYWRIGHT_EXTERNAL_DEMO_URL: `${previewUrl}/` };
 
   assert.equal(isExpectedExternalDemoConsoleNoise(toolbarCspError, previewEnvironment), true);
+  assert.equal(isExpectedExternalDemoConsoleNoise(webkitToolbarCspError, previewEnvironment), true);
   assert.equal(isExpectedExternalDemoConsoleNoise(toolbarCspError, {}), false);
+  assert.equal(isExpectedExternalDemoConsoleNoise(webkitToolbarCspError, {}), false);
   assert.equal(isExpectedExternalDemoConsoleNoise("Application failed to load.", previewEnvironment), false);
   assert.equal(
     isExpectedExternalDemoConsoleNoise(
       "Loading the script 'https://example.com/feedback.js' violates the following Content Security Policy directive: script-src. The action has been blocked.",
+      previewEnvironment,
+    ),
+    false,
+  );
+  assert.equal(
+    isExpectedExternalDemoConsoleNoise(
+      "Refused to load https://example.com/feedback.js because it does not appear in the script-src directive of the Content Security Policy.",
+      previewEnvironment,
+    ),
+    false,
+  );
+  assert.equal(
+    isExpectedExternalDemoConsoleNoise(
+      "Refused to load https://vercel.live/_next-live/feedback/feedback.js because it does not appear in the connect-src directive of the Content Security Policy.",
       previewEnvironment,
     ),
     false,

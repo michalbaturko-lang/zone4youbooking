@@ -68,9 +68,13 @@ export function isExpectedExternalDemoConsoleNoise(
   environment: Environment = process.env,
 ) {
   if (!externalDemoOrigin(environment)) return false;
-  return message.includes("https://vercel.live/_next-live/feedback/feedback.js") &&
-    message.includes("violates the following Content Security Policy directive") &&
+  const toolbarScript = "https://vercel.live/_next-live/feedback/feedback.js";
+  if (!message.includes(toolbarScript)) return false;
+  const chromiumCspMessage = message.includes("violates the following Content Security Policy directive") &&
     message.endsWith("The action has been blocked.");
+  const webkitCspMessage = message ===
+    `Refused to load ${toolbarScript} because it does not appear in the script-src directive of the Content Security Policy.`;
+  return chromiumCspMessage || webkitCspMessage;
 }
 
 export function assertExternalDemoReadiness(payload: DemoReadiness, expectedCommit: string) {
