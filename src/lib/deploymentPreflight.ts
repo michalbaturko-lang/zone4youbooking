@@ -260,6 +260,24 @@ export function deploymentRuntimeConfigurationProblems(
   if (transport === "invalid") {
     issues.push(issue("LUXART_API_TRANSPORT", "LUXART_API_BASE_URL", "LUXART_ALLOW_INSECURE_TEST_HTTP"));
   }
+  if (transport === "approved_test_http" && phase !== "read_only") {
+    issues.push(issue(
+      "INSECURE_HTTP_READ_ONLY_ONLY",
+      "LUXART_API_BASE_URL",
+      "LUXART_ALLOW_INSECURE_TEST_HTTP",
+      "ZONE4YOU_DEPLOYMENT_PHASE",
+    ));
+  }
+  if (
+    transport === "approved_test_http" &&
+    environment.LUXART_API_AUTH_MODE?.trim().toLowerCase() !== "none"
+  ) {
+    issues.push(issue(
+      "INSECURE_HTTP_GATEWAY_AUTH",
+      "LUXART_API_BASE_URL",
+      "LUXART_API_AUTH_MODE",
+    ));
+  }
   if (target === "production" && environment.LUXART_ALLOW_INSECURE_TEST_HTTP !== "false") {
     issues.push(issue("PRODUCTION_INSECURE_HTTP_OVERRIDE", "LUXART_ALLOW_INSECURE_TEST_HTTP"));
   }

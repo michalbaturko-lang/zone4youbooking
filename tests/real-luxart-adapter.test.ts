@@ -582,13 +582,15 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
   await new Promise((resolve) => setTimeout(resolve, 1_200));
 });
 
-test("runtime adapter accepts only a clean HTTPS origin outside an explicit staging test", () => {
+test("runtime adapter accepts only a clean HTTPS origin outside an explicit anonymous staging test", async () => {
   const names = [
     "LUXART_API_CONTRACT",
     "LUXART_API_BASE_URL",
     "LUXART_RESORT_ID",
     "LUXART_TIMEOUT_MS",
     "LUXART_API_AUTH_MODE",
+    "LUXART_API_BASIC_USERNAME",
+    "LUXART_API_BASIC_PASSWORD",
     "LUXART_ALLOW_INSECURE_TEST_HTTP",
     "ZONE4YOU_DEPLOYMENT_TARGET",
     "NEXT_PUBLIC_APP_ENV",
@@ -634,6 +636,30 @@ test("runtime adapter accepts only a clean HTTPS origin outside an explicit stag
     process.env.ZONE4YOU_DEPLOYMENT_TARGET = "staging";
     process.env.NEXT_PUBLIC_APP_ENV = "staging";
     assert.doesNotThrow(() => createRealLuxartAdapter());
+
+    process.env.LUXART_API_BASE_URL = "http://luxart.example.com:9191/";
+    const anonymousHttpAdapter = createRealLuxartAdapter();
+    await assert.rejects(
+      anonymousHttpAdapter.login({ login: "test@example.invalid", password: "1" }),
+      (error: unknown) => error instanceof BookingApiError &&
+        error.status === 503 &&
+        error.code === "LUXART_HTTPS_REQUIRED",
+    );
+    assert.throws(
+      () => createRealLuxartAdapter({ userId: "42" }),
+      (error: unknown) => error instanceof BookingApiError && error.code === "LUXART_HTTPS_REQUIRED",
+    );
+
+    process.env.LUXART_API_AUTH_MODE = "basic";
+    process.env.LUXART_API_BASIC_USERNAME = "gateway-user";
+    process.env.LUXART_API_BASIC_PASSWORD = "gateway-password";
+    assert.throws(
+      () => createRealLuxartAdapter(),
+      /gateway authentication requires HTTPS/i,
+    );
+    process.env.LUXART_API_AUTH_MODE = "none";
+    delete process.env.LUXART_API_BASIC_USERNAME;
+    delete process.env.LUXART_API_BASIC_PASSWORD;
 
     process.env.VERCEL_ENV = "production";
     assert.throws(() => createRealLuxartAdapter(), /clean HTTPS origin/i);

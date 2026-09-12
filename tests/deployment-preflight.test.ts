@@ -221,6 +221,28 @@ test("preflight fails closed on commit drift, phase drift and production HTTP ov
   }));
   assert.ok(productionOverride.some(({ code }) => code === "PRODUCTION_INSECURE_HTTP_OVERRIDE"));
 
+  const anonymousHttpDiagnostic = buildDeploymentPreflightReport(readOnlyStagingEnvironment({
+    LUXART_API_BASE_URL: "http://luxart-test.example.com:9295/",
+    LUXART_ALLOW_INSECURE_TEST_HTTP: "true",
+  }));
+  assert.equal(anonymousHttpDiagnostic.ok, true);
+  assert.equal(anonymousHttpDiagnostic.configuration.luxartTransport, "approved_test_http");
+
+  const insecureBooking = deploymentRuntimeConfigurationProblems(bookingStagingEnvironment({
+    LUXART_API_BASE_URL: "http://luxart-test.example.com:9191/",
+    LUXART_ALLOW_INSECURE_TEST_HTTP: "true",
+  }), confirmedBusinessRulesProfile);
+  assert.ok(insecureBooking.some(({ code }) => code === "INSECURE_HTTP_READ_ONLY_ONLY"));
+
+  const insecureGatewayAuth = deploymentRuntimeConfigurationProblems(readOnlyStagingEnvironment({
+    LUXART_API_BASE_URL: "http://luxart-test.example.com:9191/",
+    LUXART_ALLOW_INSECURE_TEST_HTTP: "true",
+    LUXART_API_AUTH_MODE: "basic",
+    LUXART_API_BASIC_USERNAME: "gateway-user",
+    LUXART_API_BASIC_PASSWORD: "gateway-password",
+  }));
+  assert.ok(insecureGatewayAuth.some(({ code }) => code === "INSECURE_HTTP_GATEWAY_AUTH"));
+
   const nestedApiPath = deploymentRuntimeConfigurationProblems(readOnlyStagingEnvironment({
     LUXART_API_BASE_URL: "https://luxart-test.example.com:9191/api/",
   }));

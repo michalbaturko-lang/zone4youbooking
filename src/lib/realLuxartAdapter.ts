@@ -46,6 +46,7 @@ interface RealLuxartConfig {
   resortId: number;
   timeoutMs: number;
   gatewayHeaders: Record<string, string>;
+  sensitiveOperationsAllowed: boolean;
 }
 
 interface RealLuxartContext {
@@ -138,6 +139,23 @@ function normalizedLuxartBaseUrl(environment: NodeJS.ProcessEnv = process.env) {
   return url.origin;
 }
 
+function sensitiveLuxartOperationsAllowed(baseUrl: string) {
+  const url = new URL(baseUrl);
+  return url.protocol === "https:" || (
+    url.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)
+  );
+}
+
+function assertSensitiveLuxartTransport(config: RealLuxartConfig) {
+  if (!config.sensitiveOperationsAllowed) {
+    throw new BookingApiError(
+      503,
+      "LUXART_HTTPS_REQUIRED",
+      "Přihlášení a klientská data vyžadují zabezpečené spojení s Luxartem.",
+    );
+  }
+}
+
 class LuxartHttpError extends BookingApiError {
   constructor(
     readonly upstreamStatus: number,
@@ -150,6 +168,11 @@ class LuxartHttpError extends BookingApiError {
 function loadConfig(): RealLuxartConfig {
   assertSupportedLuxartApiContract();
   const baseUrl = normalizedLuxartBaseUrl();
+  const sensitiveOperationsAllowed = sensitiveLuxartOperationsAllowed(baseUrl);
+  const gatewayAuth = loadLuxartGatewayAuthConfig();
+  if (!sensitiveOperationsAllowed && gatewayAuth.mode !== "none") {
+    throw new Error("Luxart gateway authentication requires HTTPS outside loopback tests.");
+  }
   const resortId = Number(process.env.LUXART_RESORT_ID ?? "1");
   if (resortId !== 1) throw new Error("LUXART_RESORT_ID must be 1 for the Zone4You pilot.");
   const timeoutMs = Number(process.env.LUXART_TIMEOUT_MS ?? "12000");
@@ -161,7 +184,8 @@ function loadConfig(): RealLuxartConfig {
     baseUrl,
     resortId,
     timeoutMs,
-    gatewayHeaders: loadLuxartGatewayAuthConfig().headers,
+    gatewayHeaders: gatewayAuth.headers,
+    sensitiveOperationsAllowed,
   };
 }
 
@@ -440,6 +464,7 @@ function watchdogInsertPath() {
 
 export function createRealLuxartAdapter(context: RealLuxartContext = {}): LuxartAdapter {
   const config = loadConfig();
+  if (context.userId) assertSensitiveLuxartTransport(config);
   let cachedUser: User | null | undefined;
 
   function currentUserId() {
@@ -461,6 +486,7 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
 
   return {
     async login(input: LoginInput): Promise<LoginResult> {
+      assertSensitiveLuxartTransport(config);
       const userData = await luxartFetch<LuxartUserData>(
         config,
         queryPath("/api/Login", {

@@ -116,6 +116,9 @@ export async function runLuxartReadonlyVerification({
 }: LuxartReadonlyVerificationOptions = {}) {
   const { url: target, apiContract } = requireSafeConfiguration(environment);
   const gatewayAuth = loadLuxartGatewayAuthConfig(environment);
+  if (target.protocol !== "https:" && gatewayAuth.mode !== "none") {
+    throw new Error("Luxart gateway authentication requires HTTPS; gateway credentials will not be sent over HTTP.");
+  }
   const authentication = loadLuxartTestCredentials(environment);
   if (authentication && target.protocol !== "https:") {
     throw new Error("Authenticated Luxart verification requires HTTPS; test credentials will not be sent over HTTP.");

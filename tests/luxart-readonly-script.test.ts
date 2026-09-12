@@ -35,6 +35,29 @@ test("release-grade Luxart verification requires a complete test login by defaul
   );
 });
 
+test("HTTP diagnostics reject gateway authentication before creating an adapter", async () => {
+  let adapterCreated = false;
+  await assert.rejects(
+    runLuxartReadonlyVerification({
+      environment: {
+        ...environment,
+        LUXART_API_BASE_URL: "http://luxart-test.example.com:9295/",
+        LUXART_ALLOW_INSECURE_TEST_HTTP: "true",
+        LUXART_API_AUTH_MODE: "basic",
+        LUXART_API_BASIC_USERNAME: "gateway-user",
+        LUXART_API_BASIC_PASSWORD: "gateway-password",
+        LUXART_REQUIRE_AUTHENTICATED_PROBE: "false",
+      },
+      adapterFactory: () => {
+        adapterCreated = true;
+        throw new Error("Adapter must not be created.");
+      },
+    }),
+    /gateway credentials will not be sent over HTTP/i,
+  );
+  assert.equal(adapterCreated, false);
+});
+
 test("authenticated Luxart verification never sends test credentials over HTTP", async () => {
   let adapterCreated = false;
   await assert.rejects(
