@@ -691,6 +691,45 @@ test("pilot release dossier rejects stale evidence and missing live approval", (
   );
 });
 
+test("pilot release approvals cannot predate their evidence or the final cutover", () => {
+  for (const [approvalName, approvedAtValue, expectedError] of [
+    ["uat", "2026-09-05T07:29:00.000Z", /approvals\.uat\.approvedAt must not predate artifacts\.bookingMutationUat\.checkedAt/i],
+    ["alertReceipt", "2026-09-05T07:29:00.000Z", /approvals\.alertReceipt\.approvedAt must not predate artifacts\.alertDelivery\.checkedAt/i],
+    ["memberzoneFallback", "2026-09-05T07:29:00.000Z", /approvals\.memberzoneFallback\.approvedAt must not predate artifacts\.memberzoneFallback\.checkedAt/i],
+    ["luxartNotifications", "2026-09-05T07:29:00.000Z", /approvals\.luxartNotifications\.approvedAt must not predate artifacts\.runtimeProbe\.checkedAt/i],
+    ["cutover", "2026-09-05T07:39:00.000Z", /approvals\.cutover\.approvedAt must not predate approvals\.uat\.approvedAt/i],
+  ] as const) {
+    const fixture = validFixture();
+    const dossier = structuredClone(fixture.dossier);
+    dossier.approvals[approvalName].approvedAt = approvedAtValue;
+    const dossierSha = writeJson(fixture.dossierPath, dossier);
+    assert.throws(
+      () => verifyPilotReleaseEvidence({
+        ...fixture.environment,
+        ZONE4YOU_RELEASE_DOSSIER_CONFIRMATION: `VERIFY_ZONE4YOU_RELEASE_DOSSIER:${dossierSha}`,
+      }, now),
+      expectedError,
+    );
+  }
+});
+
+test("pilot release cutover cannot predate the latest artifact", () => {
+  const fixture = validFixture();
+  const rollback = structuredClone(fixture.files.rollback) as Record<string, unknown>;
+  rollback.checkedAt = "2026-09-05T07:51:00.000Z";
+  const dossier = structuredClone(fixture.dossier);
+  dossier.artifacts.rollback.sha256 = writeJson(dossier.artifacts.rollback.path, rollback);
+  const dossierSha = writeJson(fixture.dossierPath, dossier);
+
+  assert.throws(
+    () => verifyPilotReleaseEvidence({
+      ...fixture.environment,
+      ZONE4YOU_RELEASE_DOSSIER_CONFIRMATION: `VERIFY_ZONE4YOU_RELEASE_DOSSIER:${dossierSha}`,
+    }, now),
+    /approvals\.cutover\.approvedAt must not predate artifacts\.rollback\.checkedAt/i,
+  );
+});
+
 test("pilot release dossier never treats a prepared draft as cutover authority", () => {
   const fixture = validFixture();
   const dossier = structuredClone(fixture.dossier);

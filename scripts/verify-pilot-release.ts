@@ -135,8 +135,8 @@ function artifact(
   );
   if (loaded.sha256 !== expectedSha256) throw new Error(`artifacts.${name} SHA-256 does not match the dossier.`);
   trueValue(loaded.data.ok, `artifacts.${name}.ok`);
-  checkedAt(loaded.data.checkedAt, `artifacts.${name}`, now, maximumAgeHours);
-  return { ...loaded, path };
+  const evidenceCheckedAt = checkedAt(loaded.data.checkedAt, `artifacts.${name}`, now, maximumAgeHours);
+  return { ...loaded, path, checkedAt: evidenceCheckedAt };
 }
 
 function exactString(value: unknown, expected: string, label: string) {
@@ -188,15 +188,34 @@ function requireApproval(
   name: string,
   now: Date,
   maximumAgeHours: number,
-) {
+): JsonObject {
   const approval = objectValue(approvals[name], `approvals.${name}`);
   const approvedBy = stringValue(approval.approvedBy, `approvals.${name}.approvedBy`);
   if (approvedBy.length > 120) throw new Error(`approvals.${name}.approvedBy must contain at most 120 characters.`);
   if (approvedBy === "pending-human-approval") {
     throw new Error(`approvals.${name}.approvedBy must identify the actual approving person or role.`);
   }
-  approvedAt(approval.approvedAt, `approvals.${name}`, now, maximumAgeHours);
-  return approval;
+  const normalizedApprovedAt = approvedAt(approval.approvedAt, `approvals.${name}`, now, maximumAgeHours);
+  return { ...approval, approvedAt: normalizedApprovedAt };
+}
+
+function latestTimestamp(values: Array<{ label: string; timestamp: string }>) {
+  if (values.length === 0) throw new Error("At least one timestamp is required for release chronology.");
+  return values.reduce((latest, candidate) =>
+    Date.parse(candidate.timestamp) >= Date.parse(latest.timestamp) ? candidate : latest
+  );
+}
+
+function requireApprovalAfter(
+  approval: JsonObject,
+  approvalName: string,
+  prerequisites: Array<{ label: string; timestamp: string }>,
+) {
+  const approvedAtValue = stringValue(approval.approvedAt, `approvals.${approvalName}.approvedAt`);
+  const latest = latestTimestamp(prerequisites);
+  if (Date.parse(approvedAtValue) < Date.parse(latest.timestamp)) {
+    throw new Error(`approvals.${approvalName}.approvedAt must not predate ${latest.label}.`);
+  }
 }
 
 function roomMap(environment: Environment) {
@@ -567,9 +586,11 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
   const dossierDirectory = dirname(dossierPath);
   const artifacts = objectValue(dossier.artifacts, "artifacts");
   const loadedArtifacts: Array<{ name: string; sha256: string }> = [];
+  const artifactTimes = new Map<string, string>();
   const load = (name: string, ageHours = maximumAgeHours) => {
     const loaded = artifact(dossierDirectory, artifacts, name, now, ageHours);
     loadedArtifacts.push({ name, sha256: loaded.sha256 });
+    artifactTimes.set(name, loaded.checkedAt);
     return loaded.data;
   };
 
@@ -604,15 +625,46 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
   if (integerValue(uat.openP0, "approvals.uat.openP0") !== 0 || integerValue(uat.openP1, "approvals.uat.openP1") !== 0) {
     throw new Error("UAT approval must have zero open P0 and P1 findings.");
   }
+  requireApprovalAfter(uat, "uat", ["luxartReadOnly", "runtimeProbe", "bookingMutationUat"].map((name) => ({
+    label: `artifacts.${name}.checkedAt`,
+    timestamp: artifactTimes.get(name)!,
+  })));
   const alertReceipt = requireApproval(approvals, "alertReceipt", now, maximumAgeHours);
   trueValue(alertReceipt.confirmed, "approvals.alertReceipt.confirmed");
   exactString(alertReceipt.eventId, alertEventId, "approvals.alertReceipt.eventId");
+  requireApprovalAfter(alertReceipt, "alertReceipt", [{
+    label: "artifacts.alertDelivery.checkedAt",
+    timestamp: artifactTimes.get("alertDelivery")!,
+  }]);
   const fallback = requireApproval(approvals, "memberzoneFallback", now, Math.min(24, maximumAgeHours));
   trueValue(fallback.available, "approvals.memberzoneFallback.available");
+  requireApprovalAfter(fallback, "memberzoneFallback", [{
+    label: "artifacts.memberzoneFallback.checkedAt",
+    timestamp: artifactTimes.get("memberzoneFallback")!,
+  }]);
   const notifications = requireApproval(approvals, "luxartNotifications", now, maximumAgeHours);
   trueValue(notifications.confirmed, "approvals.luxartNotifications.confirmed");
+  requireApprovalAfter(notifications, "luxartNotifications", ["luxartReadOnly", "runtimeProbe"].map((name) => ({
+    label: `artifacts.${name}.checkedAt`,
+    timestamp: artifactTimes.get(name)!,
+  })));
   const cutover = requireApproval(approvals, "cutover", now, Math.min(24, maximumAgeHours));
   trueValue(cutover.approved, "approvals.cutover.approved");
+  requireApprovalAfter(cutover, "cutover", [
+    ...[...artifactTimes.entries()].map(([name, timestamp]) => ({
+      label: `artifacts.${name}.checkedAt`,
+      timestamp,
+    })),
+    ...[
+      ["uat", uat],
+      ["alertReceipt", alertReceipt],
+      ["memberzoneFallback", fallback],
+      ["luxartNotifications", notifications],
+    ].map(([name, approval]) => ({
+      label: `approvals.${name}.approvedAt`,
+      timestamp: stringValue((approval as JsonObject).approvedAt, `approvals.${name}.approvedAt`),
+    })),
+  ]);
 
   return {
     ok: true,
