@@ -33,6 +33,8 @@ function releaseEvidence(cutoverApprovedAt = now.toISOString()) {
     lessonFeed: {
       count: 24,
       occurrenceSetSha256: "c".repeat(64),
+      roomPlacementSetSha256: "d".repeat(64),
+      roomNumbers: [1, 2, 3],
       reformer: 3,
       range: {
         from: "2026-09-11T00:00:00.000Z",

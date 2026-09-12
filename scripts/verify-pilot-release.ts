@@ -296,6 +296,16 @@ export function validateLuxartEvidence(
   if (!/^[a-f0-9]{64}$/.test(occurrenceSha) || english.occurrenceSetSha256 !== occurrenceSha) {
     throw new Error("Czech and English Luxart occurrence digests must be the same full SHA-256.");
   }
+  const roomPlacementSha = stringValue(
+    czech.roomPlacementSetSha256,
+    "Luxart Czech room-placement digest",
+  );
+  if (
+    !/^[a-f0-9]{64}$/.test(roomPlacementSha) ||
+    english.roomPlacementSetSha256 !== roomPlacementSha
+  ) {
+    throw new Error("Czech and English Luxart room-placement digests must be the same full SHA-256.");
+  }
   const reformer = integerValue(czech.reformer, "artifacts.luxartReadOnly.czech.reformer", 1);
   if (integerValue(english.reformer, "artifacts.luxartReadOnly.english.reformer", 1) !== reformer) {
     throw new Error("Czech and English Reformer counts differ.");
@@ -336,6 +346,11 @@ export function validateLuxartEvidence(
       occurrenceSha,
       `Luxart personalized ${label} occurrence digest`,
     );
+    exactString(
+      localized.roomPlacementSetSha256,
+      roomPlacementSha,
+      `Luxart personalized ${label} room-placement digest`,
+    );
     const eligible = integerValue(localized.eligible, `Luxart personalized ${label} eligible count`);
     const ineligible = integerValue(localized.ineligible, `Luxart personalized ${label} ineligible count`);
     if (eligible + ineligible !== count) {
@@ -347,7 +362,15 @@ export function validateLuxartEvidence(
     expectedEligible = eligible;
     expectedIneligible = ineligible;
   }
-  return { count, reformer, occurrenceSha, observedRooms, range, lessonRange: czechRange };
+  return {
+    count,
+    reformer,
+    occurrenceSha,
+    roomPlacementSha,
+    observedRooms: [...new Set(observedRooms)].sort((left, right) => left - right),
+    range,
+    lessonRange: czechRange,
+  };
 }
 
 function validateRuntimeEvidence(
@@ -409,6 +432,19 @@ function validateRuntimeEvidence(
       luxart.occurrenceSha,
       `runtime ${label} lesson occurrence digest`,
     );
+    exactString(
+      localized.roomPlacementSetSha256,
+      luxart.roomPlacementSha,
+      `runtime ${label} lesson room-placement digest`,
+    );
+    const runtimeRoomNumbers = Array.isArray(localized.roomNumbers)
+      ? localized.roomNumbers.map((room, index) =>
+        integerValue(room, `runtime lessons.${language}.roomNumbers[${index}]`, 1)
+      )
+      : [];
+    if (JSON.stringify(runtimeRoomNumbers) !== JSON.stringify(luxart.observedRooms)) {
+      throw new Error(`The ${label} application runtime does not expose the approved Luxart room-number set.`);
+    }
     if (integerValue(localized.reformer, `runtime lessons.${language}.reformer`, 1) !== luxart.reformer) {
       throw new Error(`The ${label} application runtime does not expose the full Luxart Reformer count.`);
     }
@@ -681,6 +717,8 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
     lessonFeed: {
       count: luxart.count,
       occurrenceSetSha256: luxart.occurrenceSha,
+      roomPlacementSetSha256: luxart.roomPlacementSha,
+      roomNumbers: luxart.observedRooms,
       reformer: luxart.reformer,
       range: {
         ...luxart.range,

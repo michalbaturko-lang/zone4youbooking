@@ -6,6 +6,7 @@ import { loadLuxartGatewayAuthConfig } from "../src/lib/luxartGatewayAuth";
 import { assertSupportedLuxartApiContract } from "../src/lib/luxartApiContract";
 import { bookingRules } from "../src/lib/bookingRules";
 import { zone4YouDateKey, zone4YouScheduleRange, zone4YouTimeZone } from "../src/lib/zone4YouTime";
+import { lessonPlacementEvidence } from "./lesson-placement-evidence";
 
 type Environment = Record<string, string | undefined>;
 type AdapterFactory = (context: { userId?: string; locale: "cs" | "en" }) => LuxartAdapter;
@@ -34,6 +35,7 @@ function requireSafeConfiguration(environment: Environment) {
 function lessonEvidence(lessons: Lesson[], range: { from: string; to: string }) {
   const ids = lessons.map((lesson) => lesson.id).sort();
   if (new Set(ids).size !== lessons.length) throw new Error("Luxart returned duplicate lesson occurrence IDs.");
+  const placement = lessonPlacementEvidence(lessons, "Luxart lesson feed");
   const startsAt: string[] = [];
   const dateKeys = new Set<string>();
   const fromDay = range.from.slice(0, 10);
@@ -57,8 +59,9 @@ function lessonEvidence(lessons: Lesson[], range: { from: string; to: string }) 
   return {
     count: lessons.length,
     occurrenceSetSha256: createHash("sha256").update(ids.join("\n")).digest("hex"),
+    roomPlacementSetSha256: placement.roomPlacementSetSha256,
     rooms: [...new Set(lessons.map((lesson) => lesson.roomName))].sort(),
-    roomNumbers: [...new Set(lessons.map((lesson) => lesson.luxartRoomNumber).filter(Number.isFinite))].sort(),
+    roomNumbers: placement.roomNumbers,
     reformer,
     earliestStartsAt: startsAt[0],
     latestStartsAt: startsAt.at(-1),
@@ -80,11 +83,15 @@ function personalizedLessonEvidence(lessons: Lesson[], range: { from: string; to
 }
 
 function assertSameLessonOccurrences(
-  actual: { count: number; occurrenceSetSha256: string },
-  expected: { count: number; occurrenceSetSha256: string },
+  actual: { count: number; occurrenceSetSha256: string; roomPlacementSetSha256: string },
+  expected: { count: number; occurrenceSetSha256: string; roomPlacementSetSha256: string },
   label: string,
 ) {
-  if (actual.count !== expected.count || actual.occurrenceSetSha256 !== expected.occurrenceSetSha256) {
+  if (
+    actual.count !== expected.count ||
+    actual.occurrenceSetSha256 !== expected.occurrenceSetSha256 ||
+    actual.roomPlacementSetSha256 !== expected.roomPlacementSetSha256
+  ) {
     throw new Error(`${label} does not contain the complete anonymous Luxart lesson set.`);
   }
 }
@@ -134,8 +141,12 @@ export async function runLuxartReadonlyVerification({
   ]);
   const czech = lessonEvidence(czechLessons, query);
   const english = lessonEvidence(englishLessons, query);
-  if (czech.count !== english.count || czech.occurrenceSetSha256 !== english.occurrenceSetSha256) {
-    throw new Error("Czech and English Luxart feeds do not contain the same lesson occurrences.");
+  if (
+    czech.count !== english.count ||
+    czech.occurrenceSetSha256 !== english.occurrenceSetSha256 ||
+    czech.roomPlacementSetSha256 !== english.roomPlacementSetSha256
+  ) {
+    throw new Error("Czech and English Luxart feeds do not contain the same lesson occurrences and room placements.");
   }
   if (environment.PROBE_REQUIRE_REFORMER !== "false" && czech.reformer === 0) {
     throw new Error("The seven-day Luxart feed contains no Reformer lesson.");

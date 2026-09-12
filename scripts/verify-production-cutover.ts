@@ -3,6 +3,7 @@ import type { AnyRecord } from "node:dns";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { BookingCapabilities, Lesson } from "../src/lib/domain";
+import { lessonPlacementEvidence } from "./lesson-placement-evidence";
 import {
   addZone4YouCalendarDays,
   zone4YouDateKey,
@@ -28,6 +29,8 @@ export type ProductionPilotPhase = "booking_without_payments" | "booking_with_st
 export interface ApprovedLessonFeedEvidence {
   count: number;
   occurrenceSetSha256: string;
+  roomPlacementSetSha256: string;
+  roomNumbers: number[];
   reformer: number;
   range: {
     from: string;
@@ -111,6 +114,8 @@ function approvedLessonFeed(value: unknown): ApprovedLessonFeedEvidence {
   const count = evidence.count;
   const reformer = evidence.reformer;
   const occurrenceSetSha256 = evidence.occurrenceSetSha256;
+  const roomPlacementSetSha256 = evidence.roomPlacementSetSha256;
+  const roomNumbers = evidence.roomNumbers;
   const rangeValue = evidence.range;
   const earliestStartsAt = evidence.earliestStartsAt;
   const latestStartsAt = evidence.latestStartsAt;
@@ -119,11 +124,21 @@ function approvedLessonFeed(value: unknown): ApprovedLessonFeedEvidence {
     !Number.isSafeInteger(count) || Number(count) < 1 ||
     !Number.isSafeInteger(reformer) || Number(reformer) < 1 || Number(reformer) > Number(count) ||
     typeof occurrenceSetSha256 !== "string" || !/^[a-f0-9]{64}$/.test(occurrenceSetSha256) ||
+    typeof roomPlacementSetSha256 !== "string" || !/^[a-f0-9]{64}$/.test(roomPlacementSetSha256) ||
+    !Array.isArray(roomNumbers) || roomNumbers.length === 0 ||
     !rangeValue || typeof rangeValue !== "object" || Array.isArray(rangeValue) ||
     typeof earliestStartsAt !== "string" || typeof latestStartsAt !== "string" ||
     !Array.isArray(dateKeys) || dateKeys.length === 0
   ) {
     throw new Error("Pre-cutover approved lesson feed is incomplete or invalid.");
+  }
+  const normalizedRoomNumbers = roomNumbers.map(Number);
+  if (
+    normalizedRoomNumbers.some((room) => !Number.isSafeInteger(room) || room < 1) ||
+    JSON.stringify(normalizedRoomNumbers) !==
+      JSON.stringify([...new Set(normalizedRoomNumbers)].sort((left, right) => left - right))
+  ) {
+    throw new Error("Pre-cutover approved lesson room numbers are incomplete or invalid.");
   }
 
   const range = rangeValue as Record<string, unknown>;
@@ -158,6 +173,8 @@ function approvedLessonFeed(value: unknown): ApprovedLessonFeedEvidence {
   return {
     count: Number(count),
     occurrenceSetSha256,
+    roomPlacementSetSha256,
+    roomNumbers: normalizedRoomNumbers,
     reformer: Number(reformer),
     range: { from, to, days: 7, timeZone: zone4YouTimeZone },
     earliestStartsAt: earliest.toISOString(),
@@ -400,6 +417,7 @@ function lessonFeedEvidence(
   const startsAt: string[] = [];
   const dateKeys = new Set<string>();
   let reformer = 0;
+  const placement = lessonPlacementEvidence(lessons, `${language} production lesson feed`);
   const fromDay = range.from.slice(0, 10);
   const toDay = range.to.slice(0, 10);
 
@@ -447,6 +465,8 @@ function lessonFeedEvidence(
     occurrenceSetSha256: createHash("sha256")
       .update([...ids].sort().join("\n"), "utf8")
       .digest("hex"),
+    roomPlacementSetSha256: placement.roomPlacementSetSha256,
+    roomNumbers: placement.roomNumbers,
     rooms: [...rooms].sort(),
     reformer,
     earliestStartsAt: startsAt[0],
@@ -462,6 +482,8 @@ function sameOccurrences(
   return (
     czech.count === english.count &&
     czech.occurrenceSetSha256 === english.occurrenceSetSha256 &&
+    czech.roomPlacementSetSha256 === english.roomPlacementSetSha256 &&
+    JSON.stringify(czech.roomNumbers) === JSON.stringify(english.roomNumbers) &&
     czech.earliestStartsAt === english.earliestStartsAt &&
     czech.latestStartsAt === english.latestStartsAt &&
     JSON.stringify(czech.dateKeys) === JSON.stringify(english.dateKeys)
@@ -475,6 +497,8 @@ function matchesApprovedLessonFeed(
   return (
     observed.count === approved.count &&
     observed.occurrenceSetSha256 === approved.occurrenceSetSha256 &&
+    observed.roomPlacementSetSha256 === approved.roomPlacementSetSha256 &&
+    JSON.stringify(observed.roomNumbers) === JSON.stringify(approved.roomNumbers) &&
     observed.reformer === approved.reformer &&
     observed.earliestStartsAt === approved.earliestStartsAt &&
     observed.latestStartsAt === approved.latestStartsAt &&
@@ -631,6 +655,8 @@ export async function runProductionCutoverVerification(
       approved: approvedFeed,
       count: czech.count,
       occurrenceSetSha256: czech.occurrenceSetSha256,
+      roomPlacementSetSha256: czech.roomPlacementSetSha256,
+      roomNumbers: czech.roomNumbers,
       rooms: czech.rooms,
       reformer: czech.reformer,
       czech,

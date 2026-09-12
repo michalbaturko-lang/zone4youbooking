@@ -21,6 +21,7 @@ chmodSync(fixtureDirectory, 0o700);
 let fixtureCounter = 0;
 const range = zone4YouScheduleRange(checkedAt, 7);
 const approvedOccurrenceSetSha256 = createHash("sha256").update("lesson-1").digest("hex");
+const approvedRoomPlacementSetSha256 = createHash("sha256").update("lesson-1\0" + 4).digest("hex");
 
 function preCutoverFixture(
   overrides: Record<string, unknown> = {},
@@ -39,6 +40,8 @@ function preCutoverFixture(
     lessonFeed: {
       count: 1,
       occurrenceSetSha256: approvedOccurrenceSetSha256,
+      roomPlacementSetSha256: approvedRoomPlacementSetSha256,
+      roomNumbers: [4],
       reformer: 1,
       range: { ...range, days: 7, timeZone: "Europe/Prague" },
       earliestStartsAt: `${range.from.slice(0, 10)}T10:00:00.000Z`,
@@ -75,6 +78,7 @@ test.after(() => rmSync(fixtureDirectory, { recursive: true, force: true }));
 function lesson(id: string, startsAt = `${range.from.slice(0, 10)}T10:00:00.000Z`): Lesson {
   return {
     id,
+    luxartRoomNumber: 4,
     name: "Reformer pilates",
     description: "Pilot lesson",
     startsAt,
@@ -168,6 +172,8 @@ test("production cutover configuration is pinned to the exact host, commit, phas
   assert.equal(config.dossierSha256, dossierSha256);
   assert.equal(config.cutoverApprovedAt, new Date(checkedAt.getTime() - 5 * 60_000).toISOString());
   assert.equal(config.approvedLessonFeed.occurrenceSetSha256, approvedOccurrenceSetSha256);
+  assert.equal(config.approvedLessonFeed.roomPlacementSetSha256, approvedRoomPlacementSetSha256);
+  assert.deepEqual(config.approvedLessonFeed.roomNumbers, [4]);
   assert.equal(config.approvedLessonFeed.count, 1);
 });
 
@@ -351,6 +357,18 @@ test("production verifier rejects any lesson omission or drift from the approved
         now: () => checkedAt,
       },
     ),
+    /does not exactly match the approved live Luxart and staging lesson evidence/i,
+  );
+});
+
+test("production verifier rejects room placement drift even when lesson IDs are unchanged", async () => {
+  const config = loadProductionCutoverConfig(baseEnvironment, checkedAt);
+  await assert.rejects(
+    runProductionCutoverVerification(config, {
+      fetchImpl: liveFetch([{ ...lesson("lesson-1"), luxartRoomNumber: 5 }]),
+      resolveAnyImpl: async () => [{ type: "A", address: "203.0.113.10", ttl: 60 }],
+      now: () => checkedAt,
+    }),
     /does not exactly match the approved live Luxart and staging lesson evidence/i,
   );
 });

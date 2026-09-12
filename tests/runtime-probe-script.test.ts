@@ -81,6 +81,7 @@ test("runtime probe verifies the same lesson occurrences through Czech and Engli
       apiResponse(response, {
         lessons: [{
           id: "lesson-1",
+          luxartRoomNumber: 4,
           name: locale === "en" ? "Reformer Basics" : "Reformer základy",
           roomName: "Reformer",
           category: "Reformer",
@@ -110,8 +111,8 @@ test("runtime probe verifies the same lesson occurrences through Czech and Engli
         };
         lessons: {
           range: { from: string; to: string; days: number; timeZone: string };
-          czech: { occurrenceSetSha256: string };
-          english: { occurrenceSetSha256: string };
+          czech: { occurrenceSetSha256: string; roomPlacementSetSha256: string; roomNumbers: number[] };
+          english: { occurrenceSetSha256: string; roomPlacementSetSha256: string; roomNumbers: number[] };
         };
       };
     };
@@ -130,6 +131,11 @@ test("runtime probe verifies the same lesson occurrences through Czech and Engli
       evidence.checks.lessons.czech.occurrenceSetSha256,
       evidence.checks.lessons.english.occurrenceSetSha256,
     );
+    assert.equal(
+      evidence.checks.lessons.czech.roomPlacementSetSha256,
+      evidence.checks.lessons.english.roomPlacementSetSha256,
+    );
+    assert.deepEqual(evidence.checks.lessons.czech.roomNumbers, [4]);
 
     lessonStartsAt = new Date(new Date(expectedRange.to).getTime() + 10 * 60 * 60_000).toISOString();
     const outOfRange = await runProbe(address.port);

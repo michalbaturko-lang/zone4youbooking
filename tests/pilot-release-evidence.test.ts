@@ -17,6 +17,7 @@ const stagingTarget = "https://staging.booking.zone4you.cz";
 const luxartTarget = "https://luxart-test.example.com:9443";
 const luxartTargetFingerprint = createHash("sha256").update(luxartTarget).digest("hex");
 const occurrenceSetSha256 = "a".repeat(64);
+const roomPlacementSetSha256 = "b".repeat(64);
 
 function writeJson(path: string, value: unknown) {
   const body = `${JSON.stringify(value, null, 2)}\n`;
@@ -62,6 +63,7 @@ function validFixture() {
       czech: {
         count: 24,
         occurrenceSetSha256,
+        roomPlacementSetSha256,
         rooms: ["Sál 1", "Sál 2", "Reformer"],
         roomNumbers: [1, 2, 3],
         reformer: 3,
@@ -72,6 +74,7 @@ function validFixture() {
       english: {
         count: 24,
         occurrenceSetSha256,
+        roomPlacementSetSha256,
         rooms: ["Studio 1", "Studio 2", "Reformer"],
         roomNumbers: [1, 2, 3],
         reformer: 3,
@@ -82,8 +85,8 @@ function validFixture() {
       authenticated: { checked: true, userLoaded: true, reservations: 0, creditTransactions: 2 },
       personalized: {
         checked: true,
-        czech: { count: 24, occurrenceSetSha256, eligible: 22, ineligible: 2 },
-        english: { count: 24, occurrenceSetSha256, eligible: 22, ineligible: 2 },
+        czech: { count: 24, occurrenceSetSha256, roomPlacementSetSha256, eligible: 22, ineligible: 2 },
+        english: { count: 24, occurrenceSetSha256, roomPlacementSetSha256, eligible: 22, ineligible: 2 },
       },
     },
     runtimeProbe: {
@@ -131,6 +134,8 @@ function validFixture() {
             ok: true,
             count: 24,
             occurrenceSetSha256,
+            roomPlacementSetSha256,
+            roomNumbers: [1, 2, 3],
             reformer: 3,
             earliestStartsAt: "2026-09-05T08:00:00.000Z",
             latestStartsAt: "2026-09-11T18:00:00.000Z",
@@ -140,6 +145,8 @@ function validFixture() {
             ok: true,
             count: 24,
             occurrenceSetSha256,
+            roomPlacementSetSha256,
+            roomNumbers: [1, 2, 3],
             reformer: 3,
             earliestStartsAt: "2026-09-05T08:00:00.000Z",
             latestStartsAt: "2026-09-11T18:00:00.000Z",
@@ -313,6 +320,8 @@ test("pilot release dossier binds live Luxart, UAT, application and DNS rollback
   assert.deepEqual(result.lessonFeed, {
     count: 24,
     occurrenceSetSha256,
+    roomPlacementSetSha256,
+    roomNumbers: [1, 2, 3],
     reformer: 3,
     range: {
       from: "2026-09-05T00:00:00.000Z",
@@ -548,6 +557,50 @@ test("pilot release dossier rejects an observed hall without a reservation resou
     () => verifyPilotReleaseEvidence({ ...fixture.environment, LUXART_RESOURCE_MAP_JSON: JSON.stringify({ 1: 101, 2: 102 }) }, now),
     /missing observed room numbers: 3/i,
   );
+});
+
+test("pilot release dossier binds every lesson to the same Luxart room in live and runtime evidence", () => {
+  for (const [artifactName, mutate, expectedError] of [
+    [
+      "luxartReadOnly",
+      (artifact: Record<string, unknown>) => {
+        const english = artifact.english as Record<string, unknown>;
+        english.roomPlacementSetSha256 = "e".repeat(64);
+      },
+      /Luxart room-placement digests must be the same/i,
+    ],
+    [
+      "runtimeProbe",
+      (artifact: Record<string, unknown>) => {
+        const checks = artifact.checks as { lessons: { english: Record<string, unknown> } };
+        checks.lessons.english.roomPlacementSetSha256 = "e".repeat(64);
+      },
+      /runtime English lesson room-placement digest/i,
+    ],
+    [
+      "runtimeProbe",
+      (artifact: Record<string, unknown>) => {
+        const checks = artifact.checks as { lessons: { english: Record<string, unknown> } };
+        checks.lessons.english.roomNumbers = [1, 2, 4];
+      },
+      /approved Luxart room-number set/i,
+    ],
+  ] as const) {
+    const fixture = validFixture();
+    const artifact = structuredClone(fixture.files[artifactName]) as Record<string, unknown>;
+    mutate(artifact);
+    const artifactSha = writeJson(join(fixture.directory, `${artifactName}.json`), artifact);
+    const dossier = structuredClone(fixture.dossier);
+    dossier.artifacts[artifactName].sha256 = artifactSha;
+    const dossierSha = writeJson(fixture.dossierPath, dossier);
+    assert.throws(
+      () => verifyPilotReleaseEvidence({
+        ...fixture.environment,
+        ZONE4YOU_RELEASE_DOSSIER_CONFIRMATION: `VERIFY_ZONE4YOU_RELEASE_DOSSIER:${dossierSha}`,
+      }, now),
+      expectedError,
+    );
+  }
 });
 
 test("pilot release dossier rejects malformed resource-map entries instead of silently dropping them", () => {

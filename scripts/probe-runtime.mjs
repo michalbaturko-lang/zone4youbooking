@@ -94,12 +94,17 @@ function lessonFeedEvidence(result, language) {
   const rooms = new Set();
   const startsAt = [];
   const dateKeys = new Set();
+  const roomNumbers = new Set();
+  const roomPlacements = [];
   let reformer = 0;
   for (const lesson of lessons) {
     if (!lesson?.id || !lesson?.name || !lesson?.roomName || !lesson?.startsAt) {
       throw new Error(`${language} lesson feed contains an item without a required display field.`);
     }
     if (ids.has(lesson.id)) throw new Error(`${language} lesson feed contains duplicate id ${lesson.id}.`);
+    if (!Number.isSafeInteger(lesson.luxartRoomNumber) || lesson.luxartRoomNumber < 1) {
+      throw new Error(`${language} lesson feed contains a lesson without a positive Luxart room number.`);
+    }
     const normalizedStart = new Date(lesson.startsAt).toISOString();
     const dayKey = pragueDateKey(normalizedStart);
     if (dayKey < scheduleRange.from.slice(0, 10) || dayKey >= scheduleRange.to.slice(0, 10)) {
@@ -107,6 +112,8 @@ function lessonFeedEvidence(result, language) {
     }
     ids.add(lesson.id);
     rooms.add(lesson.roomName);
+    roomNumbers.add(lesson.luxartRoomNumber);
+    roomPlacements.push(`${lesson.id}\0${lesson.luxartRoomNumber}`);
     startsAt.push(normalizedStart);
     dateKeys.add(dayKey);
     if (/reformer/i.test(`${lesson.name} ${lesson.roomName} ${lesson.category ?? ""}`)) reformer += 1;
@@ -118,7 +125,9 @@ function lessonFeedEvidence(result, language) {
     durationMs: result.durationMs,
     count: lessons.length,
     occurrenceSetSha256: createHash("sha256").update([...ids].sort().join("\n"), "utf8").digest("hex"),
+    roomPlacementSetSha256: createHash("sha256").update(roomPlacements.sort().join("\n"), "utf8").digest("hex"),
     rooms: [...rooms].sort(),
+    roomNumbers: [...roomNumbers].sort((left, right) => left - right),
     reformer,
     earliestStartsAt: startsAt[0],
     latestStartsAt: startsAt.at(-1),
@@ -185,8 +194,12 @@ async function main() {
   ]);
   const czech = lessonFeedEvidence(czechResult, "Czech");
   const english = lessonFeedEvidence(englishResult, "English");
-  if (czech.count !== english.count || czech.occurrenceSetSha256 !== english.occurrenceSetSha256) {
-    throw new Error("Czech and English application feeds do not contain the same lesson occurrences.");
+  if (
+    czech.count !== english.count ||
+    czech.occurrenceSetSha256 !== english.occurrenceSetSha256 ||
+    czech.roomPlacementSetSha256 !== english.roomPlacementSetSha256
+  ) {
+    throw new Error("Czech and English application feeds do not contain the same lesson occurrences and room placements.");
   }
   evidence.checks.lessons = {
     ok: true,
@@ -194,6 +207,8 @@ async function main() {
     range: scheduleRange,
     count: czech.count,
     occurrenceSetSha256: czech.occurrenceSetSha256,
+    roomPlacementSetSha256: czech.roomPlacementSetSha256,
+    roomNumbers: czech.roomNumbers,
     rooms: czech.rooms,
     reformer: czech.reformer,
     czech,
