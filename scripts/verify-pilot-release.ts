@@ -30,6 +30,24 @@ interface JsonEvidenceFile {
 
 const maximumJsonBytes = 256 * 1024;
 const productionOrigin = "https://booking.zone4you.cz";
+const placeholderApprovalIdentities = new Set([
+  "-",
+  "doplnit",
+  "n a",
+  "na",
+  "none",
+  "not assigned",
+  "pending",
+  "pending approval",
+  "pending human approval",
+  "placeholder",
+  "tbd",
+  "to be confirmed",
+  "to be decided",
+  "todo",
+  "unassigned",
+  "unknown",
+]);
 
 function required(environment: Environment, name: string) {
   const value = environment[name]?.trim();
@@ -47,6 +65,22 @@ function objectValue(value: unknown, label: string): JsonObject {
 function stringValue(value: unknown, label: string) {
   if (typeof value !== "string" || !value.trim()) throw new Error(`${label} must be a non-empty string.`);
   return value.trim();
+}
+
+function approvalIdentity(value: unknown, label: string) {
+  const identity = stringValue(value, label);
+  if (identity.length > 120) throw new Error(`${label} must contain at most 120 characters.`);
+  if (/\p{Cc}/u.test(identity)) throw new Error(`${label} must not contain control characters.`);
+  const normalized = identity
+    .normalize("NFKC")
+    .toLocaleLowerCase("en-US")
+    .replace(/[_./-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (placeholderApprovalIdentities.has(normalized)) {
+    throw new Error(`${label} must identify the actual approving person or operational role.`);
+  }
+  return identity;
 }
 
 function trueValue(value: unknown, label: string) {
@@ -195,11 +229,7 @@ function requireApproval(
   maximumAgeHours: number,
 ): JsonObject {
   const approval = objectValue(approvals[name], `approvals.${name}`);
-  const approvedBy = stringValue(approval.approvedBy, `approvals.${name}.approvedBy`);
-  if (approvedBy.length > 120) throw new Error(`approvals.${name}.approvedBy must contain at most 120 characters.`);
-  if (approvedBy === "pending-human-approval") {
-    throw new Error(`approvals.${name}.approvedBy must identify the actual approving person or role.`);
-  }
+  approvalIdentity(approval.approvedBy, `approvals.${name}.approvedBy`);
   const normalizedApprovedAt = approvedAt(approval.approvedAt, `approvals.${name}`, now, maximumAgeHours);
   return { ...approval, approvedAt: normalizedApprovedAt };
 }

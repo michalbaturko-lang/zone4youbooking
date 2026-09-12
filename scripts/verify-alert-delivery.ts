@@ -4,6 +4,25 @@ import { pathToFileURL } from "node:url";
 type Environment = Record<string, string | undefined>;
 type FetchLike = typeof fetch;
 
+const placeholderSupportOwners = new Set([
+  "-",
+  "doplnit",
+  "n a",
+  "na",
+  "none",
+  "not assigned",
+  "pending",
+  "pending approval",
+  "pending human approval",
+  "placeholder",
+  "tbd",
+  "to be confirmed",
+  "to be decided",
+  "todo",
+  "unassigned",
+  "unknown",
+]);
+
 export interface AlertDeliveryConfig {
   appTarget: URL;
   webhookTarget: URL;
@@ -16,6 +35,21 @@ function required(environment: Environment, name: string) {
   const value = environment[name]?.trim();
   if (!value) throw new Error(`${name} is required.`);
   return value;
+}
+
+function operationalOwner(rawValue: string, name: string) {
+  if (rawValue.length > 120) throw new Error(`${name} must contain at most 120 characters.`);
+  if (/\p{Cc}/u.test(rawValue)) throw new Error(`${name} must not contain control characters.`);
+  const normalized = rawValue
+    .normalize("NFKC")
+    .toLocaleLowerCase("en-US")
+    .replace(/[_./-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (placeholderSupportOwners.has(normalized)) {
+    throw new Error(`${name} must identify the actual support person or operational role.`);
+  }
+  return rawValue;
 }
 
 function secureUrl(rawValue: string, name: string, allowLocalHttp: boolean) {
@@ -47,8 +81,10 @@ export function loadAlertDeliveryConfig(environment: Environment = process.env):
     "ZONE4YOU_ALERT_WEBHOOK_URL",
     allowLocalHttp,
   );
-  const supportOwner = required(environment, "ZONE4YOU_ALERT_SUPPORT_OWNER");
-  if (supportOwner.length > 120) throw new Error("ZONE4YOU_ALERT_SUPPORT_OWNER must contain at most 120 characters.");
+  const supportOwner = operationalOwner(
+    required(environment, "ZONE4YOU_ALERT_SUPPORT_OWNER"),
+    "ZONE4YOU_ALERT_SUPPORT_OWNER",
+  );
 
   const expectedConfirmation = `SEND_ZONE4YOU_TEST_ALERT:${alertTargetFingerprint(webhookTarget)}`;
   if (environment.ZONE4YOU_ALERT_CONFIRMATION !== expectedConfirmation) {

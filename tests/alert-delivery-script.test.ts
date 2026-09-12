@@ -31,6 +31,16 @@ test("alert test configuration requires HTTPS, an owner and exact target fingerp
     () => loadAlertDeliveryConfig({ ...baseEnvironment, ZONE4YOU_ALERT_SUPPORT_OWNER: "" }),
     /required/i,
   );
+  for (const placeholder of ["TBD", "unknown", "N/A", "pending-human-approval"]) {
+    assert.throws(
+      () => loadAlertDeliveryConfig({ ...baseEnvironment, ZONE4YOU_ALERT_SUPPORT_OWNER: placeholder }),
+      /actual support person or operational role/i,
+    );
+  }
+  assert.throws(
+    () => loadAlertDeliveryConfig({ ...baseEnvironment, ZONE4YOU_ALERT_SUPPORT_OWNER: "Reception\u0000desk" }),
+    /control characters/i,
+  );
 });
 
 test("alert delivery emits a privacy-safe test event and evidence without webhook secrets", async () => {

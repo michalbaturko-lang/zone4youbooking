@@ -57,6 +57,24 @@ const paymentProductProfileSha256 = createHash("sha256")
 const deploymentPhase = process.env.ZONE4YOU_DEPLOYMENT_PHASE;
 const paymentsExcludedFromLaunch = deploymentPhase === "booking_without_payments";
 const paymentsIncludedInLaunch = deploymentPhase === "booking_with_stripe";
+const placeholderOperationalOwners = new Set([
+  "-",
+  "doplnit",
+  "n a",
+  "na",
+  "none",
+  "not assigned",
+  "pending",
+  "pending approval",
+  "pending human approval",
+  "placeholder",
+  "tbd",
+  "to be confirmed",
+  "to be decided",
+  "todo",
+  "unassigned",
+  "unknown",
+]);
 
 const checks = [];
 
@@ -71,6 +89,19 @@ function check(name, passed, detail, options = {}) {
 
 function configured(name) {
   return typeof process.env[name] === "string" && process.env[name].trim().length > 0;
+}
+
+function validOperationalOwner(value) {
+  if (typeof value !== "string") return false;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 120 || /\p{Cc}/u.test(trimmed)) return false;
+  const normalized = trimmed
+    .normalize("NFKC")
+    .toLocaleLowerCase("en-US")
+    .replace(/[_./-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return !placeholderOperationalOwners.has(normalized);
 }
 
 function validHttpsUrl(value) {
@@ -445,7 +476,7 @@ check(
   "Pilot alert delivery",
   existsSync(join(repositoryRoot, "scripts/verify-alert-delivery.ts")) &&
     process.env.ZONE4YOU_ALERT_DELIVERY_CONFIRMED === "true" &&
-    configured("ZONE4YOU_ALERT_SUPPORT_OWNER"),
+    validOperationalOwner(process.env.ZONE4YOU_ALERT_SUPPORT_OWNER),
   "Run the privacy-safe test alert, have the named support owner confirm receipt and set ZONE4YOU_ALERT_DELIVERY_CONFIRMED=true.",
 );
 check(

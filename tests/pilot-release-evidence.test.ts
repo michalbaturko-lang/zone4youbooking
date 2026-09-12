@@ -862,6 +862,22 @@ test("pilot release approvals cannot predate their evidence or the final cutover
   }
 });
 
+test("pilot release approvals reject placeholder and unsafe approver identities", () => {
+  for (const approvedBy of ["TBD", "unknown", "N/A", "pending-human-approval", "Release\u0000owner"]) {
+    const fixture = validFixture();
+    const dossier = structuredClone(fixture.dossier);
+    dossier.approvals.cutover.approvedBy = approvedBy;
+    const dossierSha = writeJson(fixture.dossierPath, dossier);
+    assert.throws(
+      () => verifyPilotReleaseEvidence({
+        ...fixture.environment,
+        ZONE4YOU_RELEASE_DOSSIER_CONFIRMATION: `VERIFY_ZONE4YOU_RELEASE_DOSSIER:${dossierSha}`,
+      }, now),
+      /actual approving person or operational role|control characters/i,
+    );
+  }
+});
+
 test("pilot release cutover cannot predate the latest artifact", () => {
   const fixture = validFixture();
   const rollbackTimer = structuredClone(fixture.files.rollbackTimer) as Record<string, unknown>;
