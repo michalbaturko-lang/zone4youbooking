@@ -44,6 +44,8 @@ test("runtime probe verifies the same lesson occurrences through Czech and Engli
   let readinessSchedule = "ready";
   let readinessRegion = "fra1";
   let bookingNotifications = "ready";
+  let readinessMode = "live";
+  let lessonRoomNumber: number | undefined = 4;
   const server = createServer((request, response) => {
     if (request.url === "/") {
       response.writeHead(200, {
@@ -61,7 +63,7 @@ test("runtime probe verifies the same lesson occurrences through Czech and Engli
     if (request.url === "/api/readiness") {
       apiResponse(response, {
         status: "ready",
-        mode: "live",
+        mode: readinessMode,
         phase: "booking_without_payments",
         commit,
         region: readinessRegion,
@@ -81,7 +83,7 @@ test("runtime probe verifies the same lesson occurrences through Czech and Engli
       apiResponse(response, {
         lessons: [{
           id: "lesson-1",
-          luxartRoomNumber: 4,
+          luxartRoomNumber: lessonRoomNumber,
           name: locale === "en" ? "Reformer Basics" : "Reformer základy",
           roomName: "Reformer",
           category: "Reformer",
@@ -159,6 +161,16 @@ test("runtime probe verifies the same lesson occurrences through Czech and Engli
     const wrongRegion = await runProbe(address.port);
     assert.equal(wrongRegion.code, 1);
     assert.match(wrongRegion.stderr, /does not prove the approved fra1 deployment region/i);
+
+    readinessRegion = "fra1";
+    lessonRoomNumber = undefined;
+    const liveMissingRoom = await runProbe(address.port);
+    assert.equal(liveMissingRoom.code, 1);
+    assert.match(liveMissingRoom.stderr, /without a positive Luxart room number/i);
+
+    readinessMode = "demo";
+    const demoWithoutInternalRoom = await runProbe(address.port);
+    assert.equal(demoWithoutInternalRoom.code, 0, demoWithoutInternalRoom.stderr);
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }

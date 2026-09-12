@@ -85,7 +85,7 @@ async function jsonEndpoint(path, expectedStatus = 200, init) {
   return { body, durationMs };
 }
 
-function lessonFeedEvidence(result, language) {
+function lessonFeedEvidence(result, language, requireLuxartRoomNumbers) {
   const lessons = result.body.lessons;
   if (!Array.isArray(lessons) || lessons.length === 0) {
     throw new Error(`${language} lesson feed is empty or invalid.`);
@@ -102,7 +102,8 @@ function lessonFeedEvidence(result, language) {
       throw new Error(`${language} lesson feed contains an item without a required display field.`);
     }
     if (ids.has(lesson.id)) throw new Error(`${language} lesson feed contains duplicate id ${lesson.id}.`);
-    if (!Number.isSafeInteger(lesson.luxartRoomNumber) || lesson.luxartRoomNumber < 1) {
+    const hasLuxartRoomNumber = Number.isSafeInteger(lesson.luxartRoomNumber) && lesson.luxartRoomNumber > 0;
+    if (requireLuxartRoomNumbers && !hasLuxartRoomNumber) {
       throw new Error(`${language} lesson feed contains a lesson without a positive Luxart room number.`);
     }
     const normalizedStart = new Date(lesson.startsAt).toISOString();
@@ -112,8 +113,10 @@ function lessonFeedEvidence(result, language) {
     }
     ids.add(lesson.id);
     rooms.add(lesson.roomName);
-    roomNumbers.add(lesson.luxartRoomNumber);
-    roomPlacements.push(`${lesson.id}\0${lesson.luxartRoomNumber}`);
+    if (hasLuxartRoomNumber) {
+      roomNumbers.add(lesson.luxartRoomNumber);
+      roomPlacements.push(`${lesson.id}\0${lesson.luxartRoomNumber}`);
+    }
     startsAt.push(normalizedStart);
     dateKeys.add(dayKey);
     if (/reformer/i.test(`${lesson.name} ${lesson.roomName} ${lesson.category ?? ""}`)) reformer += 1;
@@ -125,7 +128,9 @@ function lessonFeedEvidence(result, language) {
     durationMs: result.durationMs,
     count: lessons.length,
     occurrenceSetSha256: createHash("sha256").update([...ids].sort().join("\n"), "utf8").digest("hex"),
-    roomPlacementSetSha256: createHash("sha256").update(roomPlacements.sort().join("\n"), "utf8").digest("hex"),
+    ...(requireLuxartRoomNumbers ? {
+      roomPlacementSetSha256: createHash("sha256").update(roomPlacements.sort().join("\n"), "utf8").digest("hex"),
+    } : {}),
     rooms: [...rooms].sort(),
     roomNumbers: [...roomNumbers].sort((left, right) => left - right),
     reformer,
@@ -192,12 +197,13 @@ async function main() {
     jsonEndpoint("/api/lessons", 200, { headers: { "X-Zone4You-Locale": "cs" } }),
     jsonEndpoint("/api/lessons", 200, { headers: { "X-Zone4You-Locale": "en" } }),
   ]);
-  const czech = lessonFeedEvidence(czechResult, "Czech");
-  const english = lessonFeedEvidence(englishResult, "English");
+  const requireLuxartRoomNumbers = readiness.body.mode === "live";
+  const czech = lessonFeedEvidence(czechResult, "Czech", requireLuxartRoomNumbers);
+  const english = lessonFeedEvidence(englishResult, "English", requireLuxartRoomNumbers);
   if (
     czech.count !== english.count ||
     czech.occurrenceSetSha256 !== english.occurrenceSetSha256 ||
-    czech.roomPlacementSetSha256 !== english.roomPlacementSetSha256
+    (requireLuxartRoomNumbers && czech.roomPlacementSetSha256 !== english.roomPlacementSetSha256)
   ) {
     throw new Error("Czech and English application feeds do not contain the same lesson occurrences and room placements.");
   }
@@ -207,8 +213,10 @@ async function main() {
     range: scheduleRange,
     count: czech.count,
     occurrenceSetSha256: czech.occurrenceSetSha256,
-    roomPlacementSetSha256: czech.roomPlacementSetSha256,
-    roomNumbers: czech.roomNumbers,
+    ...(requireLuxartRoomNumbers ? {
+      roomPlacementSetSha256: czech.roomPlacementSetSha256,
+      roomNumbers: czech.roomNumbers,
+    } : {}),
     rooms: czech.rooms,
     reformer: czech.reformer,
     czech,
