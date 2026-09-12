@@ -19,6 +19,8 @@ const baselineSha256 = "b".repeat(64);
 const fixtureDirectory = mkdtempSync(join(tmpdir(), "zone4you-cutover-"));
 chmodSync(fixtureDirectory, 0o700);
 let fixtureCounter = 0;
+const range = zone4YouScheduleRange(checkedAt, 7);
+const approvedOccurrenceSetSha256 = createHash("sha256").update("lesson-1").digest("hex");
 
 function preCutoverFixture(
   overrides: Record<string, unknown> = {},
@@ -34,6 +36,15 @@ function preCutoverFixture(
     commit,
     launchMode: "booking_without_payments",
     dossierSha256,
+    lessonFeed: {
+      count: 1,
+      occurrenceSetSha256: approvedOccurrenceSetSha256,
+      reformer: 1,
+      range: { ...range, days: 7, timeZone: "Europe/Prague" },
+      earliestStartsAt: `${range.from.slice(0, 10)}T10:00:00.000Z`,
+      latestStartsAt: `${range.from.slice(0, 10)}T10:00:00.000Z`,
+      dateKeys: [range.from.slice(0, 10)],
+    },
     dns: {
       baselineFileSha256: baselineSha256,
       unchangedSinceCapture: true,
@@ -58,8 +69,6 @@ const baseEnvironment = {
   ZONE4YOU_RELEASE_DOSSIER_CONFIRMATION: `VERIFY_ZONE4YOU_RELEASE_DOSSIER:${dossierSha256}`,
   ZONE4YOU_PRODUCTION_CUTOVER_CONFIRMATION: `VERIFY_ZONE4YOU_PRODUCTION_CUTOVER:${approvedPreCutover.sha256}`,
 } satisfies Record<string, string | undefined>;
-
-const range = zone4YouScheduleRange(checkedAt, 7);
 
 test.after(() => rmSync(fixtureDirectory, { recursive: true, force: true }));
 
@@ -158,6 +167,8 @@ test("production cutover configuration is pinned to the exact host, commit, phas
   assert.equal(config.preCutoverEvidenceSha256, approvedPreCutover.sha256);
   assert.equal(config.dossierSha256, dossierSha256);
   assert.equal(config.cutoverApprovedAt, new Date(checkedAt.getTime() - 5 * 60_000).toISOString());
+  assert.equal(config.approvedLessonFeed.occurrenceSetSha256, approvedOccurrenceSetSha256);
+  assert.equal(config.approvedLessonFeed.count, 1);
 });
 
 test("production cutover configuration rejects stale, mismatched or weakly protected pre-cutover evidence", () => {
@@ -237,6 +248,19 @@ test("production cutover configuration rejects stale, mismatched or weakly prote
     }, checkedAt),
     /not a symlink/i,
   );
+
+  const incompleteLessonFeed = preCutoverFixture({
+    lessonFeed: { count: 1, occurrenceSetSha256: approvedOccurrenceSetSha256 },
+  });
+  assert.throws(
+    () => loadProductionCutoverConfig({
+      ...baseEnvironment,
+      ZONE4YOU_PRECUTOVER_EVIDENCE_PATH: incompleteLessonFeed.path,
+      ZONE4YOU_PRODUCTION_CUTOVER_CONFIRMATION:
+        `VERIFY_ZONE4YOU_PRODUCTION_CUTOVER:${incompleteLessonFeed.sha256}`,
+    }, checkedAt),
+    /approved lesson feed is incomplete or invalid/i,
+  );
 });
 
 test("production cutover verifier proves DNS, security, runtime provenance and matching CS/EN lesson feeds", async () => {
@@ -280,6 +304,54 @@ test("production verifier independently enforces the approved chronology", async
       },
     ),
     /chronology is invalid/i,
+  );
+});
+
+test("production verifier independently validates the approved lesson snapshot and its Prague range", async () => {
+  const config = loadProductionCutoverConfig(baseEnvironment, checkedAt);
+  const dependencies = {
+    fetchImpl: liveFetch(),
+    resolveAnyImpl: async () => [{ type: "A" as const, address: "203.0.113.10", ttl: 60 }],
+    now: () => checkedAt,
+  };
+  await assert.rejects(
+    runProductionCutoverVerification({
+      ...config,
+      approvedLessonFeed: { ...config.approvedLessonFeed, count: 0 },
+    }, dependencies),
+    /approved lesson feed is incomplete or invalid/i,
+  );
+
+  await assert.rejects(
+    runProductionCutoverVerification(config, {
+      ...dependencies,
+      now: () => new Date(checkedAt.getTime() + 24 * 60 * 60_000),
+    }),
+    /no longer covers the approved lesson range/i,
+  );
+});
+
+test("production verifier rejects any lesson omission or drift from the approved live feed", async () => {
+  const config = loadProductionCutoverConfig(baseEnvironment, checkedAt);
+  await assert.rejects(
+    runProductionCutoverVerification(
+      {
+        ...config,
+        approvedLessonFeed: {
+          ...config.approvedLessonFeed,
+          count: 2,
+          occurrenceSetSha256: createHash("sha256")
+            .update(["lesson-1", "lesson-2"].sort().join("\n"))
+            .digest("hex"),
+        },
+      },
+      {
+        fetchImpl: liveFetch([lesson("lesson-1")]),
+        resolveAnyImpl: async () => [{ type: "A", address: "203.0.113.10", ttl: 60 }],
+        now: () => checkedAt,
+      },
+    ),
+    /does not exactly match the approved live Luxart and staging lesson evidence/i,
   );
 });
 

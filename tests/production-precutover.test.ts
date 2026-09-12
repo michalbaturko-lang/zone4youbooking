@@ -30,6 +30,20 @@ function releaseEvidence(cutoverApprovedAt = now.toISOString()) {
     commit: "1".repeat(40),
     launchMode: "booking_without_payments",
     paymentsIncluded: false,
+    lessonFeed: {
+      count: 24,
+      occurrenceSetSha256: "c".repeat(64),
+      reformer: 3,
+      range: {
+        from: "2026-09-11T00:00:00.000Z",
+        to: "2026-09-18T00:00:00.000Z",
+        days: 7 as const,
+        timeZone: "Europe/Prague" as const,
+      },
+      earliestStartsAt: "2026-09-11T08:00:00.000Z",
+      latestStartsAt: "2026-09-17T18:00:00.000Z",
+      dateKeys: ["2026-09-11", "2026-09-17"],
+    },
     conditions: {
       liveLuxartVerified: true,
       allObservedRoomsMapped: true,
@@ -81,6 +95,8 @@ test("pre-cutover gate binds the approved dossier to the unchanged live DNS roll
   assert.equal(result.decision, "GO_TO_AUTHORIZED_DNS_CHANGE");
   assert.equal(result.explicitCutoverApproval, true);
   assert.equal(result.cutoverApprovedAt, now.toISOString());
+  assert.equal(result.lessonFeed.occurrenceSetSha256, "c".repeat(64));
+  assert.equal(result.lessonFeed.count, 24);
   assert.equal(receivedDnsConfirmation, `VERIFY_ZONE4YOU_DNS_BASELINE:${baselineSha256}`);
 });
 

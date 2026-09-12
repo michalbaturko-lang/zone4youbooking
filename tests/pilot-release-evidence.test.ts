@@ -310,6 +310,20 @@ test("pilot release dossier binds live Luxart, UAT, application and DNS rollback
   assert.equal(result.conditions.luxartNotificationTemplatesConfirmed, true);
   assert.equal(result.conditions.explicitCutoverApproval, true);
   assert.equal(result.cutoverApprovedAt, "2026-09-05T07:50:00.000Z");
+  assert.deepEqual(result.lessonFeed, {
+    count: 24,
+    occurrenceSetSha256,
+    reformer: 3,
+    range: {
+      from: "2026-09-05T00:00:00.000Z",
+      to: "2026-09-12T00:00:00.000Z",
+      days: 7,
+      timeZone: "Europe/Prague",
+    },
+    earliestStartsAt: "2026-09-05T08:00:00.000Z",
+    latestStartsAt: "2026-09-11T18:00:00.000Z",
+    dateKeys: ["2026-09-05", "2026-09-11"],
+  });
   assert.equal(result.paymentsIncluded, false);
   assert.equal(result.artifacts.length, 7);
   assert.equal(JSON.stringify(result).includes("approvedBy"), false);

@@ -3,7 +3,12 @@ import type { AnyRecord } from "node:dns";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { BookingCapabilities, Lesson } from "../src/lib/domain";
-import { zone4YouDateKey, zone4YouScheduleRange, zone4YouTimeZone } from "../src/lib/zone4YouTime";
+import {
+  addZone4YouCalendarDays,
+  zone4YouDateKey,
+  zone4YouScheduleRange,
+  zone4YouTimeZone,
+} from "../src/lib/zone4YouTime";
 import {
   normalizeProductionDnsRecords,
   productionDnsRecordSetSha256,
@@ -20,6 +25,21 @@ const productionOrigin = "https://booking.zone4you.cz";
 
 export type ProductionPilotPhase = "booking_without_payments" | "booking_with_stripe";
 
+export interface ApprovedLessonFeedEvidence {
+  count: number;
+  occurrenceSetSha256: string;
+  reformer: number;
+  range: {
+    from: string;
+    to: string;
+    days: 7;
+    timeZone: typeof zone4YouTimeZone;
+  };
+  earliestStartsAt: string;
+  latestStartsAt: string;
+  dateKeys: string[];
+}
+
 export interface ProductionCutoverConfig {
   target: URL;
   expectedCommit: string;
@@ -28,6 +48,7 @@ export interface ProductionCutoverConfig {
   cutoverApprovedAt: string;
   preCutoverCheckedAt: string;
   preCutoverEvidenceSha256: string;
+  approvedLessonFeed: ApprovedLessonFeedEvidence;
   timeoutMs: number;
   maxDurationMs: number;
 }
@@ -53,6 +74,7 @@ interface PreCutoverReceipt {
   commit?: unknown;
   launchMode?: unknown;
   dossierSha256?: unknown;
+  lessonFeed?: unknown;
   explicitCutoverApproval?: unknown;
   dns?: {
     baselineFileSha256?: unknown;
@@ -79,6 +101,69 @@ function boundedInteger(
     throw new Error(`${name} must be an integer between ${minimum} and ${maximum}.`);
   }
   return value;
+}
+
+function approvedLessonFeed(value: unknown): ApprovedLessonFeedEvidence {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Pre-cutover evidence is missing the approved lesson feed.");
+  }
+  const evidence = value as Record<string, unknown>;
+  const count = evidence.count;
+  const reformer = evidence.reformer;
+  const occurrenceSetSha256 = evidence.occurrenceSetSha256;
+  const rangeValue = evidence.range;
+  const earliestStartsAt = evidence.earliestStartsAt;
+  const latestStartsAt = evidence.latestStartsAt;
+  const dateKeys = evidence.dateKeys;
+  if (
+    !Number.isSafeInteger(count) || Number(count) < 1 ||
+    !Number.isSafeInteger(reformer) || Number(reformer) < 1 || Number(reformer) > Number(count) ||
+    typeof occurrenceSetSha256 !== "string" || !/^[a-f0-9]{64}$/.test(occurrenceSetSha256) ||
+    !rangeValue || typeof rangeValue !== "object" || Array.isArray(rangeValue) ||
+    typeof earliestStartsAt !== "string" || typeof latestStartsAt !== "string" ||
+    !Array.isArray(dateKeys) || dateKeys.length === 0
+  ) {
+    throw new Error("Pre-cutover approved lesson feed is incomplete or invalid.");
+  }
+
+  const range = rangeValue as Record<string, unknown>;
+  const from = range.from;
+  const to = range.to;
+  if (
+    typeof from !== "string" || typeof to !== "string" ||
+    range.days !== 7 || range.timeZone !== zone4YouTimeZone
+  ) {
+    throw new Error("Pre-cutover approved lesson range is incomplete or invalid.");
+  }
+  const fromDay = /^(\d{4}-\d{2}-\d{2})T00:00:00\.000Z$/.exec(from)?.[1];
+  const toDay = /^(\d{4}-\d{2}-\d{2})T00:00:00\.000Z$/.exec(to)?.[1];
+  if (!fromDay || !toDay || addZone4YouCalendarDays(fromDay, 7) !== toDay) {
+    throw new Error("Pre-cutover approved lesson range must contain exactly seven Prague calendar days.");
+  }
+
+  const earliest = new Date(earliestStartsAt);
+  const latest = new Date(latestStartsAt);
+  const normalizedDateKeys = dateKeys.map((value) => typeof value === "string" ? value : "");
+  const expectedDateKeys = [...new Set(normalizedDateKeys)].sort();
+  if (
+    Number.isNaN(earliest.getTime()) || Number.isNaN(latest.getTime()) || latest < earliest ||
+    JSON.stringify(normalizedDateKeys) !== JSON.stringify(expectedDateKeys) ||
+    normalizedDateKeys.some((day) => !/^\d{4}-\d{2}-\d{2}$/.test(day) || day < fromDay || day >= toDay) ||
+    zone4YouDateKey(earliest) !== normalizedDateKeys[0] ||
+    zone4YouDateKey(latest) !== normalizedDateKeys.at(-1)
+  ) {
+    throw new Error("Pre-cutover approved lesson bounds are incomplete or invalid.");
+  }
+
+  return {
+    count: Number(count),
+    occurrenceSetSha256,
+    reformer: Number(reformer),
+    range: { from, to, days: 7, timeZone: zone4YouTimeZone },
+    earliestStartsAt: earliest.toISOString(),
+    latestStartsAt: latest.toISOString(),
+    dateKeys: normalizedDateKeys,
+  };
 }
 
 export function loadProductionCutoverConfig(
@@ -148,6 +233,7 @@ export function loadProductionCutoverConfig(
   ) {
     throw new Error("Pre-cutover evidence does not match the approved production release.");
   }
+  const approvedFeed = approvedLessonFeed(receipt.lessonFeed);
 
   if (typeof receipt.checkedAt !== "string" || typeof receipt.cutoverApprovedAt !== "string") {
     throw new Error("Pre-cutover evidence chronology is missing or invalid.");
@@ -205,6 +291,7 @@ export function loadProductionCutoverConfig(
     cutoverApprovedAt: cutoverApprovedAt.toISOString(),
     preCutoverCheckedAt: preCutoverCheckedAt.toISOString(),
     preCutoverEvidenceSha256,
+    approvedLessonFeed: approvedFeed,
     timeoutMs,
     maxDurationMs: maxDurationSeconds * 1_000,
   };
@@ -381,6 +468,20 @@ function sameOccurrences(
   );
 }
 
+function matchesApprovedLessonFeed(
+  observed: ReturnType<typeof lessonFeedEvidence>,
+  approved: ApprovedLessonFeedEvidence,
+) {
+  return (
+    observed.count === approved.count &&
+    observed.occurrenceSetSha256 === approved.occurrenceSetSha256 &&
+    observed.reformer === approved.reformer &&
+    observed.earliestStartsAt === approved.earliestStartsAt &&
+    observed.latestStartsAt === approved.latestStartsAt &&
+    JSON.stringify(observed.dateKeys) === JSON.stringify(approved.dateKeys)
+  );
+}
+
 export async function runProductionCutoverVerification(
   config: ProductionCutoverConfig,
   dependencies: ProductionCutoverDependencies = {},
@@ -391,6 +492,7 @@ export async function runProductionCutoverVerification(
   const startedAt = Date.now();
   const checkedAt = now();
   if (Number.isNaN(checkedAt.getTime())) throw new Error("Production verification time is invalid.");
+  const approvedFeed = approvedLessonFeed(config.approvedLessonFeed);
   const cutoverApprovedAt = new Date(config.cutoverApprovedAt);
   const preCutoverCheckedAt = new Date(config.preCutoverCheckedAt);
   if (
@@ -402,6 +504,14 @@ export async function runProductionCutoverVerification(
     throw new Error("Production verification chronology is invalid.");
   }
   const range = zone4YouScheduleRange(checkedAt, 7);
+  if (
+    range.from !== approvedFeed.range.from ||
+    range.to !== approvedFeed.range.to
+  ) {
+    throw new Error(
+      "Production verification no longer covers the approved lesson range; regenerate the live release evidence.",
+    );
+  }
 
   let unresolvedDnsRecords: AnyRecord[];
   try {
@@ -463,7 +573,14 @@ export async function runProductionCutoverVerification(
   if (!sameOccurrences(czech, english)) {
     throw new Error("Czech and English production feeds do not contain the same lesson occurrences and range.");
   }
-
+  if (
+    !matchesApprovedLessonFeed(czech, approvedFeed) ||
+    !matchesApprovedLessonFeed(english, approvedFeed)
+  ) {
+    throw new Error(
+      "Production lesson feed does not exactly match the approved live Luxart and staging lesson evidence.",
+    );
+  }
   const durationMs = Date.now() - startedAt;
   if (durationMs > config.maxDurationMs) {
     throw new Error(
@@ -511,6 +628,7 @@ export async function runProductionCutoverVerification(
     },
     lessons: {
       range: { ...range, days: 7, timeZone: zone4YouTimeZone },
+      approved: approvedFeed,
       count: czech.count,
       occurrenceSetSha256: czech.occurrenceSetSha256,
       rooms: czech.rooms,

@@ -118,6 +118,7 @@ export async function verifyProductionPreCutover({
     commit: release.commit,
     launchMode: release.launchMode,
     dossierSha256,
+    lessonFeed: release.lessonFeed,
     dns: {
       hostname: dns.hostname,
       recordCount: dns.recordCount,

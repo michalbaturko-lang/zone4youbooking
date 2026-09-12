@@ -678,6 +678,19 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
     commit: expectedCommit,
     launchMode,
     paymentsIncluded: launchMode === "booking_with_stripe",
+    lessonFeed: {
+      count: luxart.count,
+      occurrenceSetSha256: luxart.occurrenceSha,
+      reformer: luxart.reformer,
+      range: {
+        ...luxart.range,
+        days: bookingRules.scheduleDays,
+        timeZone: zone4YouTimeZone,
+      },
+      earliestStartsAt: luxart.lessonRange.earliest,
+      latestStartsAt: luxart.lessonRange.latest,
+      dateKeys: luxart.lessonRange.dateKeys,
+    },
     conditions: {
       liveLuxartVerified: true,
       allObservedRoomsMapped: true,

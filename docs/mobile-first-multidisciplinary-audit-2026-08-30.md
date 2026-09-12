@@ -112,7 +112,7 @@ Všechna kritéria označená `MUST` musí být zelená. Jediný červený `MUST
 | S2 | Secure HttpOnly cookie, silný secret, exact Origin, rate limit a PostgreSQL mutation ledger | MUST |
 | S3 | žádné heslo, klíč, osobní data nebo plná Luxart ID v release důkazech/logu | MUST |
 | S4 | alert dorazí určenému support vlastníkovi; rollback do read-only do 5 minut | MUST |
-| S5 | DNS, HTTPS, commit, region `fra1`, capabilities a CS/EN feed projdou post-cutover ověřovačem | MUST |
+| S5 | DNS, HTTPS, commit, region `fra1`, capabilities a CS/EN feed projdou post-cutover ověřovačem a přesně odpovídají schválenému počtu, SHA-256 množiny výskytů, počtu Reformerů i sedmidennímu pražskému rozsahu | MUST |
 
 ### P — výkonové rozpočty pro staging
 
