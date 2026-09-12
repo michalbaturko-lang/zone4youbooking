@@ -20,6 +20,7 @@
     "verify:luxart-gateway-config": "tsx scripts/verify-luxart-gateway-config.ts",
     "verify:luxart-readonly": "tsx scripts/verify-luxart-readonly.ts",
     "verify:booking-mutations": "tsx scripts/verify-booking-mutations.ts",
+    "start:readonly-rollback": "tsx scripts/start-readonly-rollback.ts",
     "verify:readonly-rollback": "tsx scripts/verify-readonly-rollback.ts",
     "capture:production-domain-baseline": "tsx scripts/capture-production-domain-baseline.ts",
     "verify:production-domain-baseline": "tsx scripts/verify-production-domain-baseline.ts",

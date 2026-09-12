@@ -31,6 +31,19 @@ function writeJson(path: string, value: unknown) {
 function validFixture() {
   const directory = mkdtempSync(join(tmpdir(), "zone4you-release-evidence-"));
   const checkedAt = "2026-09-05T07:30:00.000Z";
+  const rollbackDrillId = "22c0bf77-6a42-4e9d-827d-a5ec8c6f3a0a";
+  const rollbackTimer = {
+    schemaVersion: 1,
+    ok: true,
+    checkedAt: "2026-09-05T07:29:46.000Z",
+    startedAt: "2026-09-05T07:29:46.000Z",
+    target: stagingTarget,
+    commit,
+    maximumDurationMs: 300_000,
+    drillId: rollbackDrillId,
+  };
+  const rollbackTimerBody = `${JSON.stringify(rollbackTimer, null, 2)}\n`;
+  const rollbackTimerSha256 = createHash("sha256").update(rollbackTimerBody).digest("hex");
   const files: Record<string, unknown> = {
     luxartReadOnly: {
       ok: true,
@@ -189,11 +202,14 @@ function validFixture() {
       cancellationFeeMatched: true,
       requestIds: Array.from({ length: 16 }, (_, index) => `request-${index}`),
     },
+    rollbackTimer,
     rollback: {
       schemaVersion: 2,
       ok: true,
       checkedAt,
       rollbackStartedAt: "2026-09-05T07:29:46.000Z",
+      rollbackDrillId,
+      rollbackTimerSha256,
       readOnlyVerifiedAt: checkedAt,
       target: stagingTarget,
       commit,
@@ -255,8 +271,9 @@ function validFixture() {
   );
   chmodSync(artifacts.dnsRollbackBaseline.path, 0o600);
   chmodSync(artifacts.memberzoneFallback.path, 0o600);
+  chmodSync(artifacts.rollbackTimer.path, 0o600);
   const dossier = {
-    schemaVersion: 5,
+    schemaVersion: 6,
     draft: false,
     releaseId: "zone4you-pilot-2026-09-05",
     target: "https://booking.zone4you.cz/",
@@ -347,7 +364,7 @@ test("pilot release dossier binds live Luxart, UAT, application and DNS rollback
     dateKeys: ["2026-09-05", "2026-09-11"],
   });
   assert.equal(result.paymentsIncluded, false);
-  assert.equal(result.artifacts.length, 7);
+  assert.equal(result.artifacts.length, 8);
   assert.equal(JSON.stringify(result).includes("approvedBy"), false);
   assert.equal(JSON.stringify(result).includes(fixture.dossierPath), false);
   chmodSync(fixture.dossier.artifacts.dnsRollbackBaseline.path, 0o644);
@@ -361,6 +378,13 @@ test("pilot release dossier binds live Luxart, UAT, application and DNS rollback
   assert.throws(
     () => verifyPilotReleaseEvidence(readableFallback.environment, now),
     /memberzoneFallback must not be accessible/i,
+  );
+
+  const readableRollbackTimer = validFixture();
+  chmodSync(readableRollbackTimer.dossier.artifacts.rollbackTimer.path, 0o640);
+  assert.throws(
+    () => verifyPilotReleaseEvidence(readableRollbackTimer.environment, now),
+    /rollbackTimer must not be accessible/i,
   );
 });
 
@@ -476,6 +500,13 @@ test("pilot release dossier rejects evidence that cannot come from the real guar
       /booking UAT lessonIdSha256 must be a 16-character lowercase SHA-256 prefix/i,
     ],
     [
+      "rollbackTimer",
+      (artifact: Record<string, unknown>) => {
+        artifact.drillId = "6182a4d0-d12f-4012-894f-2050f8a56857";
+      },
+      /rollback drillId must exactly equal/i,
+    ],
+    [
       "rollback",
       (artifact: Record<string, unknown>) => {
         delete artifact.requestIds;
@@ -495,6 +526,13 @@ test("pilot release dossier rejects evidence that cannot come from the real guar
         artifact.commit = "f".repeat(40);
       },
       /rollback commit must exactly equal/i,
+    ],
+    [
+      "rollback",
+      (artifact: Record<string, unknown>) => {
+        artifact.rollbackTimerSha256 = "f".repeat(64);
+      },
+      /rollback timer SHA-256 must exactly equal/i,
     ],
     [
       "dnsRollbackBaseline",
@@ -818,11 +856,18 @@ test("pilot release approvals cannot predate their evidence or the final cutover
 
 test("pilot release cutover cannot predate the latest artifact", () => {
   const fixture = validFixture();
+  const rollbackTimer = structuredClone(fixture.files.rollbackTimer) as Record<string, unknown>;
+  rollbackTimer.checkedAt = "2026-09-05T07:49:46.000Z";
+  rollbackTimer.startedAt = "2026-09-05T07:49:46.000Z";
   const rollback = structuredClone(fixture.files.rollback) as Record<string, unknown>;
-  rollback.checkedAt = "2026-09-05T07:51:00.000Z";
-  rollback.readOnlyVerifiedAt = "2026-09-05T07:51:00.000Z";
-  rollback.rollbackStartedAt = "2026-09-05T07:50:46.000Z";
+  rollback.checkedAt = "2026-09-05T07:50:30.000Z";
+  rollback.readOnlyVerifiedAt = "2026-09-05T07:50:30.000Z";
+  rollback.rollbackStartedAt = "2026-09-05T07:49:46.000Z";
+  rollback.recoveryDurationMs = 44_000;
   const dossier = structuredClone(fixture.dossier);
+  dossier.artifacts.rollbackTimer.sha256 = writeJson(dossier.artifacts.rollbackTimer.path, rollbackTimer);
+  chmodSync(dossier.artifacts.rollbackTimer.path, 0o600);
+  rollback.rollbackTimerSha256 = dossier.artifacts.rollbackTimer.sha256;
   dossier.artifacts.rollback.sha256 = writeJson(dossier.artifacts.rollback.path, rollback);
   const dossierSha = writeJson(fixture.dossierPath, dossier);
 

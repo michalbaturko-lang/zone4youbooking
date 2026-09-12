@@ -40,6 +40,8 @@ npm run inspect:business-rules
 npm run inspect:payment-product
 # Po výběru staging alert kanálu a support vlastníka:
 npm run verify:alert-delivery
+# Bezprostředně před rollback drillem vytvoří owner-only startovní účtenku:
+npm run start:readonly-rollback
 # Ze živých JSON důkazů vytvoří pouze povinně NO-GO draft:
 npm run prepare:pilot-release
 # Až existují živé hashované důkazy a výslovný cutover souhlas:
@@ -70,7 +72,9 @@ Síťové rozhodnutí a důkaz, proč se čeká na veřejný Zone4You hostname m
 
 `inspect:payment-product` ukáže potvrzený profil pěti CZK top-up částek a jeho SHA-256. Live Stripe vyžaduje přesnou shodu profilu s implementací i explicitní `PAYMENT_PRODUCT_CONFIRMED=true`.
 
-`verify:pilot-release` je poslední release pojistka. Pro přesný commit a aktivní launch okno ověřuje SHA-256 všech živých důkazů: Luxart CS/EN feed, úplnou shodu českých i anglických výskytů lekcí mezi Luxartem a stagingem, totožný interval přesně sedmi kalendářních dnů v `Europe/Prague`, mapování každého pozorovaného sálu a přesný anonymní otisk celé vazby `cislo_salu → id_resource`, booking UAT, rollback do pěti minut měřený od času zachyceného před změnou konfigurace do potvrzeného read-only stavu na stejném commitu, doručení alertu, nulové P0/P1, dostupný Memberzone fallback a výslovný cutover souhlas. Reálný dossier a evidence patří mimo repozitář; bezpečná neaktivní šablona je v `config/pilot-release-dossier.template.json`.
+`start:readonly-rollback` před změnou konfigurace vytvoří v chráněném adresáři mimo repozitář jednorázovou owner-only startovní účtenku. Existující soubor nepřepíše. `verify:readonly-rollback` pak přijme pouze přesný celý SHA-256 této účtenky a shodný cíl, commit, časový limit i drill ID, takže začátek pětiminutového měření nelze doplnit zpětně.
+
+`verify:pilot-release` je poslední release pojistka. Pro přesný commit a aktivní launch okno ověřuje SHA-256 všech živých důkazů: Luxart CS/EN feed, úplnou shodu českých i anglických výskytů lekcí mezi Luxartem a stagingem, totožný interval přesně sedmi kalendářních dnů v `Europe/Prague`, mapování každého pozorovaného sálu a přesný anonymní otisk celé vazby `cislo_salu → id_resource`, booking UAT, rollback do pěti minut měřený od chráněné startovní účtenky do potvrzeného read-only stavu na stejném commitu, doručení alertu, nulové P0/P1, dostupný Memberzone fallback a výslovný cutover souhlas. Dossier schématu 6 váže rollback výsledek na účtenku jejím SHA-256 a drill ID. Reálný dossier a evidence patří mimo repozitář; bezpečná neaktivní šablona je v `config/pilot-release-dossier.template.json`.
 
 `verify:production-precutover` ukládá autorizační výsledek do nového owner-only souboru mimo repozitář bez možnosti přepsání. Nese přesný schválený snapshot živého Luxart/staging feedu: počet lekcí, SHA-256 množiny výskytů, SHA-256 vazeb výskyt → číslo sálu, SHA-256 celé resource mapy bez zveřejnění interních ID, množinu čísel sálů, počet Reformerů, sedmidenní pražský rozsah, časové meze a seznam dnů. `verify:production-cutover` je druhá, čistě čtecí brána po schválené změně DNS. Je pevně omezená na `https://booking.zone4you.cz/` a přijme pouze čerstvý pre-cutover soubor s přesným SHA-256 potvrzením a shodným release dossierem, commitem i fází. Ověří DNS, TLS bezpečnostní hlavičky, health/readiness, Vercel region `fra1`, živý Luxart, shodný otisk resource mapy, PostgreSQL rate limit, booking/platební capability a totožný CS/EN feed, který musí položku po položce odpovídat schválenému snapshotu včetně čísla sálu a Reformeru. Vynechaná nebo přidaná lekce, změna jejího Luxart sálu, změna resource mapy i přechod do nového pražského dne vynutí nové release důkazy a schválení. Výstup neobsahuje DNS adresy, ID lekcí, resource mapu, secrets ani osobní údaje. Pilot se otevře až po zeleném výsledku; chyba znamená návrat DNS podle provozního runbooku.
 

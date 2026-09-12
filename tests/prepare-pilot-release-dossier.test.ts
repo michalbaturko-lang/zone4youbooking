@@ -13,7 +13,7 @@ function fixture() {
   const directory = mkdtempSync(join(tmpdir(), "zone4you-dossier-preparation-"));
   const checkedAt = "2026-09-05T07:30:00.000Z";
   const evidencePaths = Object.fromEntries(
-    ["luxart", "runtime", "booking", "rollback", "dns", "alert", "memberzone"].map((name) => {
+    ["luxart", "runtime", "booking", "timer", "rollback", "dns", "alert", "memberzone"].map((name) => {
       const path = join(directory, `${name}.json`);
       writeFileSync(path, `${JSON.stringify({
         ok: true,
@@ -32,6 +32,7 @@ function fixture() {
   );
   chmodSync(evidencePaths.dns, 0o600);
   chmodSync(evidencePaths.memberzone, 0o600);
+  chmodSync(evidencePaths.timer, 0o600);
   const outputPath = join(directory, "pilot-release-dossier.json");
   const environment = {
     ZONE4YOU_RELEASE_DOSSIER_OUTPUT_PATH: outputPath,
@@ -46,6 +47,7 @@ function fixture() {
     ZONE4YOU_LUXART_EVIDENCE_PATH: evidencePaths.luxart,
     ZONE4YOU_RUNTIME_EVIDENCE_PATH: evidencePaths.runtime,
     ZONE4YOU_BOOKING_UAT_EVIDENCE_PATH: evidencePaths.booking,
+    ZONE4YOU_ROLLBACK_TIMER_EVIDENCE_PATH: evidencePaths.timer,
     ZONE4YOU_ROLLBACK_EVIDENCE_PATH: evidencePaths.rollback,
     ZONE4YOU_DNS_BASELINE_EVIDENCE_PATH: evidencePaths.dns,
     ZONE4YOU_ALERT_EVIDENCE_PATH: evidencePaths.alert,
@@ -73,9 +75,9 @@ test("dossier preparation hashes real evidence but remains an explicit human-app
 
   assert.equal(result.ok, true);
   assert.equal(result.draft, true);
-  assert.equal(result.artifactCount, 7);
+  assert.equal(result.artifactCount, 8);
   assert.equal(result.dossierSha256, createHash("sha256").update(body).digest("hex"));
-  assert.equal(dossier.schemaVersion, 5);
+  assert.equal(dossier.schemaVersion, 6);
   assert.equal(dossier.draft, true);
   assert.equal(dossier.luxartApiContract, "memberzone_rest_v1");
   assert.equal(dossier.approvals.uat.decision, "NO-GO");
@@ -86,6 +88,7 @@ test("dossier preparation hashes real evidence but remains an explicit human-app
   assert.equal(dossier.approvals.cutover.approved, false);
   assert.equal(dossier.artifacts.luxartReadOnly.path, evidencePaths.luxart);
   assert.equal(dossier.artifacts.memberzoneFallback.path, evidencePaths.memberzone);
+  assert.equal(dossier.artifacts.rollbackTimer.path, evidencePaths.timer);
   assert.equal(
     dossier.artifacts.luxartReadOnly.sha256,
     createHash("sha256").update(readFileSync(evidencePaths.luxart)).digest("hex"),
@@ -136,6 +139,13 @@ test("dossier preparation refuses failed evidence and unsafe origins", () => {
   assert.throws(
     () => buildPilotReleaseDossier(readableMemberzoneEvidence.environment),
     /Memberzone fallback evidence must not be accessible by group or other users/i,
+  );
+
+  const readableRollbackTimerEvidence = fixture();
+  chmodSync(readableRollbackTimerEvidence.evidencePaths.timer, 0o640);
+  assert.throws(
+    () => buildPilotReleaseDossier(readableRollbackTimerEvidence.environment),
+    /Rollback timer evidence must not be accessible by group or other users/i,
   );
 
   const symlinkedEvidence = fixture();

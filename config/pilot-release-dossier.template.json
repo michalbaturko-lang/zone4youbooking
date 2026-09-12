@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "draft": true,
   "releaseId": "zone4you-pilot-2026-09-05",
   "target": "https://booking.zone4you.cz/",
@@ -24,6 +24,10 @@
     },
     "bookingMutationUat": {
       "path": "/secure/release-evidence/booking-mutation-uat.json",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "rollbackTimer": {
+      "path": "/secure/release-evidence/readonly-rollback-timer.json",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
     },
     "rollback": {

@@ -15,6 +15,10 @@ import {
   luxartPublicContractEndpoints,
 } from "./verify-luxart-public-contract";
 import { memberzoneFallbackUrl } from "./verify-memberzone-fallback";
+import {
+  validateReadonlyRollbackTimerEvidence,
+  type ReadonlyRollbackTimerEvidence,
+} from "./start-readonly-rollback";
 
 type Environment = Record<string, string | undefined>;
 type JsonObject = Record<string, unknown>;
@@ -132,7 +136,7 @@ function artifact(
   const loaded = readBoundedJson(
     path,
     `artifacts.${name}`,
-    name === "dnsRollbackBaseline" || name === "memberzoneFallback",
+    name === "dnsRollbackBaseline" || name === "memberzoneFallback" || name === "rollbackTimer",
   );
   if (loaded.sha256 !== expectedSha256) throw new Error(`artifacts.${name} SHA-256 does not match the dossier.`);
   trueValue(loaded.data.ok, `artifacts.${name}.ok`);
@@ -527,6 +531,8 @@ export function validateRollbackEvidence(
   evidence: JsonObject,
   stagingOrigin: string,
   expectedCommit: string,
+  timer: ReadonlyRollbackTimerEvidence,
+  timerSha256: string,
 ) {
   if (evidence.schemaVersion !== 2) {
     throw new Error("Rollback evidence schemaVersion must be 2.");
@@ -539,9 +545,12 @@ export function validateRollbackEvidence(
   );
   exactString(evidence.phase, "read_only", "rollback phase");
   exactString(evidence.region, "fra1", "rollback region");
+  exactString(evidence.rollbackDrillId, timer.drillId, "rollback drillId");
+  exactString(evidence.rollbackTimerSha256, timerSha256, "rollback timer SHA-256");
   const checkedAtValue = stringValue(evidence.checkedAt, "rollback checkedAt");
   exactString(evidence.readOnlyVerifiedAt, checkedAtValue, "rollback readOnlyVerifiedAt");
-  const rollbackStartedAt = new Date(stringValue(evidence.rollbackStartedAt, "rollback rollbackStartedAt"));
+  exactString(evidence.rollbackStartedAt, timer.startedAt, "rollback rollbackStartedAt");
+  const rollbackStartedAt = new Date(timer.startedAt);
   const readOnlyVerifiedAt = new Date(checkedAtValue);
   if (!Number.isFinite(rollbackStartedAt.getTime()) || !Number.isFinite(readOnlyVerifiedAt.getTime())) {
     throw new Error("Rollback evidence timestamps must be valid.");
@@ -556,6 +565,9 @@ export function validateRollbackEvidence(
   }
   const verificationDurationMs = integerValue(evidence.verificationDurationMs, "rollback verificationDurationMs");
   const maximumDurationMs = integerValue(evidence.maximumDurationMs, "rollback maximumDurationMs", 1);
+  if (maximumDurationMs !== timer.maximumDurationMs) {
+    throw new Error("Rollback maximumDurationMs does not match its immutable timer evidence.");
+  }
   if (
     maximumDurationMs > 300_000 ||
     recoveryDurationMs > maximumDurationMs ||
@@ -634,7 +646,7 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
   }
 
   const dossier = dossierFile.data;
-  if (dossier.schemaVersion !== 5) throw new Error("release dossier schemaVersion must be 5.");
+  if (dossier.schemaVersion !== 6) throw new Error("release dossier schemaVersion must be 6.");
   falseValue(dossier.draft, "release dossier draft");
   const releaseId = stringValue(dossier.releaseId, "releaseId");
   const target = cleanHttpsOrigin(dossier.target, "target");
@@ -707,10 +719,21 @@ export function verifyPilotReleaseEvidence(environment: Environment = process.en
     expectedCommit,
     launchMode,
   );
+  const rollbackTimerEvidence = load("rollbackTimer", Math.min(24, maximumAgeHours));
+  const rollbackTimer = validateReadonlyRollbackTimerEvidence(rollbackTimerEvidence);
+  exactString(rollbackTimer.target, stagingTarget, "Rollback timer target");
+  exactString(rollbackTimer.commit, expectedCommit, "Rollback timer commit");
+  const rollbackTimerReference = objectValue(artifacts.rollbackTimer, "artifacts.rollbackTimer");
+  const rollbackTimerSha256 = stringValue(
+    rollbackTimerReference.sha256,
+    "artifacts.rollbackTimer.sha256",
+  ).toLowerCase();
   validateRollbackEvidence(
     load("rollback", Math.min(24, maximumAgeHours)),
     stagingTarget,
     expectedCommit,
+    rollbackTimer,
+    rollbackTimerSha256,
   );
   validateProductionDomainBaselineEvidence(load("dnsRollbackBaseline", Math.min(24, maximumAgeHours)));
   const alertEventId = validateAlertEvidence(load("alertDelivery"), stagingTarget);

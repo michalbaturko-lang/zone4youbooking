@@ -90,6 +90,11 @@ export function buildPilotReleaseDossier(environment: Environment = process.env)
     luxartReadOnly: evidenceFile(required(environment, "ZONE4YOU_LUXART_EVIDENCE_PATH"), "Luxart evidence"),
     runtimeProbe: evidenceFile(required(environment, "ZONE4YOU_RUNTIME_EVIDENCE_PATH"), "runtime evidence"),
     bookingMutationUat: evidenceFile(required(environment, "ZONE4YOU_BOOKING_UAT_EVIDENCE_PATH"), "booking UAT evidence"),
+    rollbackTimer: evidenceFile(
+      required(environment, "ZONE4YOU_ROLLBACK_TIMER_EVIDENCE_PATH"),
+      "rollback timer evidence",
+      true,
+    ),
     rollback: evidenceFile(required(environment, "ZONE4YOU_ROLLBACK_EVIDENCE_PATH"), "rollback evidence"),
     dnsRollbackBaseline: evidenceFile(
       required(environment, "ZONE4YOU_DNS_BASELINE_EVIDENCE_PATH"),
@@ -119,7 +124,7 @@ export function buildPilotReleaseDossier(environment: Environment = process.env)
   const pendingAt = startsAt.toISOString();
 
   return {
-    schemaVersion: 5,
+    schemaVersion: 6,
     draft: true,
     releaseId: required(environment, "ZONE4YOU_RELEASE_ID"),
     target: `${productionTarget}/`,

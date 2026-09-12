@@ -1,6 +1,7 @@
 import { pathToFileURL } from "node:url";
 import type { BookingCapabilities } from "../src/lib/domain";
 import { approvedRuntimeRegion } from "../src/lib/deploymentPreflight";
+import { readReadonlyRollbackTimerFile } from "./start-readonly-rollback";
 
 type Environment = Record<string, string | undefined>;
 type FetchLike = typeof fetch;
@@ -9,6 +10,8 @@ export interface ReadonlyRollbackConfig {
   target: URL;
   expectedCommit: string;
   rollbackStartedAt: Date;
+  rollbackDrillId: string;
+  rollbackTimerSha256: string;
   timeoutMs: number;
   maxDurationMs: number;
 }
@@ -47,7 +50,7 @@ function timestamp(rawValue: string, name: string) {
 
 function assertWithinRecoveryWindow(startedAt: Date, now: Date, maximumDurationMs: number) {
   const elapsedMs = now.getTime() - startedAt.getTime();
-  if (elapsedMs < 0) throw new Error("ZONE4YOU_ROLLBACK_STARTED_AT must not be in the future.");
+  if (elapsedMs < 0) throw new Error("Rollback timer startedAt must not be in the future.");
   if (elapsedMs > maximumDurationMs) {
     throw new Error("The five-minute rollback recovery objective was already exceeded.");
   }
@@ -80,12 +83,33 @@ export function loadReadonlyRollbackConfig(
   if (!/^[a-f0-9]{40}$/.test(expectedCommit)) {
     throw new Error("ZONE4YOU_ROLLBACK_EXPECTED_COMMIT must be a full 40-character Git SHA.");
   }
-  const rollbackStartedAt = timestamp(
-    required(environment, "ZONE4YOU_ROLLBACK_STARTED_AT"),
-    "ZONE4YOU_ROLLBACK_STARTED_AT",
+  const timer = readReadonlyRollbackTimerFile(
+    required(environment, "ZONE4YOU_ROLLBACK_TIMER_EVIDENCE_PATH"),
   );
+  const expectedTimerConfirmation = `VERIFY_ZONE4YOU_ROLLBACK_TIMER:${timer.fileSha256}`;
+  if (environment.ZONE4YOU_ROLLBACK_TIMER_VERIFY_CONFIRMATION !== expectedTimerConfirmation) {
+    throw new Error(
+      `ZONE4YOU_ROLLBACK_TIMER_VERIFY_CONFIRMATION must exactly equal ${expectedTimerConfirmation}.`,
+    );
+  }
+  if (
+    timer.evidence.target !== target.origin ||
+    timer.evidence.commit !== expectedCommit ||
+    timer.evidence.maximumDurationMs !== maxDurationMs
+  ) {
+    throw new Error("Rollback timer evidence does not match the target, commit and recovery objective.");
+  }
+  const rollbackStartedAt = timestamp(timer.evidence.startedAt, "Rollback timer startedAt");
   assertWithinRecoveryWindow(rollbackStartedAt, now, maxDurationMs);
-  return { target, expectedCommit, rollbackStartedAt, timeoutMs, maxDurationMs };
+  return {
+    target,
+    expectedCommit,
+    rollbackStartedAt,
+    rollbackDrillId: timer.evidence.drillId,
+    rollbackTimerSha256: timer.fileSha256,
+    timeoutMs,
+    maxDurationMs,
+  };
 }
 
 async function api<T>(
@@ -227,6 +251,8 @@ export async function runReadonlyRollbackDrill(
     checkedAt: readOnlyVerifiedAt.toISOString(),
     rollbackStartedAt: config.rollbackStartedAt.toISOString(),
     readOnlyVerifiedAt: readOnlyVerifiedAt.toISOString(),
+    rollbackDrillId: config.rollbackDrillId,
+    rollbackTimerSha256: config.rollbackTimerSha256,
     target: config.target.origin,
     commit: config.expectedCommit,
     phase: "read_only",

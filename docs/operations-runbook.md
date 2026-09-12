@@ -22,7 +22,7 @@ Reformer může být v potvrzeném profilu označen jako `same_as_group`, nebo m
 1. `npm run quality` je zelené.
 2. Veřejný referenční kontrakt projde `npm run verify:luxart-public-contract`; tento výsledek pouze odhaluje dokumentační drift a výslovně není živým Zone4You důkazem ani launch autoritou. Přesný build následně projde `npm run verify:deployment-preflight` podle matice v `docs/deployment-preflight.md`; výstup je uložený jako ne-secret důkaz.
 3. IT potvrdilo gateway auth režim, případné hodnoty jsou v secret store a `npm run verify:luxart-gateway-config` projde bez vypsání credentials. Režim `none` musí být stejně explicitní jako Basic/Bearer/`X-*`.
-4. Po písemném potvrzení REST kontraktu nastaví operátor `LUXART_API_CONTRACT=memberzone_rest_v1`, spustí neautentizovaný `npm run probe:luxart-help`, nechá odpovědnou osobu schválit přesný zobrazený SHA-256 otisk originu a vloží jej do jednorázové CLI proměnné `LUXART_APPROVED_ORIGIN_SHA256`. Poté vytvoří mimo repozitář nový adresář s oprávněním `0700`, nastaví jedinečnou dosud neexistující cestu `ZONE4YOU_LUXART_EVIDENCE_OUTPUT_PATH` a spustí `npm run verify:luxart-d1`. Brána přijme pouze schválený čistý Zone4You HTTPS REST origin bez `/api` cesty, shodný otisk a stejný `/Help` a API origin, potvrzený gateway režim, resort 1 a autentizovaný český i anglický read-only feed včetně Reformeru. Ještě před klientským loginem přes stejný HTTPS origin a případnou potvrzenou gateway autentizaci načte všech 11 používaných dokumentačních stránek a jejich úplný sémantický SHA-256 musí přesně odpovídat schválenému referenčnímu baseline. Port odvodí ze schváleného originu; samotné číslo 9191 ani SOAP `Service1.svc` nejsou důkazem REST kontraktu. HTTP, nechráněný adresář ani existující výstup nepřijme. Samostatný diagnostický `verify:luxart-readonly` smí přes výslovně povolené stagingové HTTP provést jen anonymní čtení bez gateway autentizace; klientský login, personalizovaná data a všechny mutace jsou v runtime před síťovým požadavkem blokované. Jakmile jsou v diagnostice přítomné gateway nebo testovací klientské credentials, skončí ještě před vytvořením adapteru a síťovým požadavkem. JSON důkaz uloží s oprávněním `0600`; neobsahuje credentials, osobní data ani syrový payload a uvnitř nese D1 atestaci REST kontraktu, sémantického baseline, `/Help`, originu, gateway a autentizovaného čtení. Release dossier schématu 5 bez D1 evidence verze 3 selže, takže samostatný `verify:luxart-readonly` zůstává pouze diagnostický stavební blok a nelze jej omylem použít jako release důkaz.
+4. Po písemném potvrzení REST kontraktu nastaví operátor `LUXART_API_CONTRACT=memberzone_rest_v1`, spustí neautentizovaný `npm run probe:luxart-help`, nechá odpovědnou osobu schválit přesný zobrazený SHA-256 otisk originu a vloží jej do jednorázové CLI proměnné `LUXART_APPROVED_ORIGIN_SHA256`. Poté vytvoří mimo repozitář nový adresář s oprávněním `0700`, nastaví jedinečnou dosud neexistující cestu `ZONE4YOU_LUXART_EVIDENCE_OUTPUT_PATH` a spustí `npm run verify:luxart-d1`. Brána přijme pouze schválený čistý Zone4You HTTPS REST origin bez `/api` cesty, shodný otisk a stejný `/Help` a API origin, potvrzený gateway režim, resort 1 a autentizovaný český i anglický read-only feed včetně Reformeru. Ještě před klientským loginem přes stejný HTTPS origin a případnou potvrzenou gateway autentizaci načte všech 11 používaných dokumentačních stránek a jejich úplný sémantický SHA-256 musí přesně odpovídat schválenému referenčnímu baseline. Port odvodí ze schváleného originu; samotné číslo 9191 ani SOAP `Service1.svc` nejsou důkazem REST kontraktu. HTTP, nechráněný adresář ani existující výstup nepřijme. Samostatný diagnostický `verify:luxart-readonly` smí přes výslovně povolené stagingové HTTP provést jen anonymní čtení bez gateway autentizace; klientský login, personalizovaná data a všechny mutace jsou v runtime před síťovým požadavkem blokované. Jakmile jsou v diagnostice přítomné gateway nebo testovací klientské credentials, skončí ještě před vytvořením adapteru a síťovým požadavkem. JSON důkaz uloží s oprávněním `0600`; neobsahuje credentials, osobní data ani syrový payload a uvnitř nese D1 atestaci REST kontraktu, sémantického baseline, `/Help`, originu, gateway a autentizovaného čtení. Release dossier schématu 6 bez D1 evidence verze 3 selže, takže samostatný `verify:luxart-readonly` zůstává pouze diagnostický stavební blok a nelze jej omylem použít jako release důkaz.
 5. `npm run check:launch` nemá žádný automatický `FAIL` relevantní pro zvolený režim.
 6. `APP_BASE_URL=<schválený staging/produkční origin> npm run probe:runtime` projde, readiness vrátí přesný `phase`, `commit`, systémový region `fra1`, `schedule=ready`, `booking`, `payments` a v booking fázi kanonický `resourceMapSha256`; česká i anglická `/api/lessons` route vrátí stejnou úplnou množinu výskytů a uloží se celý JSON výstup.
 7. E0–E9 v prováděcím plánu jsou vyhodnocené; vypnutá funkce má doložený fallback.
@@ -44,7 +44,7 @@ Ve fázi `booking_without_payments` vypíše `check:launch` čtyři Stripe infra
 
 ### Finální release dossier
 
-Do schváleného evidence úložiště mimo repozitář uložte nezměněné JSON výstupy `verify:luxart-d1`, `probe:runtime`, `verify:booking-mutations`, `verify:readonly-rollback`, `capture:production-domain-baseline`, `verify:alert-delivery` a `verify:memberzone-fallback`. Jejich cesty, přesný commit, staging/Luxart HTTPS origin a launch okno předejte jednorázovému operátorskému příkazu `npm run prepare:pilot-release`; Memberzone cesta se předává jako `ZONE4YOU_MEMBERZONE_FALLBACK_EVIDENCE_PATH`. Příkaz přijme jen pravidelné úspěšné JSON soubory, vypočítá jejich celé SHA-256, odmítne přepsat existující dossier a nový soubor uloží s oprávněním pouze pro vlastníka. Finální validátor schématu 5 navíc zkontroluje v Luxart souboru povinnou D1 atestaci a v owner-only Memberzone souboru přesnou HTTPS URL, status, typ obsahu, omezenou velikost a všechny detekční příznaky; samostatný `verify:luxart-readonly` je pouze diagnostický a do dossieru nepatří.
+Do schváleného evidence úložiště mimo repozitář uložte nezměněné JSON výstupy `verify:luxart-d1`, `probe:runtime`, `verify:booking-mutations`, `start:readonly-rollback`, `verify:readonly-rollback`, `capture:production-domain-baseline`, `verify:alert-delivery` a `verify:memberzone-fallback`. Jejich cesty, přesný commit, staging/Luxart HTTPS origin a launch okno předejte jednorázovému operátorskému příkazu `npm run prepare:pilot-release`; startovní rollback účtenka se předává jako `ZONE4YOU_ROLLBACK_TIMER_EVIDENCE_PATH` a Memberzone cesta jako `ZONE4YOU_MEMBERZONE_FALLBACK_EVIDENCE_PATH`. Příkaz přijme jen pravidelné úspěšné JSON soubory, vypočítá jejich celé SHA-256, odmítne přepsat existující dossier a nový soubor uloží s oprávněním pouze pro vlastníka. Finální validátor schématu 6 navíc zkontroluje v Luxart souboru povinnou D1 atestaci, owner-only a nepřepisovatelnou startovní rollback účtenku svázanou SHA-256 a drill ID s výsledkem rollbacku a v owner-only Memberzone souboru přesnou HTTPS URL, status, typ obsahu, omezenou velikost a všechny detekční příznaky; samostatný `verify:luxart-readonly` je pouze diagnostický a do dossieru nepatří.
 
 ### DNS rollback baseline před cutoverem
 
@@ -164,7 +164,7 @@ Konkrétní opravný SQL příkaz není záměrně součástí automatického b�
 
 Před pilotem proveďte na stagingu:
 
-1. bezprostředně před změnou uložit UTC čas začátku měření;
+1. bezprostředně před změnou vytvořit mimo repozitář owner-only startovní účtenku měření;
 2. `BOOKING_MUTATIONS_ENABLED=false`;
 3. `PAYMENT_MUTATIONS_ENABLED=false`;
 4. potvrzení, že lekce se načítají, ale rezervace/storno vrací `BOOKING_READ_ONLY` a Checkout `PAYMENTS_DISABLED`;
@@ -173,14 +173,25 @@ Před pilotem proveďte na stagingu:
 
 GO práh: bezpečný read-only stav do 5 minut, žádná nechtěná Luxart mutace a zdokumentovaný vlastník dalšího kroku.
 
-Po přepnutí a novém deployi spusťte bez přihlašovacích údajů:
+Před změnou vytvořte nový adresář s oprávněním `0700` mimo repozitář. První běh bez potvrzení vypíše požadovaný fingerprint; druhý běh s přesnou frází vytvoří jednorázovou startovní účtenku `0600` a existující soubor nikdy nepřepíše:
+
+```bash
+ZONE4YOU_ROLLBACK_APP_URL=https://staging.booking.zone4you.cz/ \
+ZONE4YOU_ROLLBACK_EXPECTED_COMMIT=<přesný-40znakový-git-commit> \
+ZONE4YOU_ROLLBACK_TIMER_OUTPUT_PATH=/bezpecne-uloziste/readonly-rollback-timer.json \
+ZONE4YOU_ROLLBACK_TIMER_CAPTURE_CONFIRMATION=START_ZONE4YOU_READ_ONLY_ROLLBACK:<zobrazený-fingerprint> \
+npm run start:readonly-rollback
+```
+
+Ihned potom nastavte `BOOKING_MUTATIONS_ENABLED=false`, `PAYMENT_MUTATIONS_ENABLED=false`, fázi `read_only` a nasaďte tentýž commit. Po přepnutí spusťte bez přihlašovacích údajů; plný SHA-256 účtenky převezměte pouze z výstupu startovního příkazu:
 
 ```bash
 ZONE4YOU_ROLLBACK_APP_URL=https://staging.booking.zone4you.cz/ \
 ZONE4YOU_ROLLBACK_CONFIRMATION=READ_ONLY_ROLLBACK:https://staging.booking.zone4you.cz \
 ZONE4YOU_ROLLBACK_EXPECTED_COMMIT=<přesný-40znakový-git-commit> \
-ZONE4YOU_ROLLBACK_STARTED_AT=<UTC-čas-uložený-před-změnou> \
+ZONE4YOU_ROLLBACK_TIMER_EVIDENCE_PATH=/bezpecne-uloziste/readonly-rollback-timer.json \
+ZONE4YOU_ROLLBACK_TIMER_VERIFY_CONFIRMATION=VERIFY_ZONE4YOU_ROLLBACK_TIMER:<plný-sha256-účtenky> \
 npm run verify:readonly-rollback
 ```
 
-Příkaz vyžaduje přesnou potvrzovací frázi pro cílový origin, celý očekávaný commit a neměnný čas zachycený ještě před přepnutím konfigurace. Ověří `health`, živé read-only `readiness`, fázi `read_only`, commit, region `fra1`, neprázdný rozvrh a bezpečné odmítnutí vytvoření rezervace, storna, watchdogu a Stripe Checkout. Nepoužívá login, cookie ani reálné ID lekce/rezervace; záměrně posílá sentinelové hodnoty, které musí být odmítnuty dříve, než se zavolá Luxart nebo Stripe. Celý privacy-safe JSON výstup s `X-Request-ID`, začátkem rollbacku, časem dosažení read-only a oběma odvozenými délkami uložte jako časovaný rollback důkaz. Skript skončí ještě před sentinelovými požadavky při nesprávném commitu/fázi nebo pokud od zachyceného začátku do ověřeného read-only stavu uplynulo více než pět minut.
+Ověřovač nepřijme ručně dopsaný čas: vyžaduje chráněnou startovní účtenku, její celý SHA-256 a shodu cíle, commitu, limitu i drill ID. Ověří `health`, živé read-only `readiness`, fázi `read_only`, commit, region `fra1`, neprázdný rozvrh a bezpečné odmítnutí vytvoření rezervace, storna, watchdogu a Stripe Checkout. Nepoužívá login, cookie ani reálné ID lekce/rezervace; záměrně posílá sentinelové hodnoty, které musí být odmítnuty dříve, než se zavolá Luxart nebo Stripe. Celý privacy-safe JSON výstup s `X-Request-ID`, otiskem startovní účtenky, začátkem rollbacku, časem dosažení read-only a oběma odvozenými délkami uložte jako časovaný rollback důkaz. Skript skončí ještě před sentinelovými požadavky při nesprávném commitu/fázi nebo pokud od nezměnitelného začátku do ověřeného read-only stavu uplynulo více než pět minut.
