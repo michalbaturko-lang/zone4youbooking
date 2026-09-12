@@ -1,6 +1,6 @@
 # Zone4You Booking — připravenost hostingu
 
-Aktualizace: 2026-09-11
+Aktualizace: 2026-09-12
 
 Tento dokument odděluje bezpečnou přípravu hostingu od deploye, změny DNS a produkčního cutoveru. Samotná existence Vercel projektu ani zelený build není souhlas s publikací.
 
@@ -18,6 +18,7 @@ Read-only kontrola propojeného Vercel projektu potvrdila:
 - historický produkční alias je 84 dní starý a není důkazem současného buildu;
 - 11. 9. vznikl nový izolovaný Vercel Preview pro klientskou prezentaci. Vrací HTTPS bezpečnostní hlavičky, `noindex`, zdravý `/api/health` a `/api/readiness`, který výslovně potvrzuje pouze `mode=demo`, `luxart=mock`, `schedule=mock`, paměťový rate limit, přesný Git commit a systémový region `fra1`;
 - nový Preview prošel nízkoobjemovou browser regresí ve všech pěti viewports: 20/20 provedených scénářů včetně jediného přihlášení, rezervace a následného storna, 5 záměrných skipů kvůli login limiteru a desktopové duplicitě mobilní ergonomie;
+- read-only kontrola 12. 9. znovu potvrdila A/AAAA mimo Vercel, nginx HTTP 404, neplatný HTTPS hostname a nepřipojenou doménu v aktuálním Vercel týmu; nový `npm run probe:production-domain` tento stav opakovaně kontroluje bez vypsání DNS adres a vždy vrací `authorizesCutover=false`; společný resolver nyní dotazuje A, AAAA a CNAME samostatně, protože DNS `ANY` na této doméně vracelo jen IPv4 a mohlo by vynechat rollback pro IPv6;
 - Preview nemá Luxart ani jiné live runtime secrets a není live stagingem, UAT důkazem ani kandidátem pro release dossier. Externí browser regrese vyžaduje samostatně zadaný očekávaný commit a odmítne chybějící či rozdílný commit, jiný region i obecné `unverified` údaje ještě před přihlášením.
 
 Z toho plyne, že nový Preview lze bezpečně ukázat klientovi jako interaktivní demo, ale nelze jej použít jako stagingový ani produkční důkaz pro pilot. Současná cílová doména zůstává bez schváleného cutoveru nepoužitelná a žádný demo důkaz nesmí vstoupit do release dossieru.

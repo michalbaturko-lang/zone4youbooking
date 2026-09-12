@@ -1,13 +1,21 @@
 import { createHash } from "node:crypto";
 import type { AnyRecord } from "node:dns";
-import { resolveAny } from "node:dns/promises";
+import { resolve4, resolve6, resolveCname } from "node:dns/promises";
 import { existsSync, lstatSync, readFileSync, writeFileSync } from "node:fs";
 import { isIP } from "node:net";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 type Environment = Record<string, string | undefined>;
-type ResolveAnyLike = (hostname: string) => Promise<AnyRecord[]>;
+type ResolveRecordsLike = (hostname: string) => Promise<AnyRecord[]>;
+type ResolveAddressLike = (hostname: string) => Promise<Array<{ address: string; ttl: number }>>;
+type ResolveCnameLike = (hostname: string) => Promise<string[]>;
+
+interface ProductionDnsResolvers {
+  resolve4Impl?: ResolveAddressLike;
+  resolve6Impl?: ResolveAddressLike;
+  resolveCnameImpl?: ResolveCnameLike;
+}
 
 export type ProductionDnsRollbackRecord =
   | { type: "A" | "AAAA"; address: string }
@@ -27,12 +35,42 @@ interface CaptureOptions {
   environment?: Environment;
   now?: Date;
   repositoryRoot?: string;
-  resolveAnyImpl?: ResolveAnyLike;
+  resolveRecordsImpl?: ResolveRecordsLike;
 }
 
 const productionHostname = "booking.zone4you.cz";
 const repositoryRootDefault = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const maximumEvidenceBytes = 64 * 1024;
+
+async function optionalDnsRecords<T>(request: Promise<T[]>): Promise<T[]> {
+  try {
+    return await request;
+  } catch (error) {
+    const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
+    if (code === "ENODATA" || code === "ENOTFOUND") return [];
+    throw error;
+  }
+}
+
+export async function resolveProductionDnsRecords(
+  targetHostname: string,
+  {
+    resolve4Impl = (value) => resolve4(value, { ttl: true }),
+    resolve6Impl = (value) => resolve6(value, { ttl: true }),
+    resolveCnameImpl = resolveCname,
+  }: ProductionDnsResolvers = {},
+): Promise<AnyRecord[]> {
+  const [ipv4, ipv6, cnames] = await Promise.all([
+    optionalDnsRecords(resolve4Impl(targetHostname)),
+    optionalDnsRecords(resolve6Impl(targetHostname)),
+    optionalDnsRecords(resolveCnameImpl(targetHostname)),
+  ]);
+  return [
+    ...ipv4.map(({ address, ttl }) => ({ type: "A" as const, address, ttl })),
+    ...ipv6.map(({ address, ttl }) => ({ type: "AAAA" as const, address, ttl })),
+    ...cnames.map((value) => ({ type: "CNAME" as const, value })),
+  ];
+}
 
 function required(environment: Environment, name: string) {
   const value = environment[name]?.trim();
@@ -196,11 +234,11 @@ export async function captureProductionDomainBaseline({
   environment = process.env,
   now = new Date(),
   repositoryRoot = repositoryRootDefault,
-  resolveAnyImpl = resolveAny,
+  resolveRecordsImpl = resolveProductionDnsRecords,
 }: CaptureOptions = {}) {
   const config = loadProductionDomainBaselineCaptureConfig(environment, repositoryRoot);
   if (!Number.isFinite(now.getTime())) throw new Error("Production DNS baseline time is invalid.");
-  const records = normalizeProductionDnsRecords(await resolveAnyImpl(config.hostname));
+  const records = normalizeProductionDnsRecords(await resolveRecordsImpl(config.hostname));
   const recordSetSha256 = productionDnsRecordSetSha256(records);
   const evidence: ProductionDomainBaselineEvidence = {
     schemaVersion: 1,

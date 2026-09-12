@@ -23,6 +23,7 @@
     "verify:readonly-rollback": "tsx scripts/verify-readonly-rollback.ts",
     "capture:production-domain-baseline": "tsx scripts/capture-production-domain-baseline.ts",
     "verify:production-domain-baseline": "tsx scripts/verify-production-domain-baseline.ts",
+    "probe:production-domain": "tsx scripts/probe-production-domain.ts",
     "verify:production-precutover": "tsx scripts/verify-production-precutover.ts",
     "verify:production-cutover": "tsx scripts/verify-production-cutover.ts",
     "verify:alert-delivery": "tsx scripts/verify-alert-delivery.ts",

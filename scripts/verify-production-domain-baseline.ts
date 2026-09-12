@@ -1,19 +1,19 @@
 import type { AnyRecord } from "node:dns";
-import { resolveAny } from "node:dns/promises";
 import { pathToFileURL } from "node:url";
 import {
   normalizeProductionDnsRecords,
   productionDnsRecordSetSha256,
   readProductionDomainBaselineFile,
+  resolveProductionDnsRecords,
 } from "./capture-production-domain-baseline";
 
 type Environment = Record<string, string | undefined>;
-type ResolveAnyLike = (hostname: string) => Promise<AnyRecord[]>;
+type ResolveRecordsLike = (hostname: string) => Promise<AnyRecord[]>;
 
 interface VerificationOptions {
   environment?: Environment;
   now?: Date;
-  resolveAnyImpl?: ResolveAnyLike;
+  resolveRecordsImpl?: ResolveRecordsLike;
 }
 
 function required(environment: Environment, name: string) {
@@ -25,7 +25,7 @@ function required(environment: Environment, name: string) {
 export async function verifyProductionDomainBaseline({
   environment = process.env,
   now = new Date(),
-  resolveAnyImpl = resolveAny,
+  resolveRecordsImpl = resolveProductionDnsRecords,
 }: VerificationOptions = {}) {
   if (!Number.isFinite(now.getTime())) throw new Error("Production DNS baseline verification time is invalid.");
   const stored = readProductionDomainBaselineFile(
@@ -42,7 +42,7 @@ export async function verifyProductionDomainBaseline({
       `ZONE4YOU_DNS_BASELINE_VERIFY_CONFIRMATION must exactly equal ${expectedConfirmation}.`,
     );
   }
-  const currentRecords = normalizeProductionDnsRecords(await resolveAnyImpl(stored.evidence.hostname));
+  const currentRecords = normalizeProductionDnsRecords(await resolveRecordsImpl(stored.evidence.hostname));
   const currentFingerprint = productionDnsRecordSetSha256(currentRecords);
   if (currentFingerprint !== stored.recordSetSha256) {
     throw new Error(

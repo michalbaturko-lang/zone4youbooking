@@ -6,6 +6,8 @@ import test from "node:test";
 import {
   captureProductionDomainBaseline,
   loadProductionDomainBaselineCaptureConfig,
+  normalizeProductionDnsRecords,
+  resolveProductionDnsRecords,
 } from "../scripts/capture-production-domain-baseline";
 import { verifyProductionDomainBaseline } from "../scripts/verify-production-domain-baseline";
 
@@ -60,7 +62,7 @@ test("DNS rollback capture stores exact records owner-only while the receipt hid
       environment: captureEnvironment(outputPath),
       now,
       repositoryRoot: "/repository",
-      resolveAnyImpl: async () => [...records, records[1]],
+      resolveRecordsImpl: async () => [...records, records[1]],
     });
     assert.equal(receipt.ok, true);
     assert.equal(receipt.recordCount, 2);
@@ -84,7 +86,7 @@ test("DNS rollback verifier stops cutover when the public record set drifted", a
       environment: captureEnvironment(outputPath),
       now,
       repositoryRoot: "/repository",
-      resolveAnyImpl: async () => records,
+      resolveRecordsImpl: async () => records,
     });
     const environment = {
       ZONE4YOU_DNS_BASELINE_EVIDENCE_PATH: outputPath,
@@ -93,14 +95,14 @@ test("DNS rollback verifier stops cutover when the public record set drifted", a
     const verified = await verifyProductionDomainBaseline({
       environment,
       now,
-      resolveAnyImpl: async () => [...records].reverse().map((record) => ({ ...record, ttl: 30 })),
+      resolveRecordsImpl: async () => [...records].reverse().map((record) => ({ ...record, ttl: 30 })),
     });
     assert.equal(verified.unchangedSinceCapture, true);
     await assert.rejects(
       verifyProductionDomainBaseline({
         environment,
         now: new Date("2026-09-12T14:00:01.000Z"),
-        resolveAnyImpl: async () => records,
+        resolveRecordsImpl: async () => records,
       }),
       /no more than 24 hours old/i,
     );
@@ -108,7 +110,7 @@ test("DNS rollback verifier stops cutover when the public record set drifted", a
       verifyProductionDomainBaseline({
         environment,
         now,
-        resolveAnyImpl: async () => [{ type: "A", address: "203.0.113.11", ttl: 30 }],
+        resolveRecordsImpl: async () => [{ type: "A", address: "203.0.113.11", ttl: 30 }],
       }),
       /changed after the rollback baseline/i,
     );
@@ -116,7 +118,7 @@ test("DNS rollback verifier stops cutover when the public record set drifted", a
       verifyProductionDomainBaseline({
         environment: { ...environment, ZONE4YOU_DNS_BASELINE_VERIFY_CONFIRMATION: "YES" },
         now,
-        resolveAnyImpl: async () => records,
+        resolveRecordsImpl: async () => records,
       }),
       /must exactly equal/i,
     );
@@ -140,7 +142,7 @@ test("DNS rollback capture rejects unsafe parent permissions and missing address
         environment: captureEnvironment(outputPath),
         now,
         repositoryRoot: "/repository",
-        resolveAnyImpl: async () => [{ type: "MX", exchange: "mail.example.com", priority: 10 }],
+        resolveRecordsImpl: async () => [{ type: "MX", exchange: "mail.example.com", priority: 10 }],
       }),
       /no A, AAAA or CNAME/i,
     );
@@ -148,4 +150,14 @@ test("DNS rollback capture rejects unsafe parent permissions and missing address
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test("production DNS resolution queries A, AAAA and CNAME explicitly", async () => {
+  const noData = Object.assign(new Error("No data"), { code: "ENODATA" });
+  const resolved = await resolveProductionDnsRecords(hostname, {
+    resolve4Impl: async () => [{ address: "203.0.113.10", ttl: 300 }],
+    resolve6Impl: async () => [{ address: "2001:db8::10", ttl: 300 }],
+    resolveCnameImpl: async () => Promise.reject(noData),
+  });
+  assert.deepEqual(normalizeProductionDnsRecords(resolved), normalizeProductionDnsRecords(records));
 });

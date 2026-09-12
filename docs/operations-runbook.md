@@ -47,6 +47,8 @@ Do schváleného evidence úložiště mimo repozitář uložte nezměněné JSO
 
 ### DNS rollback baseline před cutoverem
 
+Před plánováním změny lze bezpečně spustit `npm run probe:production-domain`. Diagnostika pouze agreguje typy a fingerprint DNS záznamů, ověří přesné HTTP→HTTPS přesměrování, platný HTTPS shell, bezpečnostní hlavičky a `/api/health`; nevypisuje IP adresy, nic nemění a její `authorizesCutover=false` nelze použít jako release důkaz. DNS vrstva dotazuje A, AAAA a CNAME samostatně, aby obecná `ANY` odpověď nemohla vynechat IPv6 nebo alias. Skutečnou autoritu dávají až níže uvedené hashované baseline, dossier, pre-cutover a post-cutover brány.
+
 Oprávněný operátor nejprve vytvoří mimo repozitář adresář s právy `0700` a zachytí přesné veřejné A/AAAA/CNAME záznamy cílové domény. Příkaz nic nemění, existující soubor nepřepíše a na standardní výstup nevypíše adresy:
 
 ```bash

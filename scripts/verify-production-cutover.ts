@@ -1,16 +1,20 @@
 import { createHash } from "node:crypto";
 import type { AnyRecord } from "node:dns";
-import { resolveAny } from "node:dns/promises";
 import { closeSync, constants, fstatSync, openSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { BookingCapabilities, Lesson } from "../src/lib/domain";
 import { zone4YouDateKey, zone4YouScheduleRange, zone4YouTimeZone } from "../src/lib/zone4YouTime";
+import {
+  normalizeProductionDnsRecords,
+  productionDnsRecordSetSha256,
+  resolveProductionDnsRecords,
+  type ProductionDnsRollbackRecord,
+} from "./capture-production-domain-baseline";
 
 type Environment = Record<string, string | undefined>;
 type FetchLike = typeof fetch;
-type DnsRecord = AnyRecord;
-type ResolveAnyLike = (hostname: string) => Promise<DnsRecord[]>;
+type ResolveAnyLike = (hostname: string) => Promise<AnyRecord[]>;
 
 const productionOrigin = "https://booking.zone4you.cz";
 
@@ -400,19 +404,20 @@ export async function runProductionCutoverVerification(
   dependencies: ProductionCutoverDependencies = {},
 ) {
   const fetchImpl = dependencies.fetchImpl ?? fetch;
-  const resolveAnyImpl = dependencies.resolveAnyImpl ?? resolveAny;
+  const resolveAnyImpl = dependencies.resolveAnyImpl ?? resolveProductionDnsRecords;
   const now = dependencies.now ?? (() => new Date());
   const startedAt = Date.now();
   const checkedAt = now();
   if (Number.isNaN(checkedAt.getTime())) throw new Error("Production verification time is invalid.");
   const range = zone4YouScheduleRange(checkedAt, 7);
 
-  let dnsRecords: DnsRecord[];
+  let unresolvedDnsRecords: AnyRecord[];
   try {
-    dnsRecords = await resolveAnyImpl(config.target.hostname);
+    unresolvedDnsRecords = await resolveAnyImpl(config.target.hostname);
   } catch {
     throw new Error("Production hostname DNS could not be resolved.");
   }
+  const dnsRecords: ProductionDnsRollbackRecord[] = normalizeProductionDnsRecords(unresolvedDnsRecords);
   const dnsTypes = [...new Set(
     dnsRecords
       .map((record) => typeof record.type === "string" ? record.type.toUpperCase() : "")
@@ -421,9 +426,7 @@ export async function runProductionCutoverVerification(
   if (dnsRecords.length === 0 || !dnsTypes.some((type) => ["A", "AAAA", "CNAME"].includes(type))) {
     throw new Error("Production hostname has no A, AAAA or CNAME DNS answer.");
   }
-  const dnsFingerprintSha256 = createHash("sha256")
-    .update(dnsRecords.map(stableJson).sort().join("\n"), "utf8")
-    .digest("hex");
+  const dnsFingerprintSha256 = productionDnsRecordSetSha256(dnsRecords);
 
   const home = await fetchImpl(config.target, {
     redirect: "error",
