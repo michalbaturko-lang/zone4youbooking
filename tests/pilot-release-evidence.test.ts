@@ -863,7 +863,17 @@ test("pilot release approvals cannot predate their evidence or the final cutover
 });
 
 test("pilot release approvals reject placeholder and unsafe approver identities", () => {
-  for (const approvedBy of ["TBD", "unknown", "N/A", "pending-human-approval", "Release\u0000owner"]) {
+  for (const approvedBy of [
+    "TBD",
+    "unknown",
+    "N/A",
+    "pending-human-approval",
+    "replace-with-authorized-role",
+    "replace-with-support-owner",
+    "replace-with-luxart-or-zone4you-owner",
+    "replace-with-authorized-release-owner",
+    "Release\u0000owner",
+  ]) {
     const fixture = validFixture();
     const dossier = structuredClone(fixture.dossier);
     dossier.approvals.cutover.approvedBy = approvedBy;

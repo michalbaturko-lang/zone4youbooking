@@ -92,7 +92,13 @@ test("launch gate does not infer active Luxart email templates from provider own
 });
 
 test("launch gate rejects placeholder alert owners", () => {
-  for (const supportOwner of ["TBD", "unknown", "N/A", "pending-human-approval"]) {
+  for (const supportOwner of [
+    "TBD",
+    "unknown",
+    "N/A",
+    "pending-human-approval",
+    "replace-with-support-owner",
+  ]) {
     const result = runLaunchCheck("booking_without_payments", "false", {
       ZONE4YOU_ALERT_DELIVERY_CONFIRMED: "true",
       ZONE4YOU_ALERT_SUPPORT_OWNER: supportOwner,

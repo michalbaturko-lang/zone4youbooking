@@ -31,7 +31,13 @@ test("alert test configuration requires HTTPS, an owner and exact target fingerp
     () => loadAlertDeliveryConfig({ ...baseEnvironment, ZONE4YOU_ALERT_SUPPORT_OWNER: "" }),
     /required/i,
   );
-  for (const placeholder of ["TBD", "unknown", "N/A", "pending-human-approval"]) {
+  for (const placeholder of [
+    "TBD",
+    "unknown",
+    "N/A",
+    "pending-human-approval",
+    "replace-with-support-owner",
+  ]) {
     assert.throws(
       () => loadAlertDeliveryConfig({ ...baseEnvironment, ZONE4YOU_ALERT_SUPPORT_OWNER: placeholder }),
       /actual support person or operational role/i,

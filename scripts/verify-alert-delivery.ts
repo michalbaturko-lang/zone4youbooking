@@ -46,7 +46,7 @@ function operationalOwner(rawValue: string, name: string) {
     .replace(/[_./-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  if (placeholderSupportOwners.has(normalized)) {
+  if (placeholderSupportOwners.has(normalized) || normalized.startsWith("replace with ")) {
     throw new Error(`${name} must identify the actual support person or operational role.`);
   }
   return rawValue;

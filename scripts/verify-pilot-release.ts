@@ -77,7 +77,7 @@ function approvalIdentity(value: unknown, label: string) {
     .replace(/[_./-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  if (placeholderApprovalIdentities.has(normalized)) {
+  if (placeholderApprovalIdentities.has(normalized) || normalized.startsWith("replace with ")) {
     throw new Error(`${label} must identify the actual approving person or operational role.`);
   }
   return identity;

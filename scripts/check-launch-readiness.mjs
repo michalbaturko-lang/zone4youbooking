@@ -101,7 +101,7 @@ function validOperationalOwner(value) {
     .replace(/[_./-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  return !placeholderOperationalOwners.has(normalized);
+  return !placeholderOperationalOwners.has(normalized) && !normalized.startsWith("replace with ");
 }
 
 function validHttpsUrl(value) {

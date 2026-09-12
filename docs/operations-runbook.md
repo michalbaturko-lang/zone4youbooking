@@ -48,7 +48,7 @@ Do schváleného evidence úložiště mimo repozitář uložte nezměněné JSO
 
 `npm run check:launch` kontroluje nejen přítomnost runbooku a UAT checklistu, ale i přesné zapojení všech výše uvedených producentů důkazů, ověření DNS baseline, přípravy a validace dossieru a pre/post-cutover brány v `package.json`. Přejmenovaný, odpojený nebo chybějící příkaz proto nesmí projít jako kompletní operační řetězec.
 
-Všech pět položek `approvals.*.approvedBy` a `ZONE4YOU_ALERT_SUPPORT_OWNER` musí uvádět skutečnou osobu nebo konkrétní provozní roli. Placeholdery jako `TBD`, `unknown`, `N/A`, `pending-human-approval` nebo hodnoty s řídicími znaky launch brána odmítne.
+Všech pět položek `approvals.*.approvedBy` a `ZONE4YOU_ALERT_SUPPORT_OWNER` musí uvádět skutečnou osobu nebo konkrétní provozní roli. Placeholdery jako `TBD`, `unknown`, `N/A`, `pending-human-approval`, všechny šablonové hodnoty začínající `replace-with-` nebo hodnoty s řídicími znaky launch brána odmítne.
 
 ### DNS rollback baseline před cutoverem
 
