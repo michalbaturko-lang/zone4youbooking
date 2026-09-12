@@ -55,6 +55,8 @@ test("Luxart Help probe sends no authentication data and recognizes the document
 
   assert.equal(result.ok, true);
   assert.equal(result.classification, "ready");
+  assert.equal(result.launchAuthority, false);
+  assert.equal(result.credentialsAuthorized, false);
   assert.equal(observedUrl, secureEnvironment.LUXART_HELP_URL);
   assert.equal(observedInit?.method, "GET");
   assert.equal(observedInit?.redirect, "manual");
@@ -81,6 +83,77 @@ test("Luxart Help probe distinguishes auth, redirects and non-document responses
   });
   assert.equal(unexpected.ok, false);
   assert.equal(unexpected.classification, "unexpected_response");
+});
+
+test("Luxart Help probe identifies a SOAP/WCF service without following exposed config links", async () => {
+  const observed: Array<{ url: URL; init?: RequestInit }> = [];
+  const result = await runLuxartHelpProbe({
+    environment: {
+      LUXART_HELP_URL: "http://api.memberzone.example:9191/Help",
+      LUXART_EXPECTED_PORT: "9191",
+      LUXART_ALLOW_INSECURE_TEST_HTTP: "true",
+    },
+    now: new Date("2026-09-12T16:00:00.000Z"),
+    fetchImpl: async (url, init) => {
+      observed.push({ url, init });
+      if (url.pathname === "/Help") return new Response("Not found", { status: 404 });
+      if (url.pathname === "/") {
+        return new Response(
+          '<html><title>api.memberzone.example - /</title><a href="/Web.config">Web.config</a></html>',
+          { status: 200 },
+        );
+      }
+      if (url.pathname === "/Service1.svc" && url.search === "?wsdl") {
+        return new Response(
+          '<wsdl:definitions><wsdl:operation name="SetReservation"/></wsdl:definitions>',
+          { status: 200 },
+        );
+      }
+      throw new Error(`Unexpected public diagnostic path: ${url.pathname}`);
+    },
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.classification, "soap_wcf_not_rest");
+  assert.equal(result.candidateContract, "soap_wcf");
+  assert.equal(result.directoryBrowsingDetected, true);
+  assert.equal(result.launchAuthority, false);
+  assert.equal(result.credentialsAuthorized, false);
+  assert.deepEqual(
+    observed.map(({ url }) => `${url.pathname}${url.search}`).sort(),
+    ["/", "/Help", "/Service1.svc?wsdl"],
+  );
+  for (const request of observed) {
+    assert.equal(request.init?.method, "GET");
+    assert.equal(request.init?.redirect, "manual");
+    const headers = new Headers(request.init?.headers);
+    assert.equal(headers.has("authorization"), false);
+    assert.equal(headers.has("cookie"), false);
+  }
+  assert.equal(observed.some(({ url }) => /Web\.config|App_Data|\/bin\//i.test(url.href)), false);
+  assert.equal(JSON.stringify(result).includes("api.memberzone.example"), false);
+});
+
+test("Luxart Help probe reports public directory listing as a non-REST security observation", async () => {
+  const result = await runLuxartHelpProbe({
+    environment: secureEnvironment,
+    fetchImpl: async (url) => {
+      if (url.pathname === "/Help") return new Response("Not found", { status: 404 });
+      if (url.pathname === "/") {
+        return new Response(
+          '<html><title>luxart-zone4you.example.com - /</title><a href="/bin/">bin</a></html>',
+          { status: 200 },
+        );
+      }
+      return new Response("Not found", { status: 404 });
+    },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.classification, "directory_listing_detected");
+  assert.equal(result.candidateContract, "unknown");
+  assert.equal(result.directoryBrowsingDetected, true);
+  assert.equal(result.launchAuthority, false);
+  assert.equal(result.credentialsAuthorized, false);
 });
 
 test("Luxart Help probe reports network failure without echoing the endpoint", async () => {

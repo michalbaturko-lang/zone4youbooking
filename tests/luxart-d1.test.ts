@@ -350,6 +350,51 @@ test("D1 rejects an unavailable Help path before the authenticated read-only req
   }
 });
 
+test("D1 rejects a detected SOAP/WCF candidate before credentials or authenticated reads", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "zone4you-d1-"));
+  try {
+    const outputPath = join(directory, "luxart.json");
+    let readonlyCalls = 0;
+    await assert.rejects(
+      runLuxartD1Verification({
+        environment: environment(outputPath),
+        now,
+        repositoryRoot: "/repository",
+        gatewayVerifier: () => ({
+          ok: true,
+          checkedAt: now.toISOString(),
+          gatewayAuthMode: "none",
+          authorizationHeaderConfigured: false,
+          gatewayDecisionConfirmed: true,
+        }),
+        helpProbe: async () => ({
+          ok: false,
+          checkedAt: now.toISOString(),
+          targetFingerprintSha256: approvedOriginFingerprint,
+          transport: "https",
+          port: "9443",
+          reached: true,
+          httpStatus: 404,
+          classification: "soap_wcf_not_rest",
+          candidateContract: "soap_wcf",
+          directoryBrowsingDetected: true,
+          launchAuthority: false,
+          credentialsAuthorized: false,
+        }),
+        readonlyVerifier: async () => {
+          readonlyCalls += 1;
+          return readonlyEvidence();
+        },
+      }),
+      /did not pass safely \(soap_wcf_not_rest\)/i,
+    );
+    assert.equal(readonlyCalls, 0);
+    assert.equal(existsSync(outputPath), false);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("D1 accepts an authentication challenge only when a non-empty gateway mode was confirmed", async () => {
   const directory = mkdtempSync(join(tmpdir(), "zone4you-d1-"));
   try {

@@ -91,4 +91,5 @@ Read-only test se nespouští, pokud chybí síťová cesta, gateway režim, pot
 - Deployment: vždy `NEAUTORIZOVÁN`, dokud nevznikne samostatné schválení
 - DNS/cutover: vždy `NEAUTORIZOVÁN`, dokud nevznikne samostatné schválení
 - Nejbližší bezpečný krok: získat od IT přesný veřejný hostname/IP, celé HTTPS URL a potvrzení, že port `9191` směruje na interní REST port `9759` a testovací databázi Zone4You. Poté se spustí pouze neautentizovaný `npm run probe:luxart-help`; klientské přihlašovací údaje se použijí až po bezpečném transportním a gateway důkazu. Endpoint monitor je aktivní každé dvě hodiny a zůstává tichý, dokud se stav významně nezmění.
+- Help probe při chybějícím REST `/Help` bezpečně načte pouze veřejný kořen a `/Service1.svc?wsdl`. Rozliší SOAP/WCF službu a veřejný directory listing, ale nikdy nenásleduje odkazy na konfiguraci, neposílá cookie ani Authorization a v každém takovém případě vrátí `NO-GO`; ani nalezená REST dokumentace sama nepovoluje credentials nebo launch.
 - Chybějící položky a vlastník: veřejná adresa/překlad/HTTPS/test DB/auth — Zone4You IT; endpoint semantics a notifikace — Luxart; mutační UAT a pravidla — Zone4You + Luxart.

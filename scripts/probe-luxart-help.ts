@@ -8,8 +8,27 @@ export type LuxartHelpProbeClassification =
   | "ready"
   | "authentication_required"
   | "redirect_rejected"
+  | "soap_wcf_not_rest"
+  | "directory_listing_detected"
   | "unexpected_response"
   | "network_unavailable";
+
+export interface LuxartHelpProbeResult {
+  ok: boolean;
+  checkedAt: string;
+  targetFingerprintSha256: string;
+  transport: "https" | "approved_test_http";
+  port: string;
+  reached: boolean;
+  classification: LuxartHelpProbeClassification;
+  launchAuthority?: false;
+  credentialsAuthorized?: false;
+  httpStatus?: number;
+  bodySha256?: string;
+  networkCode?: string;
+  candidateContract?: "soap_wcf" | "unknown";
+  directoryBrowsingDetected?: boolean;
+}
 
 interface LuxartHelpProbeOptions {
   environment?: Environment;
@@ -69,6 +88,7 @@ export function loadLuxartHelpProbeConfiguration(environment: Environment = proc
 async function readLimitedText(response: Response) {
   const rawLength = response.headers.get("content-length");
   if (rawLength && Number(rawLength) > maximumHelpBodyBytes) {
+    await response.body?.cancel().catch(() => undefined);
     throw new Error("Luxart Help response is unexpectedly large.");
   }
   if (!response.body) return "";
@@ -91,6 +111,62 @@ async function readLimitedText(response: Response) {
   }
 }
 
+async function readPublicCandidateDocument(
+  url: URL,
+  fetchImpl: FetchLike,
+  signal: AbortSignal,
+) {
+  try {
+    const response = await fetchImpl(url, {
+      method: "GET",
+      redirect: "manual",
+      cache: "no-store",
+      headers: { Accept: "text/html,application/wsdl+xml,application/xml,text/xml" },
+      signal,
+    });
+    if (response.status !== 200) {
+      await response.body?.cancel().catch(() => undefined);
+      return undefined;
+    }
+    return await readLimitedText(response);
+  } catch {
+    return undefined;
+  }
+}
+
+async function diagnoseUnexpectedCandidate(
+  helpUrl: URL,
+  fetchImpl: FetchLike,
+  signal: AbortSignal,
+) {
+  const rootUrl = new URL("/", helpUrl.origin);
+  const wsdlUrl = new URL("/Service1.svc?wsdl", helpUrl.origin);
+  const [root, wsdl] = await Promise.all([
+    readPublicCandidateDocument(rootUrl, fetchImpl, signal),
+    readPublicCandidateDocument(wsdlUrl, fetchImpl, signal),
+  ]);
+  const directoryBrowsingDetected = Boolean(
+    root &&
+    /<title>[^<]*\s-\s\/\s*<\/title>/i.test(root) &&
+    /href=["']\/(?:Web\.config|bin\/|App_Data\/)/i.test(root),
+  );
+  const soapWcfDetected = Boolean(
+    wsdl &&
+    /<(?:wsdl:)?definitions\b/i.test(wsdl) &&
+    /<(?:wsdl:)?operation\b[^>]*\bname=["'][^"']+["']/i.test(wsdl),
+  );
+
+  return {
+    classification: soapWcfDetected
+      ? "soap_wcf_not_rest" as const
+      : directoryBrowsingDetected
+        ? "directory_listing_detected" as const
+        : "unexpected_response" as const,
+    candidateContract: soapWcfDetected ? "soap_wcf" as const : "unknown" as const,
+    directoryBrowsingDetected,
+  };
+}
+
 function safeNetworkCode(error: unknown) {
   if (error instanceof DOMException && error.name === "AbortError") return "TIMEOUT";
   if (error && typeof error === "object" && "cause" in error) {
@@ -106,7 +182,7 @@ export async function runLuxartHelpProbe({
   environment = process.env,
   fetchImpl = fetch,
   now = new Date(),
-}: LuxartHelpProbeOptions = {}) {
+}: LuxartHelpProbeOptions = {}): Promise<LuxartHelpProbeResult> {
   const configuration = loadLuxartHelpProbeConfiguration(environment);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), configuration.timeoutMs);
@@ -124,6 +200,8 @@ export async function runLuxartHelpProbe({
       targetFingerprintSha256: configuration.targetFingerprintSha256,
       transport: configuration.transport,
       port: configuration.port,
+      launchAuthority: false as const,
+      credentialsAuthorized: false as const,
       reached: true,
       httpStatus: response.status,
     };
@@ -135,16 +213,22 @@ export async function runLuxartHelpProbe({
       return { ...base, ok: false, classification: "redirect_rejected" as const };
     }
     if (response.status !== 200) {
-      return { ...base, ok: false, classification: "unexpected_response" as const };
+      await response.body?.cancel().catch(() => undefined);
+      const candidate = await diagnoseUnexpectedCandidate(configuration.helpUrl, fetchImpl, controller.signal);
+      return { ...base, ...candidate, ok: false };
     }
 
     const body = await readLimitedText(response);
     const looksLikeLuxartHelp = /<title>\s*API dokumentace\s*<\/title>/i.test(body) ||
       (/\/Help\/Api\//i.test(body) && /api\/(?:Lesson|Login|Reservations)/i.test(body));
+    if (!looksLikeLuxartHelp) {
+      const candidate = await diagnoseUnexpectedCandidate(configuration.helpUrl, fetchImpl, controller.signal);
+      return { ...base, ...candidate, ok: false };
+    }
     return {
       ...base,
-      ok: looksLikeLuxartHelp,
-      classification: looksLikeLuxartHelp ? "ready" as const : "unexpected_response" as const,
+      ok: true,
+      classification: "ready" as const,
       bodySha256: createHash("sha256").update(body).digest("hex"),
     };
   } catch (error) {
@@ -154,6 +238,8 @@ export async function runLuxartHelpProbe({
       targetFingerprintSha256: configuration.targetFingerprintSha256,
       transport: configuration.transport,
       port: configuration.port,
+      launchAuthority: false as const,
+      credentialsAuthorized: false as const,
       reached: false,
       classification: "network_unavailable" as const,
       networkCode: safeNetworkCode(error),
