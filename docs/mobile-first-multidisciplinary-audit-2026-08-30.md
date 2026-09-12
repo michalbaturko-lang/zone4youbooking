@@ -52,7 +52,7 @@ Datový model Reformeru už není omezený na „stejné jako skupinová lekce�
 | Odolnost | zelená lokálně | fail-closed capabilities, persistentní outage stav, correlation ID, žádné slepé opakování nejisté mutace | staging outage test a skutečný rollback do 5 minut |
 | Recepce/support | červená | UI odkazuje na recepci, ale není určen vlastník, kanál, služba ani reakční doba | jméno/on-call kontakt, postup eskalace a školení |
 | Release/DNS | červená | cílová doména stále míří na cizí nginx, HTTPS hostname nesedí, Vercel nemá runtime konfiguraci | IT odpověď, vlastník DNS, staging deploy, certifikát a cutover approval |
-| Výkon | zelená v izolovaném mobilním labu, produkční p75 otevřeno | ověřený Preview: Lighthouse výkon 95/100, LCP 2,408 s, CLS 0, přenos 164 KiB; INP v laboratorním běhu nebylo dostupné | zopakovat na stagingu a získat field/UAT důkaz pro INP a produkční p75 |
+| Výkon | zelená v izolovaném mobilním labu, produkční p75 otevřeno | přesný Preview `ca5c085`: Lighthouse výkon 97/100, LCP 2,344 s, TBT 2 ms, CLS 0, přenos 168 051 B; INP v laboratorním běhu nebylo dostupné | zopakovat na stagingu a získat field/UAT důkaz pro INP a produkční p75 |
 
 ## 4. Mobile-first browser evidence
 
@@ -66,7 +66,7 @@ Datový model Reformeru už není omezený na „stejné jako skupinová lekce�
 
 Horizontálně posuvné řady dnů a filtrů jsou záměrné lokální scrolly; dokument samotný se horizontálně neposouvá. Na 320 px je po optimalizaci vidět začátek první lekce nad pevnou spodní navigací. Na landscape je po opravě horní hrana tabulky přibližně 255 px, tedy uvnitř 390px viewportu.
 
-Veřejný Preview přesného commitu `d10e9e048168cf6a1001f50bdc6940c320b9d6b2` prošel 12. 9. 2026 všemi 20/20 nízkoobjemovými browser scénáři v pěti viewpor-tech; 5 nevhodných opakovaných variant bylo záměrně přeskočeno kvůli produkčně tvarovanému login rate limitu. Mobilní Lighthouse běh naměřil výkon 95/100, přístupnost 100/100, FCP 1,645 s, LCP 2,408 s, TBT 103 ms, CLS 0 a přenos 168 047 B. Automatický audit nenašel nesoulad viditelného a přístupného názvu loga a ikona aplikace odpověděla `200 image/svg+xml`. Jediná konzolová hláška patřila Vercel Preview toolbaru, jehož cizí skript správně zablokovala CSP; politika se kvůli němu neuvolňuje. Jde o izolované laboratorní měření, ne produkční p75. P2 zůstává otevřené, protože Lighthouse bez uživatelské interakce INP neposkytl.
+Veřejný Preview přesného commitu `ca5c085ed7a820ecb78c678a1ab6c661a8d81f46` prošel 12. 9. 2026 všemi 20/20 nízkoobjemovými browser scénáři v pěti viewpor-tech; 5 nevhodných opakovaných variant bylo záměrně přeskočeno kvůli produkčně tvarovanému login rate limitu. Mobilní Lighthouse běh nad stejným Preview naměřil výkon 97/100, přístupnost 100/100, FCP 1,581 s, LCP 2,344 s, TBT 2 ms, CLS 0 a přenos 168 051 B. Best Practices 92/100 snižuje pouze Vercel Preview toolbar, jehož cizí skript správně zablokovala CSP; politika se kvůli němu neuvolňuje. SEO 60/100 je záměrné, protože izolovaný náhled posílá `X-Robots-Tag: noindex`. Jde o laboratorní měření, ne produkční p75. P2 zůstává otevřené, protože Lighthouse bez uživatelské interakce INP neposkytl.
 
 ## 5. Eval kritéria a launch gate
 
