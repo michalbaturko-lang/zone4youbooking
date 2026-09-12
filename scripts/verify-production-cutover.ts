@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
 import type { AnyRecord } from "node:dns";
-import { closeSync, constants, fstatSync, openSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { BookingCapabilities, Lesson } from "../src/lib/domain";
@@ -11,6 +10,7 @@ import {
   resolveProductionDnsRecords,
   type ProductionDnsRollbackRecord,
 } from "./capture-production-domain-baseline";
+import { readStableReleaseJson } from "./release-evidence-file";
 
 type Environment = Record<string, string | undefined>;
 type FetchLike = typeof fetch;
@@ -117,39 +117,12 @@ export function loadProductionCutoverConfig(
   if (Number.isNaN(now.getTime())) throw new Error("Production cutover configuration time is invalid.");
 
   const evidencePath = resolve(required(environment, "ZONE4YOU_PRECUTOVER_EVIDENCE_PATH"));
-  let evidenceBody: Buffer;
-  let evidenceDescriptor: number;
-  try {
-    evidenceDescriptor = openSync(evidencePath, constants.O_RDONLY | constants.O_NOFOLLOW);
-  } catch {
-    throw new Error("Pre-cutover evidence must be an existing regular non-symlink file.");
-  }
-  try {
-    const evidenceStats = fstatSync(evidenceDescriptor);
-    if (!evidenceStats.isFile()) {
-      throw new Error("Pre-cutover evidence must be a regular non-symlink file.");
-    }
-    if ((evidenceStats.mode & 0o077) !== 0) {
-      throw new Error("Pre-cutover evidence file permissions must be owner-only.");
-    }
-    if (evidenceStats.size <= 0 || evidenceStats.size > 256 * 1024) {
-      throw new Error("Pre-cutover evidence file must contain at most 256 KiB.");
-    }
-    evidenceBody = readFileSync(evidenceDescriptor);
-    if (evidenceBody.length !== evidenceStats.size) {
-      throw new Error("Pre-cutover evidence changed while it was being read.");
-    }
-  } finally {
-    closeSync(evidenceDescriptor);
-  }
-
-  const preCutoverEvidenceSha256 = createHash("sha256").update(evidenceBody).digest("hex");
-  let parsedReceipt: unknown;
-  try {
-    parsedReceipt = JSON.parse(evidenceBody.toString("utf8"));
-  } catch {
-    throw new Error("Pre-cutover evidence is not valid JSON.");
-  }
+  const loadedReceipt = readStableReleaseJson(evidencePath, "Pre-cutover evidence", {
+    maximumBytes: 256 * 1024,
+    ownerOnly: true,
+  });
+  const preCutoverEvidenceSha256 = loadedReceipt.sha256;
+  const parsedReceipt = loadedReceipt.data;
   if (!parsedReceipt || typeof parsedReceipt !== "object" || Array.isArray(parsedReceipt)) {
     throw new Error("Pre-cutover evidence is not a JSON object.");
   }

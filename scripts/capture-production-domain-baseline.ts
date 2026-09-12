@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
 import type { AnyRecord } from "node:dns";
 import { resolve4, resolve6, resolveCname } from "node:dns/promises";
-import { existsSync, lstatSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, writeFileSync } from "node:fs";
 import { isIP } from "node:net";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { readStableReleaseJson } from "./release-evidence-file";
 
 type Environment = Record<string, string | undefined>;
 type ResolveRecordsLike = (hostname: string) => Promise<AnyRecord[]>;
@@ -206,27 +207,14 @@ export function validateProductionDomainBaselineEvidence(value: unknown) {
 
 export function readProductionDomainBaselineFile(path: string) {
   const absolutePath = resolve(path);
-  const stat = lstatSync(absolutePath);
-  if (!stat.isFile() || stat.isSymbolicLink()) {
-    throw new Error("Production DNS baseline must be a regular file, not a symlink.");
-  }
-  if ((stat.mode & 0o077) !== 0) {
-    throw new Error("Production DNS baseline must not be accessible by group or other users.");
-  }
-  if (stat.size < 2 || stat.size > maximumEvidenceBytes) {
-    throw new Error(`Production DNS baseline must contain between 2 and ${maximumEvidenceBytes} bytes.`);
-  }
-  const bytes = readFileSync(absolutePath);
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(bytes.toString("utf8"));
-  } catch {
-    throw new Error("Production DNS baseline is not valid JSON.");
-  }
+  const loaded = readStableReleaseJson(absolutePath, "Production DNS baseline", {
+    maximumBytes: maximumEvidenceBytes,
+    ownerOnly: true,
+  });
   return {
-    ...validateProductionDomainBaselineEvidence(parsed),
+    ...validateProductionDomainBaselineEvidence(loaded.data),
     path: absolutePath,
-    fileSha256: createHash("sha256").update(bytes).digest("hex"),
+    fileSha256: loaded.sha256,
   };
 }
 
@@ -252,6 +240,9 @@ export async function captureProductionDomainBaseline({
   const body = `${JSON.stringify(evidence, null, 2)}\n`;
   writeFileSync(config.outputPath, body, { encoding: "utf8", flag: "wx", mode: 0o600 });
   const stored = readProductionDomainBaselineFile(config.outputPath);
+  if (stored.fileSha256 !== createHash("sha256").update(body, "utf8").digest("hex")) {
+    throw new Error("Production DNS baseline changed while it was being stored.");
+  }
   if ((lstatSync(config.outputPath).mode & 0o777) !== 0o600) {
     throw new Error("Production DNS baseline file permissions are not owner-only.");
   }

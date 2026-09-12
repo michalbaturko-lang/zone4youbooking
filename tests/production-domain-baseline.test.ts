@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, lstatSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -7,6 +7,7 @@ import {
   captureProductionDomainBaseline,
   loadProductionDomainBaselineCaptureConfig,
   normalizeProductionDnsRecords,
+  readProductionDomainBaselineFile,
   resolveProductionDnsRecords,
 } from "../scripts/capture-production-domain-baseline";
 import { verifyProductionDomainBaseline } from "../scripts/verify-production-domain-baseline";
@@ -121,6 +122,35 @@ test("DNS rollback verifier stops cutover when the public record set drifted", a
         resolveRecordsImpl: async () => records,
       }),
       /must exactly equal/i,
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("DNS rollback evidence reader rejects links and non-owner-only files", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "zone4you-dns-baseline-"));
+  try {
+    const outputPath = join(directory, "baseline.json");
+    await captureProductionDomainBaseline({
+      environment: captureEnvironment(outputPath),
+      now,
+      repositoryRoot: "/repository",
+      resolveRecordsImpl: async () => records,
+    });
+
+    chmodSync(outputPath, 0o640);
+    assert.throws(
+      () => readProductionDomainBaselineFile(outputPath),
+      /must not be accessible by group or other users/i,
+    );
+
+    chmodSync(outputPath, 0o600);
+    const linkPath = join(directory, "baseline-link.json");
+    symlinkSync(outputPath, linkPath);
+    assert.throws(
+      () => readProductionDomainBaselineFile(linkPath),
+      /not a symlink/i,
     );
   } finally {
     rmSync(directory, { recursive: true, force: true });

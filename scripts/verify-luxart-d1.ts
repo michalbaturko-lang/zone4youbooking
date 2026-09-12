@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { runLuxartHelpProbe } from "./probe-luxart-help";
@@ -12,6 +12,7 @@ import {
 } from "./verify-luxart-public-contract";
 import { assertSupportedLuxartApiContract } from "../src/lib/luxartApiContract";
 import { loadLuxartGatewayAuthConfig } from "../src/lib/luxartGatewayAuth";
+import { readStableReleaseJson } from "./release-evidence-file";
 
 type Environment = Record<string, string | undefined>;
 type HelpEvidence = Awaited<ReturnType<typeof runLuxartHelpProbe>>;
@@ -257,7 +258,13 @@ export async function runLuxartD1Verification({
   };
   const body = `${JSON.stringify(d1Evidence, null, 2)}\n`;
   writeFileSync(configuration.outputPath, body, { encoding: "utf8", flag: "wx", mode: 0o600 });
-  const storedBytes = readFileSync(configuration.outputPath);
+  const stored = readStableReleaseJson(configuration.outputPath, "Luxart evidence", {
+    maximumBytes: 256 * 1024,
+    ownerOnly: true,
+  });
+  if (!stored.bytes.equals(Buffer.from(body, "utf8"))) {
+    throw new Error("Luxart evidence changed while it was being stored.");
+  }
   const storedMode = lstatSync(configuration.outputPath).mode & 0o777;
   if (storedMode !== 0o600) {
     throw new Error("Luxart evidence file permissions are not owner-only.");
@@ -281,7 +288,7 @@ export async function runLuxartD1Verification({
     eligibleLessonCount: evidence.personalized.czech.eligible,
     ineligibleLessonCount: evidence.personalized.czech.ineligible,
     personalizedLessonSetMatched: true,
-    evidenceSha256: createHash("sha256").update(storedBytes).digest("hex"),
+    evidenceSha256: stored.sha256,
     evidenceStoredOwnerOnly: true,
   };
 }

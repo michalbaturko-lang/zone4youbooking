@@ -196,7 +196,7 @@ test("production cutover configuration rejects stale, mismatched or weakly prote
       ZONE4YOU_PRECUTOVER_EVIDENCE_PATH: insecure.path,
       ZONE4YOU_PRODUCTION_CUTOVER_CONFIRMATION: `VERIFY_ZONE4YOU_PRODUCTION_CUTOVER:${insecure.sha256}`,
     }, checkedAt),
-    /permissions must be owner-only/i,
+    /must not be accessible by group or other users/i,
   );
 
   const symlinkPath = join(fixtureDirectory, "precutover-link.json");
@@ -206,7 +206,7 @@ test("production cutover configuration rejects stale, mismatched or weakly prote
       ...baseEnvironment,
       ZONE4YOU_PRECUTOVER_EVIDENCE_PATH: symlinkPath,
     }, checkedAt),
-    /non-symlink/i,
+    /not a symlink/i,
   );
 });
 

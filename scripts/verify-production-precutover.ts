@@ -1,9 +1,9 @@
-import { createHash } from "node:crypto";
-import { existsSync, lstatSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { verifyPilotReleaseEvidence } from "./verify-pilot-release";
 import { verifyProductionDomainBaseline } from "./verify-production-domain-baseline";
+import { readStableReleaseJson } from "./release-evidence-file";
 
 type Environment = Record<string, string | undefined>;
 type ReleaseEvidence = ReturnType<typeof verifyPilotReleaseEvidence>;
@@ -132,13 +132,19 @@ export async function writeProductionPreCutoverEvidence(options: PreCutoverWrite
   const evidence = await verifyProductionPreCutover(options);
   const body = `${JSON.stringify(evidence, null, 2)}\n`;
   writeFileSync(outputPath, body, { encoding: "utf8", flag: "wx", mode: 0o600 });
-  const stored = readFileSync(outputPath);
+  const stored = readStableReleaseJson(outputPath, "Pre-cutover evidence", {
+    maximumBytes: 256 * 1024,
+    ownerOnly: true,
+  });
+  if (!stored.bytes.equals(Buffer.from(body, "utf8"))) {
+    throw new Error("Pre-cutover evidence changed while it was being stored.");
+  }
   if ((lstatSync(outputPath).mode & 0o777) !== 0o600) {
     throw new Error("Pre-cutover evidence file permissions are not owner-only.");
   }
   return {
     ...evidence,
-    evidenceSha256: createHash("sha256").update(stored).digest("hex"),
+    evidenceSha256: stored.sha256,
     evidenceStoredOwnerOnly: true,
   };
 }

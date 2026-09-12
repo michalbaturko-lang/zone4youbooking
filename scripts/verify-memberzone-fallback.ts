@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { readStableReleaseJson } from "./release-evidence-file";
 
 type Environment = Record<string, string | undefined>;
 type FetchLike = (input: URL, init?: RequestInit) => Promise<Response>;
@@ -134,7 +135,13 @@ export async function verifyMemberzoneFallback({
   } as const;
   const serialized = `${JSON.stringify(evidence, null, 2)}\n`;
   writeFileSync(outputPath, serialized, { encoding: "utf8", flag: "wx", mode: 0o600 });
-  const storedBytes = readFileSync(outputPath);
+  const stored = readStableReleaseJson(outputPath, "Memberzone fallback evidence", {
+    maximumBytes: 256 * 1024,
+    ownerOnly: true,
+  });
+  if (!stored.bytes.equals(Buffer.from(serialized, "utf8"))) {
+    throw new Error("Memberzone fallback evidence changed while it was being stored.");
+  }
   if ((lstatSync(outputPath).mode & 0o777) !== 0o600) {
     throw new Error("Memberzone fallback evidence file permissions are not owner-only.");
   }
@@ -148,7 +155,7 @@ export async function verifyMemberzoneFallback({
     schedulerDetected: true,
     nonEmptyScheduleDetected: true,
     reformerDetected: true,
-    evidenceSha256: createHash("sha256").update(storedBytes).digest("hex"),
+    evidenceSha256: stored.sha256,
     evidenceStoredOwnerOnly: true,
   } as const;
 }
