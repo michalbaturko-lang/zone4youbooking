@@ -18,6 +18,11 @@ const bookingMigrationPath = join(repositoryRoot, "migrations/002_booking_mutati
 const rateLimitPath = join(repositoryRoot, "src/lib/rateLimit.ts");
 const rateLimitMigrationPath = join(repositoryRoot, "migrations/003_rate_limit.sql");
 const readinessRoutePath = join(repositoryRoot, "src/app/api/readiness/route.ts");
+const bookingWriteGatePath = join(repositoryRoot, "src/lib/bookingWriteGate.ts");
+const requestSecurityPath = join(repositoryRoot, "src/lib/requestSecurity.ts");
+const bookingServicePath = join(repositoryRoot, "src/lib/bookingService.ts");
+const pilotCapabilitiesPath = join(repositoryRoot, "src/lib/pilotCapabilities.ts");
+const reservationRoutePath = join(repositoryRoot, "src/app/api/reservations/route.ts");
 const vercelConfigPath = join(repositoryRoot, "vercel.json");
 const packageConfigPath = join(repositoryRoot, "package.json");
 const businessRulesProfilePath = join(repositoryRoot, "config/business-rules-profile.json");
@@ -33,6 +38,11 @@ const bookingProcessor = existsSync(bookingProcessorPath) ? readFileSync(booking
 const bookingMigration = existsSync(bookingMigrationPath) ? readFileSync(bookingMigrationPath, "utf8") : "";
 const rateLimit = existsSync(rateLimitPath) ? readFileSync(rateLimitPath, "utf8") : "";
 const rateLimitMigration = existsSync(rateLimitMigrationPath) ? readFileSync(rateLimitMigrationPath, "utf8") : "";
+const bookingWriteGate = existsSync(bookingWriteGatePath) ? readFileSync(bookingWriteGatePath, "utf8") : "";
+const requestSecurity = existsSync(requestSecurityPath) ? readFileSync(requestSecurityPath, "utf8") : "";
+const bookingService = existsSync(bookingServicePath) ? readFileSync(bookingServicePath, "utf8") : "";
+const pilotCapabilities = existsSync(pilotCapabilitiesPath) ? readFileSync(pilotCapabilitiesPath, "utf8") : "";
+const reservationRoute = existsSync(reservationRoutePath) ? readFileSync(reservationRoutePath, "utf8") : "";
 const businessRulesProfile = existsSync(businessRulesProfilePath)
   ? JSON.parse(readFileSync(businessRulesProfilePath, "utf8"))
   : {};
@@ -474,8 +484,15 @@ check(
     vercelConfig.framework === "nextjs" &&
     Array.isArray(vercelConfig.regions) &&
     vercelConfig.regions.length === 1 &&
-    vercelConfig.regions[0] === "fra1",
-  "The production readiness endpoint and an exact Vercel fra1 Next.js runtime contract are required.",
+    vercelConfig.regions[0] === "fra1" &&
+    bookingWriteGate.includes("deploymentRuntimeConfigurationProblems") &&
+    bookingWriteGate.includes("approvedRuntimeRegion") &&
+    requestSecurity.includes("assertBookingWriteDeploymentReady") &&
+    pilotCapabilities.includes("bookingWriteDeploymentReady") &&
+    bookingService.includes("assertLiveBookingCreationReady") &&
+    bookingService.includes("assertLessonResourceMappingReady") &&
+    reservationRoute.includes("assertLiveBookingCreationReady(adapter)"),
+  "Readiness, UI capabilities and direct live writes must share the exact fra1 deployment gate; every new booking must recheck the complete current room map.",
 );
 check(
   "Pilot alert delivery",
