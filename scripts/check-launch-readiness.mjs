@@ -24,10 +24,12 @@ const liveAccessGatePath = join(repositoryRoot, "src/lib/liveAccessGate.ts");
 const adapterProviderPath = join(repositoryRoot, "src/lib/adapterProvider.ts");
 const loginRoutePath = join(repositoryRoot, "src/app/api/auth/login/route.ts");
 const loginServicePath = join(repositoryRoot, "src/lib/loginService.ts");
+const liveMutationSessionPath = join(repositoryRoot, "src/lib/liveMutationSession.ts");
 const requestSecurityPath = join(repositoryRoot, "src/lib/requestSecurity.ts");
 const bookingServicePath = join(repositoryRoot, "src/lib/bookingService.ts");
 const pilotCapabilitiesPath = join(repositoryRoot, "src/lib/pilotCapabilities.ts");
 const reservationRoutePath = join(repositoryRoot, "src/app/api/reservations/route.ts");
+const reservationCancellationRoutePath = join(repositoryRoot, "src/app/api/reservations/[reservationId]/route.ts");
 const vercelConfigPath = join(repositoryRoot, "vercel.json");
 const packageConfigPath = join(repositoryRoot, "package.json");
 const businessRulesProfilePath = join(repositoryRoot, "config/business-rules-profile.json");
@@ -49,10 +51,14 @@ const liveAccessGate = existsSync(liveAccessGatePath) ? readFileSync(liveAccessG
 const adapterProvider = existsSync(adapterProviderPath) ? readFileSync(adapterProviderPath, "utf8") : "";
 const loginRoute = existsSync(loginRoutePath) ? readFileSync(loginRoutePath, "utf8") : "";
 const loginService = existsSync(loginServicePath) ? readFileSync(loginServicePath, "utf8") : "";
+const liveMutationSession = existsSync(liveMutationSessionPath) ? readFileSync(liveMutationSessionPath, "utf8") : "";
 const requestSecurity = existsSync(requestSecurityPath) ? readFileSync(requestSecurityPath, "utf8") : "";
 const bookingService = existsSync(bookingServicePath) ? readFileSync(bookingServicePath, "utf8") : "";
 const pilotCapabilities = existsSync(pilotCapabilitiesPath) ? readFileSync(pilotCapabilitiesPath, "utf8") : "";
 const reservationRoute = existsSync(reservationRoutePath) ? readFileSync(reservationRoutePath, "utf8") : "";
+const reservationCancellationRoute = existsSync(reservationCancellationRoutePath)
+  ? readFileSync(reservationCancellationRoutePath, "utf8")
+  : "";
 const businessRulesProfile = existsSync(businessRulesProfilePath)
   ? JSON.parse(readFileSync(businessRulesProfilePath, "utf8"))
   : {};
@@ -208,6 +214,33 @@ function liveLoginPipelineReady() {
     "live ? rateLimitRules.loginAccount : rateLimitRules.loginDemo",
     "dependencies.login(input)",
   ]);
+}
+
+function liveReservationMutationPipelinesReady() {
+  const sharedSessionGuardReady = containsInOrder(liveMutationSession, [
+    "if (!live) return undefined",
+    "dependencies.readSession(request)",
+    "if (!session)",
+    "dependencies.assertLiveReady()",
+    "return session",
+  ]);
+  const routeOrder = [
+    "assertTrustedMutation(request)",
+    "assertBookingMutationsEnabled()",
+    "isRealLuxartMode()",
+    "requireLiveBookingMutationSession(request, live)",
+    "readJsonWithDemoState",
+    "readIdempotencyKey(request)",
+    "assertRateLimit(request",
+    "getRequestLuxartAdapter(request)",
+    "if (!live)",
+    "getPostgresBookingMutationLedger()",
+    "ledger.assertReady()",
+    "processBookingMutation",
+  ];
+  return sharedSessionGuardReady &&
+    containsInOrder(reservationRoute, routeOrder) &&
+    containsInOrder(reservationCancellationRoute, routeOrder);
 }
 
 const requiredOperationsChain = [
@@ -532,12 +565,13 @@ check(
     liveAccessGate.includes("PERSONALIZED_HTTPS_REQUIRED") &&
     adapterProvider.includes("assertLivePersonalizedAccessReady") &&
     liveLoginPipelineReady() &&
+    liveReservationMutationPipelinesReady() &&
     requestSecurity.includes("assertBookingWriteDeploymentReady") &&
     pilotCapabilities.includes("bookingWriteDeploymentReady") &&
     bookingService.includes("assertLiveBookingCreationReady") &&
     bookingService.includes("assertLessonResourceMappingReady") &&
     reservationRoute.includes("assertLiveBookingCreationReady(adapter)"),
-  "Login, personalized reads, UI capabilities and direct live writes must share the exact HTTPS/fra1 deployment gate; every new booking must recheck the complete current room map.",
+  "Login, personalized reads, UI capabilities and direct live writes must share the exact HTTPS/fra1 deployment gate; booking mutations must authenticate before body parsing, limiting, adapter creation and ledger access; every new booking must recheck the complete current room map.",
 );
 check(
   "Pilot alert delivery",

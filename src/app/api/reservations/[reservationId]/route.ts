@@ -4,9 +4,9 @@ import { getPostgresBookingMutationLedger } from "@/lib/bookingMutationLedger";
 import { processBookingMutation } from "@/lib/bookingMutationProcessor";
 import { readJsonWithDemoState, withDemoState } from "@/lib/demoStateTransport";
 import { BookingApiError } from "@/lib/errors";
+import { requireLiveBookingMutationSession } from "@/lib/liveMutationSession";
 import { assertBookingMutationsEnabled, assertTrustedMutation, readIdempotencyKey } from "@/lib/requestSecurity";
 import { assertRateLimit, rateLimitRules } from "@/lib/rateLimit";
-import { readBookingSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +14,8 @@ export async function DELETE(request: Request, context: { params: Promise<{ rese
   try {
     assertTrustedMutation(request);
     assertBookingMutationsEnabled();
+    const live = isRealLuxartMode();
+    const session = requireLiveBookingMutationSession(request, live);
     await readJsonWithDemoState(request);
     const { reservationId } = await context.params;
     if (!reservationId || reservationId.length > 128) {
@@ -22,18 +24,16 @@ export async function DELETE(request: Request, context: { params: Promise<{ rese
     const idempotencyKey = readIdempotencyKey(request);
     await assertRateLimit(request, rateLimitRules.reservationCancel, reservationId);
     const adapter = getRequestLuxartAdapter(request);
-    if (!isRealLuxartMode()) {
+    if (!live) {
       const reservation = await adapter.cancelReservation({ reservationId });
       return ok(withDemoState({ reservation }));
     }
 
-    const session = readBookingSession(request);
-    if (!session) throw new BookingApiError(401, "AUTH_REQUIRED", "Pro tuto akci se přihlaste.");
     const ledger = getPostgresBookingMutationLedger();
     await ledger.assertReady();
     const result = await processBookingMutation({
       ledger,
-      userId: session.userId,
+      userId: session!.userId,
       idempotencyKey,
       operation: "cancel_reservation",
       targetId: reservationId,

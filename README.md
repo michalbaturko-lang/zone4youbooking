@@ -84,6 +84,8 @@ Browserová vrstva nenechá požadavky viset bez omezení: čtení končí po 20
 
 Přihlášení chrání dvě nezávislé hashované rate-limit brány: jedna omezuje celkový počet pokusů z jedné zdrojové adresy bez ohledu na zadaný účet, druhá omezuje pokusy o stejný účet napříč adresami. Ani PostgreSQL úložiště limiteru proto neobsahuje login nebo IP v čitelné podobě a změna loginu či zdrojové adresy neobejde celý ochranný profil. Launch gate staticky váže důvěryhodný Origin na otestovanou login službu a vznik session a uvnitř služby ověřuje pořadí připravenost → limit zdroje → načtení a validace vstupu → limit účtu → Luxart.
 
+Každý živý rezervační POST i storno DELETE nejprve ověří důvěryhodný Origin, globální booking brzdu, podepsanou klientskou session a úplnou HTTPS/region readiness. Teprve potom smí načíst tělo požadavku a idempotency klíč, spotřebovat rate-limit bucket, vytvořit Luxart adapter nebo otevřít ledger. Demo tuto serverovou session bránu záměrně nepoužívá a zůstává izolované. Jednotkové testy ověřují fail-fast chování bez spotřebování těla a launch gate staticky váže přesné pořadí u rezervace i storna.
+
 `inspect:business-rules` ukáže verzovaný profil pravidel a jeho SHA-256. Dokud je profil `provisional`, živé rezervace ani platby nelze odemknout; samotné `BOOKING_RULES_CONFIRMED=true` nestačí.
 
 `inspect:payment-product` ukáže potvrzený profil pěti CZK top-up částek a jeho SHA-256. Live Stripe vyžaduje přesnou shodu profilu s implementací i explicitní `PAYMENT_PRODUCT_CONFIRMED=true`.
