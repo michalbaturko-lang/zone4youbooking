@@ -820,6 +820,16 @@ export default function Home() {
         </div>
       </header>
 
+      {capabilities.businessRulesStatus === "demo" && (
+        <div className="demo-banner" role="status">
+          <span className="demo-banner-full">
+            <strong>{t("demo.label")}</strong>
+            <span>{t("demo.description")}</span>
+          </span>
+          <strong className="demo-banner-mobile">{t("demo.mobile")}</strong>
+        </div>
+      )}
+
       {toast && (
         <div className="toast-container">
           <div className={`toast toast-${toast.tone}`} role={toast.tone === "error" ? "alert" : "status"}>

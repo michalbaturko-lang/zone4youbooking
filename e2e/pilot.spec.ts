@@ -44,6 +44,10 @@ test("zobrazí všech 24 lekcí, všechny sály a Reformer bez browser chyby", {
   const browserErrors = captureUnexpectedBrowserErrors(page);
   await openCleanDemo(page);
 
+  const demoBanner = page.locator(".demo-banner");
+  await expect(demoBanner).toContainText("Ukázková verze");
+  await expect(demoBanner).toContainText("Rezervace ani kredit se neukládají do Memberzone.");
+
   const logo = page.locator("button.logo");
   const visibleLogoLabel = (await logo.innerText()).trim().replace(/\s+/g, " ");
   expect(visibleLogoLabel).toMatch(/^Z4Y(?: Zone4You)?$/);
@@ -576,6 +580,8 @@ test("angličtina a oblíbené lekce přežijí reload", { tag: "@preview" }, as
   await openCleanDemo(page);
 
   await page.getByRole("button", { name: "EN", exact: true }).click();
+  await expect(page.locator(".demo-banner")).toContainText("Demo version");
+  await expect(page.locator(".demo-banner")).toContainText("Bookings and credit are not saved to Memberzone.");
   const englishNavigation = testInfo.project.name.startsWith("mobile")
     ? page.getByRole("navigation", { name: "Navigation" })
     : page.locator(".user-section");
