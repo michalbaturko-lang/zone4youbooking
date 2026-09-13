@@ -3,6 +3,7 @@ import test from "node:test";
 import type { BookingCapabilities, BookingRules, Lesson, Reservation, User } from "../src/lib/domain";
 import {
   assertUatReservation,
+  bookingMutationUatEvidenceSchemaVersion,
   loadBookingMutationUatConfig,
   redactUatSecrets,
   runBookingMutationUat,
@@ -305,6 +306,7 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
     config.expectedPhase,
   );
   assert.equal(evidence.ok, true);
+  assert.equal(evidence.schemaVersion, bookingMutationUatEvidenceSchemaVersion);
   assert.equal(evidence.deploymentProvenanceVerified, true);
   assert.equal(evidence.commit, commit);
   assert.equal(evidence.phase, "booking_without_payments");

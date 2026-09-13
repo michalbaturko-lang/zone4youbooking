@@ -11,6 +11,7 @@ import {
 } from "../scripts/verify-luxart-public-contract";
 import { memberzoneFallbackUrl } from "../scripts/verify-memberzone-fallback";
 import { luxartResourceMappingSha256 } from "../src/lib/luxartResourceMappingFingerprint";
+import { maximumOperationalAmountKc } from "../src/lib/moneyBounds";
 
 const now = new Date("2026-09-05T08:00:00.000Z");
 const commit = "1234567890abcdef1234567890abcdef12345678";
@@ -193,6 +194,7 @@ function validFixture() {
       },
     },
     bookingMutationUat: {
+      schemaVersion: 1,
       ok: true,
       checkedAt,
       target: stagingTarget,
@@ -488,6 +490,20 @@ test("pilot release dossier rejects evidence that cannot come from the real guar
         personalized.english.ineligible = 1;
       },
       /Czech and English personalized Luxart eligibility counts differ/i,
+    ],
+    [
+      "bookingMutationUat",
+      (artifact: Record<string, unknown>) => {
+        artifact.schemaVersion = 2;
+      },
+      /Booking UAT evidence schemaVersion must be 1/i,
+    ],
+    [
+      "bookingMutationUat",
+      (artifact: Record<string, unknown>) => {
+        artifact.expectedCancellationFeeKc = maximumOperationalAmountKc + 1;
+      },
+      /booking UAT expectedCancellationFeeKc must not exceed/i,
     ],
     [
       "bookingMutationUat",

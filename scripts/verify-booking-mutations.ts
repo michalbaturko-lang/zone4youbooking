@@ -15,6 +15,8 @@ type FetchLike = typeof fetch;
 type Environment = Record<string, string | undefined>;
 type BookingMutationUatPhase = "booking_without_payments" | "booking_with_stripe";
 
+export const bookingMutationUatEvidenceSchemaVersion = 1;
+
 interface Snapshot {
   user: User;
   lessons: Lesson[];
@@ -484,6 +486,7 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
     }
 
     return {
+      schemaVersion: bookingMutationUatEvidenceSchemaVersion,
       ok: true,
       checkedAt: new Date().toISOString(),
       target: config.target.origin,

@@ -15,6 +15,8 @@ import {
   luxartPublicContractEndpoints,
 } from "./verify-luxart-public-contract";
 import { memberzoneFallbackUrl } from "./verify-memberzone-fallback";
+import { maximumOperationalAmountKc } from "../src/lib/moneyBounds";
+import { bookingMutationUatEvidenceSchemaVersion } from "./verify-booking-mutations";
 import {
   validateReadonlyRollbackTimerEvidence,
   type ReadonlyRollbackTimerEvidence,
@@ -528,6 +530,11 @@ export function validateBookingUatEvidence(
   expectedCommit: string,
   launchMode: string,
 ) {
+  if (evidence.schemaVersion !== bookingMutationUatEvidenceSchemaVersion) {
+    throw new Error(
+      `Booking UAT evidence schemaVersion must be ${bookingMutationUatEvidenceSchemaVersion}.`,
+    );
+  }
   exactString(cleanHttpsOrigin(evidence.target, "artifacts.bookingMutationUat.target"), stagingOrigin, "Booking UAT target");
   trueValue(evidence.deploymentProvenanceVerified, "booking UAT deploymentProvenanceVerified");
   exactString(
@@ -557,7 +564,15 @@ export function validateBookingUatEvidence(
       throw new Error(`booking UAT ${key} must be a 16-character lowercase SHA-256 prefix.`);
     }
   }
-  integerValue(evidence.expectedCancellationFeeKc, "booking UAT expectedCancellationFeeKc");
+  const expectedCancellationFeeKc = integerValue(
+    evidence.expectedCancellationFeeKc,
+    "booking UAT expectedCancellationFeeKc",
+  );
+  if (expectedCancellationFeeKc > maximumOperationalAmountKc) {
+    throw new Error(
+      `booking UAT expectedCancellationFeeKc must not exceed ${maximumOperationalAmountKc}.`,
+    );
+  }
   integerValue(evidence.sameKeyCreateReplays, "booking UAT sameKeyCreateReplays", 3);
   integerValue(evidence.parallelCreateRequests, "booking UAT parallelCreateRequests", 2);
   integerValue(evidence.sameKeyCancellationReplays, "booking UAT sameKeyCancellationReplays", 3);
