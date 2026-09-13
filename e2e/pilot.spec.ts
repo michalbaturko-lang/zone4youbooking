@@ -546,6 +546,8 @@ test("rozvrh a dialogy projdou WCAG scanem i klávesnicovým focus flow", { tag:
   const loginDialog = page.getByRole("dialog", { name: "Přihlášení" });
   const usernameInput = loginDialog.getByLabel("Příjmení, e-mail nebo login");
   await expect(usernameInput).toBeFocused();
+  await expect(loginDialog.getByText(/zapomenuté heslo/i)).toHaveCount(0);
+  await expect(loginDialog.getByRole("link")).toHaveCount(0);
   await testInfo.attach(`keyboard-focus-login-${testInfo.project.name}`, {
     body: await page.screenshot({ fullPage: true }),
     contentType: "image/png",
@@ -579,7 +581,13 @@ test("angličtina a oblíbené lekce přežijí reload", { tag: "@preview" }, as
     : page.locator(".user-section");
   await expect(englishNavigation.getByRole("button", { name: "Schedule", exact: true })).toBeVisible();
   await expect(englishNavigation.getByRole("button", { name: testInfo.project.name.startsWith("mobile") ? "Bookings" : "My bookings", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Sign in", exact: true }).first()).toBeVisible();
+  const englishLoginTrigger = page.getByRole("button", { name: "Sign in", exact: true }).first();
+  await expect(englishLoginTrigger).toBeVisible();
+  await englishLoginTrigger.click();
+  const englishLoginDialog = page.getByRole("dialog", { name: "Sign in" });
+  await expect(englishLoginDialog.getByText(/forgot password/i)).toHaveCount(0);
+  await expect(englishLoginDialog.getByRole("link")).toHaveCount(0);
+  await englishLoginDialog.getByRole("button", { name: "Close" }).first().click();
   const englishRoomFilter = page.getByLabel("Room filter");
   for (const roomName of ["Studio 1", "Studio 2", "Studio 3", "Reformer"]) {
     await expect(englishRoomFilter.getByRole("button", { name: roomName, exact: true })).toBeVisible();
