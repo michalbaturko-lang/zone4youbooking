@@ -616,6 +616,42 @@ test("angličtina a oblíbené lekce přežijí reload", { tag: "@preview" }, as
   await page.reload();
   await page.getByRole("button", { name: "Oblíbené" }).click();
   await expect(page.locator(".lesson-row").filter({ hasText: "HEAT easy" }).first()).toBeVisible();
+
+  await page.evaluate(() => {
+    window.localStorage.setItem(
+      "zone4youbooking.favoriteServices:anonymous",
+      JSON.stringify(Array.from({ length: 513 }, (_, index) => `invalid-${index}`)),
+    );
+  });
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Přihlásit se" }).first()).toBeVisible();
+  const recoveredFavorites = await page.evaluate(() => JSON.parse(
+    window.localStorage.getItem("zone4youbooking.favoriteServices:anonymous") ?? "[]",
+  ) as unknown[]);
+  expect(recoveredFavorites.length).toBeLessThanOrEqual(512);
+
+  await page.addInitScript(() => {
+    const originalGetItem = Storage.prototype.getItem;
+    const originalSetItem = Storage.prototype.setItem;
+    Storage.prototype.getItem = function getItem(key: string) {
+      if (key.startsWith("zone4youbooking.favoriteServices:")) {
+        throw new DOMException("Blocked by browser privacy settings", "SecurityError");
+      }
+      return originalGetItem.call(this, key);
+    };
+    Storage.prototype.setItem = function setItem(key: string, value: string) {
+      if (key.startsWith("zone4youbooking.favoriteServices:")) {
+        throw new DOMException("Storage quota unavailable", "QuotaExceededError");
+      }
+      return originalSetItem.call(this, key, value);
+    };
+  });
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Přihlásit se" }).first()).toBeVisible();
+  await page.locator(".lesson-row").filter({ hasText: "HEAT easy" }).first().click();
+  await page.getByRole("button", { name: "Odebrat z oblíbených" }).click();
+  await expect(page.getByText("Změna platí pro tuto relaci. Prohlížeč nepovolil trvalé uložení oblíbených.")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "HEAT easy" })).toBeVisible();
 });
 
 test("read-only fallback skryje live dobití a zablokuje booking v UI", async ({ page }, testInfo) => {

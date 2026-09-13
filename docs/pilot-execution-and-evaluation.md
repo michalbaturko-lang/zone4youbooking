@@ -199,7 +199,7 @@ Práce se zastaví pouze před akcí, která vyžaduje novou autoritu (živá mu
 - demo runtime smoke prošel 24 lekcemi;
 - ruční desktopová kontrola angličtiny, Reformeru, sálů, kategorií a responsivity prošla bez konzolové chyby;
 - CZ/EN přepínač přežije reload a live adapter předává Luxartu `lang=cz/en`;
-- oblíbené lekce přežijí reload a jsou oddělené podle přihlášeného klienta;
+- oblíbené lekce přežijí reload a jsou oddělené podle přihlášeného klienta; browser test v Chromium i WebKitu navíc simuluje zablokované čtení i zápis úložiště a ověřuje, že booking nespadne, změna funguje pro relaci a uživatel dostane pravdivé upozornění;
 - 320 × 568, 390 × 844, 768 × 1024, landscape 844 × 390 a desktop 1440 × 900 mají automatizované E2E pro 24 lekcí, Reformer, login, rezervaci, storno, WCAG A/AA, 44px touch targets, dialogy a horizontální overflow; referenční mobil 390 × 844 navíc dokazuje 37 položek bez skrytého limitu a dynamické přidání dosud neznámých sálů;
 - kontrastní WCAG nálezy byly opravené bez potlačení pravidla;
 - login a detail lekce mají automaticky ověřený počáteční a navrácený focus, uzavřený Tab cyklus, zavření přes `Escape`, viditelný focus ring a samostatný WCAG A/AA scan v desktopu i mobilu;

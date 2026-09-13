@@ -49,6 +49,9 @@ type LoadFailure = { requestId?: string };
 type ToastState = { message: string; tone: "success" | "warning" | "error"; persistent?: boolean };
 const allFilter = "__all__";
 const favoriteServicesStoragePrefix = "zone4youbooking.favoriteServices";
+const maximumStoredFavoriteServices = 512;
+const maximumStoredFavoriteBytes = 64 * 1024;
+const maximumFavoriteKeyLength = 256;
 const modalFocusableSelector = [
   "a[href]",
   "button:not([disabled])",
@@ -67,6 +70,57 @@ const fallbackCapabilities: BookingCapabilities = {
   forgotPasswordEnabled: false,
   englishEnabled: true,
 };
+
+function favoriteStorageKey(owner: string) {
+  return `${favoriteServicesStoragePrefix}:${owner}`;
+}
+
+function validStoredFavoriteKey(value: unknown): value is string {
+  return typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= maximumFavoriteKeyLength &&
+    !/[\u0000-\u001f\u007f]/u.test(value);
+}
+
+function readStoredFavoriteServices(owner: string) {
+  const storageKey = favoriteStorageKey(owner);
+  try {
+    const stored = window.localStorage.getItem(storageKey);
+    if (stored === null) return undefined;
+    if (new Blob([stored]).size > maximumStoredFavoriteBytes) throw new Error("Favorite storage is too large.");
+    const parsed = JSON.parse(stored) as unknown;
+    if (
+      !Array.isArray(parsed) ||
+      parsed.length > maximumStoredFavoriteServices ||
+      !parsed.every(validStoredFavoriteKey)
+    ) {
+      throw new Error("Favorite storage is invalid.");
+    }
+    return Array.from(new Set(parsed));
+  } catch {
+    try {
+      window.localStorage.removeItem(storageKey);
+    } catch {
+      // Storage can be blocked entirely. Favorites still work for this page session.
+    }
+    return undefined;
+  }
+}
+
+function writeStoredFavoriteServices(owner: string, favoriteIds: string[]) {
+  try {
+    if (
+      favoriteIds.length > maximumStoredFavoriteServices ||
+      !favoriteIds.every(validStoredFavoriteKey)
+    ) return false;
+    const serialized = JSON.stringify(favoriteIds);
+    if (new Blob([serialized]).size > maximumStoredFavoriteBytes) return false;
+    window.localStorage.setItem(favoriteStorageKey(owner), serialized);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function modalFocusables(container: HTMLElement) {
   return Array.from(container.querySelectorAll<HTMLElement>(modalFocusableSelector))
@@ -339,23 +393,15 @@ export default function Home() {
     if (!snapshot) return;
     const owner = snapshot.user?.id ?? "anonymous";
     if (favoriteOwner === owner) return;
-    const storageKey = `${favoriteServicesStoragePrefix}:${owner}`;
-    const stored = window.localStorage.getItem(storageKey);
-    if (stored !== null) {
-      try {
-        const parsed = JSON.parse(stored) as unknown;
-        if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) {
-          setFavoriteServiceIds(parsed);
-          setFavoriteOwner(owner);
-          return;
-        }
-      } catch {
-        window.localStorage.removeItem(storageKey);
-      }
+    const stored = readStoredFavoriteServices(owner);
+    if (stored !== undefined) {
+      setFavoriteServiceIds(stored);
+      setFavoriteOwner(owner);
+      return;
     }
     const seeded = Array.from(new Set(snapshot.lessons.filter((lesson) => lesson.favorite).map(favoriteKey)));
     setFavoriteServiceIds(seeded);
-    window.localStorage.setItem(storageKey, JSON.stringify(seeded));
+    writeStoredFavoriteServices(owner, seeded);
     setFavoriteOwner(owner);
   }, [favoriteOwner, snapshot]);
 
@@ -655,10 +701,12 @@ export default function Home() {
         ? current.filter((favoriteId) => favoriteId !== key)
         : [...current, key];
       const owner = snapshot?.user?.id ?? "anonymous";
-      window.localStorage.setItem(`${favoriteServicesStoragePrefix}:${owner}`, JSON.stringify(next));
+      const persisted = writeStoredFavoriteServices(owner, next);
       setToast({
-        message: isFavorite ? t("toast.favoriteRemoved") : t("toast.favoriteAdded"),
-        tone: "success",
+        message: persisted
+          ? isFavorite ? t("toast.favoriteRemoved") : t("toast.favoriteAdded")
+          : t("toast.favoriteStorageUnavailable"),
+        tone: persisted ? "success" : "warning",
       });
       return next;
     });

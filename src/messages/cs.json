@@ -108,6 +108,7 @@
   "toast.reconciliationRequired": "Výsledek předchozí booking akce je nejistý. Akci neopakujte a kontaktujte recepci.",
   "toast.favoriteAdded": "Lekce byla přidána do oblíbených.",
   "toast.favoriteRemoved": "Lekce byla odebrána z oblíbených.",
+  "toast.favoriteStorageUnavailable": "Změna platí pro tuto relaci. Prohlížeč nepovolil trvalé uložení oblíbených.",
   "toast.sessionExpired": "Přihlášení vypršelo. Přihlaste se znovu.",
   "error.loadTitle": "Rozvrh se nepodařilo načíst",
   "error.loadBody": "Booking teď nemá potvrzená aktuální data. Zkuste načtení znovu; pokud problém trvá, použijte původní Memberzone nebo kontaktujte recepci.",

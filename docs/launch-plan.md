@@ -56,7 +56,7 @@ Poznámka: audit neprovedl vytvoření ani zrušení skutečné rezervace. Tyto 
 - automatické Playwright E2E na 1440 × 900 a 390 × 844 včetně WCAG A/AA kontroly, řízeného počátečního focusu, uzavřeného Tab cyklu, `Escape` a návratu focusu u obou dialogů;
 - přepínatelná a perzistentní CZ/EN lokalizace, která předává jazyk i Luxart API;
 - serverem vlastněný sedmidenní interval v `Europe/Prague` a pevný resort 1; veřejné URL parametry nemohou změnit rozsah, resort ani zúžit povinný feed, adapter odmítá cizí resort v ID lekce i upstream odpovědi a kontraktní test přímo dokazuje `pocet_dni_dopredu=7` přes oba přechody letního času;
-- oblíbené lekce perzistentní v prohlížeči a izolované podle přihlášeného klienta;
+- oblíbené lekce perzistentní v prohlížeči a izolované podle přihlášeného klienta; poškozené nebo nadlimitní úložiště se bezpečně zahodí a při zablokovaném úložišti zůstane změna funkční pro aktuální relaci s pravdivým upozorněním;
 - bezpečnostní CSP/HSTS hlavičky, korelační `X-Request-ID` a sdílené omezení frekvence veřejného rozvrhu, účtových čtení, loginu i mutací;
 - jednotný aplikační limit 64 KiB pro běžná JSON těla, který zastaví deklarované i streamované nadlimitní požadavky před parsováním; neplatný JSON ani jeho obsah se neodráží v live chybě, Stripe webhook má oddělený podepsaný raw-body limit 1 MiB;
 - explicitní `no-store` pro všechny odchozí Luxart požadavky a streamovaný limit 4 MiB na jejich JSON odpovědi; nadlimitní nebo neplatná odpověď se nevypíše a u zápisové operace vyvolá ruční reconciliation bez automatického opakování;

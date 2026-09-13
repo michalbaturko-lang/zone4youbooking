@@ -108,6 +108,7 @@
   "toast.reconciliationRequired": "The result of the previous booking action is uncertain. Do not repeat it; contact reception.",
   "toast.favoriteAdded": "The class was added to your favorites.",
   "toast.favoriteRemoved": "The class was removed from your favorites.",
+  "toast.favoriteStorageUnavailable": "The change applies to this session. The browser blocked persistent favorite storage.",
   "toast.sessionExpired": "Your session has expired. Please sign in again.",
   "error.loadTitle": "The schedule could not be loaded",
   "error.loadBody": "Booking cannot confirm current data right now. Try again; if the problem continues, use the original Memberzone or contact reception.",
