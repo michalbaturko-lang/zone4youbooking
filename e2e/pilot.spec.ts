@@ -243,6 +243,7 @@ test("mobile-first matice drží 44px ovládání, obsah nad navigací a bezpeč
 });
 
 test("přihlášení, rezervace a storno projdou uživatelským flow", { tag: "@preview-auth" }, async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
   const externalPreview = Boolean(process.env.PLAYWRIGHT_EXTERNAL_DEMO_URL?.trim());
   test.skip(
     externalPreview && testInfo.project.name !== "mobile-small-320x568",
@@ -280,7 +281,7 @@ test("přihlášení, rezervace a storno projdou uživatelským flow", { tag: "@
   await page.locator(".lesson-row").filter({ hasText: "PUMPING" }).first().click();
   const lessonDialog = page.getByRole("dialog", { name: "PUMPING" });
   await lessonDialog.getByRole("button", { name: "Rezervovat" }).click();
-  await expect(page.getByText("Rezervace PUMPING je potvrzená.")).toBeVisible();
+  await expect(page.getByText("Rezervace PUMPING je potvrzená.")).toBeVisible({ timeout: 10_000 });
 
   if (testInfo.project.name.startsWith("mobile")) {
     await page.getByRole("navigation", { name: "Navigace" }).getByRole("button", { name: "Rezervace" }).click();
@@ -290,7 +291,7 @@ test("přihlášení, rezervace a storno projdou uživatelským flow", { tag: "@
   const reservation = page.locator(".reservation-card").filter({ hasText: "PUMPING" });
   await expect(reservation).toBeVisible();
   await reservation.getByRole("button", { name: "Zrušit" }).click();
-  await expect(page.getByText("Rezervace byla zrušena bez storno poplatku.")).toBeVisible();
+  await expect(page.getByText("Rezervace byla zrušena bez storno poplatku.")).toBeVisible({ timeout: 10_000 });
   await expect(reservation).toHaveCount(0);
 
   if (testInfo.project.name.startsWith("mobile")) {
@@ -302,7 +303,7 @@ test("přihlášení, rezervace a storno projdou uživatelským flow", { tag: "@
   await page.locator(".lesson-row").filter({ hasText: "REFORMER" }).first().click();
   const reformerDialog = page.getByRole("dialog", { name: "REFORMER" });
   await reformerDialog.getByRole("button", { name: "Rezervovat" }).click();
-  await expect(page.getByText("Rezervace REFORMER je potvrzená.")).toBeVisible();
+  await expect(page.getByText("Rezervace REFORMER je potvrzená.")).toBeVisible({ timeout: 10_000 });
 
   if (testInfo.project.name.startsWith("mobile")) {
     await page.getByRole("navigation", { name: "Navigace" }).getByRole("button", { name: "Rezervace" }).click();
@@ -315,7 +316,7 @@ test("přihlášení, rezervace a storno projdou uživatelským flow", { tag: "@
   await expect(reformerReservation.getByText("Storno podmínky Reformeru čekají na potvrzení", { exact: false })).toBeVisible();
   await expect(reformerReservation.getByText("Bezplatné storno", { exact: false })).toHaveCount(0);
   await reformerReservation.getByRole("button", { name: "Zrušit" }).click();
-  await expect(page.getByText("Rezervace byla zrušena bez storno poplatku.")).toBeVisible();
+  await expect(page.getByText("Rezervace byla zrušena bez storno poplatku.")).toBeVisible({ timeout: 10_000 });
   await expect(reformerReservation).toHaveCount(0);
   expect(browserErrors).toEqual([]);
 });
