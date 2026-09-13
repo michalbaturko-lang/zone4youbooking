@@ -86,10 +86,11 @@ export default defineConfig({
     },
     {
       name: "mobile-webkit-390x844",
-      // A second rendering engine covers the public mobile UI without
-      // repeating login or booking mutations. Authenticated WebKit UAT stays
-      // a deliberate staging step once the real Luxart endpoint is available.
-      grep: /@preview(?!-auth)/,
+      // The local mock also exercises the complete authenticated booking flow
+      // in a second rendering engine. A public Preview stays read-only in
+      // WebKit so its production-shaped login limiter is not bypassed; live
+      // Luxart authentication and mutations remain a separate staging UAT.
+      grep: externalDemoBaseURL ? /@preview(?!-auth)/ : /@preview(?:-auth)?/,
       use: {
         browserName: "webkit",
         viewport: { width: 390, height: 844 },
