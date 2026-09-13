@@ -13,7 +13,12 @@ import { getPilotCapabilities } from "@/lib/pilotCapabilities";
 import { getPostgresPaymentLedger } from "@/lib/paymentLedger";
 import { paymentMutationsRequested } from "@/lib/paymentConfig";
 import { getPostgresRateLimiter } from "@/lib/rateLimit";
-import { assertLessonFeedReady, pilotLessonQuery } from "@/lib/bookingService";
+import type { Lesson } from "@/lib/domain";
+import {
+  assertLessonFeedReady,
+  assertLessonResourceMappingReady,
+  pilotLessonQuery,
+} from "@/lib/bookingService";
 import { BookingApiError } from "@/lib/errors";
 import { luxartResourceMappingSha256 } from "@/lib/luxartResourceMappingFingerprint";
 
@@ -104,9 +109,10 @@ export async function GET() {
     }
   }
 
+  let lessons: Lesson[];
   try {
     const query = pilotLessonQuery();
-    assertLessonFeedReady(await getLuxartAdapter().getLessons(query), query);
+    lessons = assertLessonFeedReady(await getLuxartAdapter().getLessons(query), query);
   } catch (error) {
     const emptySchedule = error instanceof BookingApiError && error.code === "LUXART_SCHEDULE_EMPTY";
     const invalidSchedule = error instanceof BookingApiError && error.code === "LUXART_RESPONSE_INVALID";
@@ -124,6 +130,29 @@ export async function GET() {
       },
       { status: 503 },
     );
+  }
+
+  if (bookingMutationsRequested()) {
+    try {
+      assertLessonResourceMappingReady(lessons, process.env.LUXART_RESOURCE_MAP_JSON);
+    } catch {
+      return ok(
+        {
+          status: "not_ready",
+          mode: "live",
+          ...deployment,
+          luxart: "reachable",
+          schedule: "ready",
+          bookingNotifications,
+          resourceMapSha256,
+          rateLimit: rateLimitMode,
+          booking: "resource_map_mismatch",
+          payments: paymentMutationsRequested() ? "not_checked" : "disabled",
+          capabilities: getPilotCapabilities(),
+        },
+        { status: 503 },
+      );
+    }
   }
 
   if (paymentMutationsRequested()) {

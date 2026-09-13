@@ -2,6 +2,7 @@ import type { BookingSnapshot, Lesson, LessonQuery, LuxartAdapter } from "./doma
 import { getLuxartAdapter } from "./adapterProvider";
 import { bookingRules } from "./bookingRules";
 import { BookingApiError } from "./errors";
+import { parseLuxartResourceMapping } from "./luxartMappings";
 import { isBoundedKcAmount } from "./moneyBounds";
 import { zone4YouDateKey, zone4YouScheduleRange } from "./zone4YouTime";
 
@@ -85,6 +86,46 @@ export function assertLessonFeedReady(lessons: Lesson[], query: LessonQuery) {
     throw new BookingApiError(503, "LUXART_SCHEDULE_EMPTY", "Luxart nevrátil žádné lekce pro sedmidenní rozvrh.");
   }
   return validated;
+}
+
+export function assertLessonResourceMappingReady(
+  lessons: Array<Pick<Lesson, "luxartRoomNumber">>,
+  rawResourceMap: string | undefined,
+) {
+  let resourceMap: Record<string, number>;
+  try {
+    resourceMap = parseLuxartResourceMapping(rawResourceMap);
+  } catch {
+    throw new BookingApiError(
+      503,
+      "LUXART_RESOURCE_MAP_MISMATCH",
+      "Rezervační zdroje sálů nejsou připravené.",
+    );
+  }
+
+  const observedRoomNumbers = new Set<number>();
+  for (const lesson of lessons) {
+    const roomNumber = lesson.luxartRoomNumber;
+    if (!Number.isSafeInteger(roomNumber) || Number(roomNumber) <= 0) {
+      throw new BookingApiError(
+        503,
+        "LUXART_RESOURCE_MAP_MISMATCH",
+        "Rozvrh obsahuje sál bez platného rezervačního zdroje.",
+      );
+    }
+    observedRoomNumbers.add(Number(roomNumber));
+  }
+
+  const observed = [...observedRoomNumbers].sort((left, right) => left - right);
+  const mapped = Object.keys(resourceMap).map(Number).sort((left, right) => left - right);
+  if (JSON.stringify(observed) !== JSON.stringify(mapped)) {
+    throw new BookingApiError(
+      503,
+      "LUXART_RESOURCE_MAP_MISMATCH",
+      "Rezervační zdroje neodpovídají aktuálním sálům v rozvrhu.",
+    );
+  }
+  return observed;
 }
 
 export async function getBookingSnapshotForAdapter(

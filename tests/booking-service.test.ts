@@ -3,11 +3,13 @@ import test from "node:test";
 import {
   assertLessonFeedWithinQuery,
   assertLessonFeedReady,
+  assertLessonResourceMappingReady,
   getBookingSnapshotForAdapter,
   pilotLessonQuery,
   queryFromRequest,
 } from "../src/lib/bookingService";
 import type { Lesson, LuxartAdapter } from "../src/lib/domain";
+import { BookingApiError } from "../src/lib/errors";
 import { maximumOperationalAmountKc } from "../src/lib/moneyBounds";
 
 function lesson(startsAt: string): Lesson {
@@ -157,4 +159,39 @@ test("readiness requires a non-empty but otherwise unfiltered seven-day feed", (
     error.code === "LUXART_SCHEDULE_EMPTY",
   );
   assert.equal(assertLessonFeedReady([lesson("2026-08-30T10:30:00.000Z")], query).length, 1);
+});
+
+test("booking readiness requires an exact resource mapping for every live room", () => {
+  const first = { ...lesson("2026-08-30T10:30:00.000Z"), luxartRoomNumber: 2 };
+  const second = { ...lesson("2026-08-30T11:30:00.000Z"), luxartRoomNumber: 4 };
+  assert.deepEqual(
+    assertLessonResourceMappingReady([first, second], JSON.stringify({ 4: 404, 2: 202 })),
+    [2, 4],
+  );
+
+  for (const mapping of [
+    JSON.stringify({ 2: 202 }),
+    JSON.stringify({ 2: 202, 4: 404, 7: 707 }),
+    JSON.stringify({ 2: 202, 4: 0 }),
+    undefined,
+  ]) {
+    assert.throws(
+      () => assertLessonResourceMappingReady([first, second], mapping),
+      (error: unknown) =>
+        error instanceof BookingApiError &&
+        error.status === 503 &&
+        error.code === "LUXART_RESOURCE_MAP_MISMATCH",
+    );
+  }
+});
+
+test("booking readiness refuses a live lesson without a positive room number", () => {
+  const invalid = { ...lesson("2026-08-30T10:30:00.000Z"), luxartRoomNumber: 0 };
+  assert.throws(
+    () => assertLessonResourceMappingReady([invalid], JSON.stringify({ 1: 101 })),
+    (error: unknown) =>
+      error instanceof BookingApiError &&
+      error.status === 503 &&
+      error.code === "LUXART_RESOURCE_MAP_MISMATCH",
+  );
 });

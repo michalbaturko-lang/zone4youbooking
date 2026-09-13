@@ -52,7 +52,7 @@ Do hostingu se nevkládají testovací klientská hesla, `LUXART_HELP_URL`, `LUX
 
 - `ok=true`: statická konfigurace daného buildu je konzistentní; nejde o důkaz dostupnosti Luxartu, databází ani o povolení cutoveru.
 - `ok=false`: nasazení nebo změna fáze je `NO-GO`; `issues[].code` a `issues[].variables` určují bezpečný opravný seznam bez hodnot.
-- `/api/readiness` 200: kromě konfigurace běží funkce v `fra1`, je dostupný Luxart a požadované PostgreSQL ledgery/rate limiter; v booking fázi obsahuje SHA-256 přesně nasazené resource mapy.
+- `/api/readiness` 200: kromě konfigurace běží funkce v `fra1`, je dostupný Luxart a požadované PostgreSQL ledgery/rate limiter; v booking fázi obsahuje SHA-256 přesně nasazené resource mapy a přímo nad aktuálním feedem ověří, že mapa obsahuje všechna a pouze pozorovaná kladná čísla sálů. Drift vrátí 503 a `booking=resource_map_mismatch`.
 - `/api/readiness` 503: provozní systém nesmí přijímat pilotní traffic; odpověď nevypisuje interní konfiguraci.
 
 Release dossier přijme runtime důkaz jen tehdy, když readiness fáze přesně odpovídá `launchMode`, readiness commit přesně odpovídá commitu dossieru, otisk resource mapy odpovídá operátorské mapě použité pro UAT a capability snapshot odpovídá omezenému pilotu. Pro `booking_without_payments` musí být Stripe i watchdog vypnuté; angličtina, oblíbené na zařízení a rezervace musí být aktivní a zapomenuté heslo vypnuté. Runtime probe musí přes CS i EN route doložit stejnou úplnou množinu Luxart výskytů a Reformerů. `booking_with_stripe` navíc vyžaduje `payments=ready`, `topupsEnabled=true` a `topupMode=stripe`.
