@@ -15,6 +15,7 @@ import {
   parseLuxartWatchdogId,
   type LuxartLessonData,
 } from "../src/lib/luxartContract";
+import { maximumOperationalAmountKc } from "../src/lib/moneyBounds";
 
 const baseLesson: LuxartLessonData = {
   resort: 1,
@@ -121,6 +122,7 @@ test("rejects malformed required Luxart lesson values instead of coercing them t
     { delka: 0 },
     { cena: Number.NaN },
     { cena: -1 },
+    { cena: maximumOperationalAmountKc + 1 },
     { kapacita: -1 },
     { kapacita: Number.MAX_SAFE_INTEGER + 1 },
     { obsazeno: -1 },
@@ -193,6 +195,10 @@ test("rejects a Luxart user without a valid positive ID and finite credit", () =
     /invalid required fields/i,
   );
   assert.throws(
+    () => mapLuxartUser({ user_id: 42, current_balance: maximumOperationalAmountKc + 1 }),
+    /invalid required fields/i,
+  );
+  assert.throws(
     () => mapLuxartUser({ user_id: Number.MAX_SAFE_INTEGER + 1, current_balance: 500 }),
     /invalid required fields/i,
   );
@@ -236,6 +242,7 @@ test("maps an active reservation back to the same Luxart lesson occurrence", () 
     { id_resource: 0 },
     { price: Number.NaN },
     { price: -1 },
+    { price: maximumOperationalAmountKc + 1 },
     { status: Number.NaN },
     { datum: "invalid" },
     { datum: "2026-09-01T16:30:00" },
@@ -297,6 +304,7 @@ test("derives running credit balances from newest Luxart history entry", () => {
     { datum: "2026-08-29T08:00:00" },
     { datum: "2026-02-30T08:00:00Z" },
     { castka: Number.NaN },
+    { castka: maximumOperationalAmountKc + 1 },
     { cdd: 0 },
   ]) {
     assert.throws(
@@ -306,6 +314,19 @@ test("derives running credit balances from newest Luxart history entry", () => {
   }
   assert.throws(() => mapLuxartCreditHistory([validEntry], "invalid-user", 1_400, 1), /invalid/i);
   assert.throws(() => mapLuxartCreditHistory([validEntry], "42", Number.NaN, 1), /invalid/i);
+  assert.throws(
+    () => mapLuxartCreditHistory([validEntry], "42", maximumOperationalAmountKc + 1, 1),
+    /invalid/i,
+  );
+  assert.throws(
+    () => mapLuxartCreditHistory(
+      [{ ...validEntry, castka: -maximumOperationalAmountKc }],
+      "42",
+      maximumOperationalAmountKc,
+      1,
+    ),
+    /invalid balance/i,
+  );
   assert.throws(
     () => mapLuxartCreditHistory([validEntry, { ...validEntry }], "42", 1_400, 1),
     /duplicate/i,

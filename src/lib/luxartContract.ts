@@ -8,6 +8,7 @@ import type {
   User,
   WaitlistEntry,
 } from "./domain";
+import { isBoundedKcAmount } from "./moneyBounds";
 
 export interface LuxartUserData {
   user_id: number;
@@ -289,7 +290,7 @@ export function parseLuxartLessonId(lessonId: string) {
 export function mapLuxartUser(data: LuxartUserData): User {
   const userId = requiredNumber(data?.user_id);
   const creditBalanceKc = requiredNumber(data?.current_balance);
-  if (!positiveSafeInteger(userId) || !Number.isFinite(creditBalanceKc)) {
+  if (!positiveSafeInteger(userId) || !isBoundedKcAmount(creditBalanceKc)) {
     throw new Error("Luxart user contains invalid required fields.");
   }
 
@@ -327,7 +328,7 @@ export function mapLuxartLesson(data: LuxartLessonData, mapping: LuxartLessonMap
     !positiveSafeInteger(categoryId) ||
     !positiveSafeInteger(serviceId) ||
     !positiveSafeInteger(durationMinutes) ||
-    !Number.isFinite(priceKc) || priceKc < 0 ||
+    !isBoundedKcAmount(priceKc, 0) ||
     !nonNegativeSafeInteger(capacity) ||
     !nonNegativeSafeInteger(occupiedCount) || occupiedCount > capacity ||
     !nonNegativeSafeInteger(availableCount) ||
@@ -621,7 +622,7 @@ export function mapLuxartReservation(
     !Number.isSafeInteger(serviceId) || serviceId <= 0 ||
     !Number.isSafeInteger(durationMinutes) || durationMinutes <= 0 ||
     !Number.isSafeInteger(resourceId) || resourceId <= 0 ||
-    !Number.isFinite(priceKc) || priceKc < 0 ||
+    !isBoundedKcAmount(priceKc, 0) ||
     !Number.isSafeInteger(status) ||
     !Number.isSafeInteger(numericUserId) || numericUserId <= 0
   ) {
@@ -674,7 +675,7 @@ export function mapLuxartCreditHistory(
   if (
     !Array.isArray(entries) ||
     !Number.isSafeInteger(numericUserId) || numericUserId <= 0 ||
-    !Number.isFinite(currentBalanceKc)
+    !isBoundedKcAmount(currentBalanceKc)
   ) {
     throw new Error("Luxart credit history context is invalid.");
   }
@@ -687,7 +688,7 @@ export function mapLuxartCreditHistory(
     if (
       !Number.isSafeInteger(resort) || resort <= 0 ||
       (expectedResort !== undefined && resort !== expectedResort) ||
-      !Number.isFinite(amountKc) ||
+      !isBoundedKcAmount(amountKc) ||
       !Number.isSafeInteger(historyId) || historyId <= 0 ||
       !occurredAtDate
     ) {
@@ -724,7 +725,7 @@ export function mapLuxartCreditHistory(
         note: text(entry.text, text(entry.uhrada, "", 1_000, true), 1_000, true) || undefined,
       };
       balance -= amountKc;
-      if (!Number.isFinite(balance)) {
+      if (!isBoundedKcAmount(balance)) {
         throw new Error("Luxart credit history produces an invalid balance.");
       }
       return transaction;

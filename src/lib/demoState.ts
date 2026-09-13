@@ -1,4 +1,5 @@
 import type { MockLuxartState } from "./mockLuxart";
+import { isBoundedKcAmount } from "./moneyBounds";
 
 export const maximumStoredDemoStateBytes = 60 * 1024;
 const maximumDemoCollectionItems = 512;
@@ -18,10 +19,6 @@ function optionalBoundedText(value: unknown, maximumLength: number) {
   return value === undefined || boundedText(value, maximumLength);
 }
 
-function finiteAmount(value: unknown, minimum = Number.NEGATIVE_INFINITY) {
-  return typeof value === "number" && Number.isFinite(value) && value >= minimum;
-}
-
 function validDateTime(value: unknown) {
   return boundedText(value, 64) && Number.isFinite(Date.parse(value));
 }
@@ -35,7 +32,7 @@ function validUser(value: unknown) {
     optionalBoundedText(value.phone, 64) &&
     optionalBoundedText(value.memberCardNumber, 128) &&
     optionalBoundedText(value.membership, 256) &&
-    finiteAmount(value.creditBalanceKc);
+    isBoundedKcAmount(value.creditBalanceKc);
 }
 
 function validReservation(value: unknown) {
@@ -46,9 +43,9 @@ function validReservation(value: unknown) {
     ["active", "cancelled", "attended", "no_show"].includes(String(value.status)) &&
     validDateTime(value.reservedAt) &&
     (value.cancelledAt === undefined || validDateTime(value.cancelledAt)) &&
-    finiteAmount(value.priceKc, 0) &&
-    (value.holdAmountKc === undefined || finiteAmount(value.holdAmountKc, 0)) &&
-    (value.cancellationFeeKc === undefined || finiteAmount(value.cancellationFeeKc, 0));
+    isBoundedKcAmount(value.priceKc, 0) &&
+    (value.holdAmountKc === undefined || isBoundedKcAmount(value.holdAmountKc, 0)) &&
+    (value.cancellationFeeKc === undefined || isBoundedKcAmount(value.cancellationFeeKc, 0));
 }
 
 function validWaitlistEntry(value: unknown) {
@@ -76,8 +73,8 @@ function validCreditTransaction(value: unknown) {
       "topup",
       "waitlist_charge",
     ].includes(String(value.type)) &&
-    finiteAmount(value.amountKc) &&
-    finiteAmount(value.balanceAfterKc) &&
+    isBoundedKcAmount(value.amountKc) &&
+    isBoundedKcAmount(value.balanceAfterKc) &&
     validDateTime(value.occurredAt) &&
     optionalBoundedText(value.note, 1_000);
 }

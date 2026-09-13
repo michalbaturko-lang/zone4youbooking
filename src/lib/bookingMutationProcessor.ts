@@ -5,6 +5,7 @@ import type {
   DurableBookingMutationLedger,
 } from "./bookingMutationLedger";
 import { BookingApiError, BookingMutationOutcomeUnknownError } from "./errors";
+import { isBoundedKcAmount } from "./moneyBounds";
 import { parseExplicitLuxartDateTime, parseLuxartLessonId } from "./luxartContract";
 
 function requestFingerprint(operation: BookingMutationOperation, targetId: string) {
@@ -28,7 +29,7 @@ function boundedIdentifier(value: unknown, maximumLength: number) {
 }
 
 function nonNegativeAmount(value: unknown) {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+  return isBoundedKcAmount(value, 0);
 }
 
 function validReservationForMutation(

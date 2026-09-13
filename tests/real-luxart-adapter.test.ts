@@ -9,6 +9,7 @@ import {
 } from "../src/lib/realLuxartAdapter";
 import { BookingApiError, BookingMutationOutcomeUnknownError } from "../src/lib/errors";
 import type { Lesson, User } from "../src/lib/domain";
+import { maximumOperationalAmountKc } from "../src/lib/moneyBounds";
 import { zone4YouScheduleRange } from "../src/lib/zone4YouTime";
 
 test("runs the documented Luxart login, lessons, credit, reservations, watchdog and payment contract", async (context) => {
@@ -31,6 +32,7 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
   let malformedMutation:
     | "reservation-create"
     | "reservation-cancel"
+    | "reservation-cancel-oversized-fee"
     | "reservation-cancel-rejected"
     | "watchdog-create"
     | "watchdog-delete"
@@ -259,6 +261,14 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
       assert.equal(url.searchParams.get("resort"), "1");
       if (malformedMutation === "reservation-cancel") {
         response.end(JSON.stringify([{ success: 1, messaget: "OK", storno_poplatek: "invalid" }]));
+        return;
+      }
+      if (malformedMutation === "reservation-cancel-oversized-fee") {
+        response.end(JSON.stringify([{
+          success: 1,
+          messaget: "OK",
+          storno_poplatek: maximumOperationalAmountKc + 1,
+        }]));
         return;
       }
       if (malformedMutation === "reservation-cancel-rejected") {
@@ -501,6 +511,11 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
     adapter.cancelReservation({ reservationId: created.id }),
     (error: unknown) => error instanceof BookingMutationOutcomeUnknownError,
   );
+  malformedMutation = "reservation-cancel-oversized-fee";
+  await assert.rejects(
+    adapter.cancelReservation({ reservationId: created.id }),
+    (error: unknown) => error instanceof BookingMutationOutcomeUnknownError,
+  );
   malformedMutation = "reservation-cancel-rejected";
   await assert.rejects(
     adapter.cancelReservation({ reservationId: created.id }),
@@ -511,7 +526,7 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
   const cancelled = await adapter.cancelReservation({ reservationId: created.id });
   assert.equal(cancelled.status, "cancelled");
   assert.equal(reservationCancelled, true);
-  assert.equal(capturedLessonQueries.length, lessonReadsBeforeCancellation + 3);
+  assert.equal(capturedLessonQueries.length, lessonReadsBeforeCancellation + 4);
 
   user.current_balance = 199;
   const lowCreditAdapter = createRealLuxartAdapter({ userId: "42", locale: "en" });

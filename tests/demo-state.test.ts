@@ -3,6 +3,7 @@ import test from "node:test";
 import { isSafeMockLuxartState, maximumStoredDemoStateBytes, safeSerializedDemoState } from "../src/lib/demoState";
 import { getMockLuxartState, resetMockLuxartState } from "../src/lib/mockLuxart";
 import { restoreDemoState } from "../src/lib/demoStateTransport";
+import { maximumOperationalAmountKc } from "../src/lib/moneyBounds";
 
 test("demo state accepts the canonical mock snapshot and stays below the request limit", () => {
   resetMockLuxartState();
@@ -19,6 +20,7 @@ test("demo state rejects malformed, unbounded and UI-breaking browser data", () 
   for (const invalid of [
     { ...state, loggedIn: "true" },
     { ...state, userState: { ...state.userState, fullName: "x".repeat(201) } },
+    { ...state, userState: { ...state.userState, creditBalanceKc: maximumOperationalAmountKc + 1 } },
     { ...state, reservations: [{}] },
     { ...state, waitlist: Array.from({ length: 513 }, () => state.waitlist[0]) },
     { ...state, occupiedCounts: { ...state.occupiedCounts, unsafe: -1 } },

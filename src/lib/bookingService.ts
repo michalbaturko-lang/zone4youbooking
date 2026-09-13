@@ -2,6 +2,7 @@ import type { BookingSnapshot, Lesson, LessonQuery, LuxartAdapter } from "./doma
 import { getLuxartAdapter } from "./adapterProvider";
 import { bookingRules } from "./bookingRules";
 import { BookingApiError } from "./errors";
+import { isBoundedKcAmount } from "./moneyBounds";
 import { zone4YouDateKey, zone4YouScheduleRange } from "./zone4YouTime";
 
 export function pilotLessonQuery(now = new Date()): LessonQuery {
@@ -40,7 +41,7 @@ export function assertLessonFeedWithinQuery(lessons: Lesson[], query: LessonQuer
         lesson.occupiedCount + lesson.availableCount > lesson.capacity
       )) ||
       (lesson.canCurrentUserReserve !== undefined && typeof lesson.canCurrentUserReserve !== "boolean") ||
-      !Number.isFinite(lesson.priceKc) || lesson.priceKc < 0 ||
+      !isBoundedKcAmount(lesson.priceKc, 0) ||
       typeof lesson.waitlistEnabled !== "boolean"
     ) {
       throw new BookingApiError(502, "LUXART_RESPONSE_INVALID", "Luxart vrátil neplatné hodnoty lekce.");

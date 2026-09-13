@@ -8,6 +8,7 @@ import {
   queryFromRequest,
 } from "../src/lib/bookingService";
 import type { Lesson, LuxartAdapter } from "../src/lib/domain";
+import { maximumOperationalAmountKc } from "../src/lib/moneyBounds";
 
 function lesson(startsAt: string): Lesson {
   const start = new Date(startsAt).getTime();
@@ -104,6 +105,7 @@ test("runtime feed rejects ambiguous or structurally invalid Luxart occurrences"
     { availableCount: 7 },
     { canCurrentUserReserve: "yes" },
     { priceKc: Number.NaN },
+    { priceKc: maximumOperationalAmountKc + 1 },
     { waitlistEnabled: undefined },
   ]) {
     assert.throws(

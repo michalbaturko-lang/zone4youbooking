@@ -32,6 +32,7 @@ import {
   type LuxartUserData,
   type LuxartWatchdogData,
 } from "./luxartContract";
+import { isBoundedKcAmount } from "./moneyBounds";
 import { createHash } from "node:crypto";
 import { availablePlacesForLesson, bookingRules, canCancelLessonAt } from "./bookingRules";
 import { BookingApiError, BookingMutationOutcomeUnknownError } from "./errors";
@@ -403,7 +404,7 @@ function requiredNonNegativeMutationNumber(value: unknown) {
     : typeof value === "string" && value.trim()
       ? Number(value)
       : Number.NaN;
-  if (!Number.isFinite(parsed) || parsed < 0) throw new BookingMutationOutcomeUnknownError();
+  if (!isBoundedKcAmount(parsed, 0)) throw new BookingMutationOutcomeUnknownError();
   return parsed;
 }
 

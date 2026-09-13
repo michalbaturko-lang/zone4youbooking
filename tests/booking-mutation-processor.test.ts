@@ -9,6 +9,7 @@ import type {
 import { processBookingMutation } from "../src/lib/bookingMutationProcessor";
 import type { Reservation } from "../src/lib/domain";
 import { BookingApiError, BookingMutationOutcomeUnknownError } from "../src/lib/errors";
+import { maximumOperationalAmountKc } from "../src/lib/moneyBounds";
 
 const reservation: Reservation = {
   id: "987",
@@ -81,6 +82,7 @@ test("a claimed mutation rejects unsafe or inconsistent Luxart results as uncert
     { ...reservation, lessonId: "luxart:1:13:321:2026-09-01T14:30:00.000Z" },
     { ...reservation, reservedAt: "2026-08-29T12:00:00" },
     { ...reservation, priceKc: -1 },
+    { ...reservation, priceKc: maximumOperationalAmountKc + 1 },
     { ...reservation, luxartCategoryId: 13 },
     { ...reservation, luxartUuid: "unsafe\nidentifier" },
   ];
@@ -135,6 +137,7 @@ test("a cancellation result must bind the reservation and include explicit non-n
   for (const invalidResult of [
     { ...cancelled, cancelledAt: "2026-08-30T12:00:00" },
     { ...cancelled, cancellationFeeKc: -1 },
+    { ...cancelled, cancellationFeeKc: maximumOperationalAmountKc + 1 },
     { ...cancelled, id: "other" },
   ]) {
     const invalid = fakeLease("claimed");
