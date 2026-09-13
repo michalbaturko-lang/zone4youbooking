@@ -313,6 +313,11 @@ check(
   "IT must explicitly confirm none/basic/bearer/custom-header gateway auth; configure it only in the secret store and run npm run verify:luxart-gateway-config.",
 );
 check(
+  "Luxart login query-string log redaction",
+  process.env.LUXART_LOGIN_QUERY_LOGGING_CONFIRMED === "true",
+  "IT/Luxart must confirm that access logs omit or redact query strings for /api/Login before any real client credentials are sent.",
+);
+check(
   "Luxart reservation resources",
   configured("LUXART_RESOURCE_MAP_JSON") && validPositiveIntegerMapping(process.env.LUXART_RESOURCE_MAP_JSON),
   "LUXART_RESOURCE_MAP_JSON must map Zone4You room numbers to positive Luxart id_resource values.",

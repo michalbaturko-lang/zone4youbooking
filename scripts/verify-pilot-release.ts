@@ -278,8 +278,8 @@ export function validateLuxartEvidence(
   const expectedPort = expectedOrigin.port || (expectedOrigin.protocol === "https:" ? "443" : "80");
   const expectedFingerprint = createHash("sha256").update(expectedOrigin.origin).digest("hex");
   const d1 = objectValue(evidence.d1, "artifacts.luxartReadOnly.d1");
-  if (d1.schemaVersion !== 3) {
-    throw new Error("artifacts.luxartReadOnly.d1.schemaVersion must be 3.");
+  if (d1.schemaVersion !== 4) {
+    throw new Error("artifacts.luxartReadOnly.d1.schemaVersion must be 4.");
   }
   exactString(d1.apiContract, supportedLuxartApiContract, "Luxart D1 apiContract");
   exactString(evidence.apiContract, supportedLuxartApiContract, "Luxart evidence apiContract");
@@ -313,6 +313,7 @@ export function validateLuxartEvidence(
   trueValue(d1.approvedOriginFingerprintVerified, "Luxart D1 approvedOriginFingerprintVerified");
   trueValue(d1.authenticatedReadOnlyVerified, "Luxart D1 authenticatedReadOnlyVerified");
   trueValue(d1.personalizedLessonSetVerified, "Luxart D1 personalizedLessonSetVerified");
+  trueValue(d1.loginQueryLoggingConfirmed, "Luxart D1 loginQueryLoggingConfirmed");
   const helpClassification = stringValue(d1.helpClassification, "Luxart D1 helpClassification");
   const helpStatus = integerValue(d1.helpHttpStatus, "Luxart D1 helpHttpStatus", 1);
   if (helpClassification === "ready") {

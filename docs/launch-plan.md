@@ -114,6 +114,8 @@ Automatický stav lze kdykoli zobrazit příkazem `npm run check:launch`. Gate z
 
 **Nejnovější lokální regrese 13. 9.:** po zabezpečení celého demo stavu, povinném oddělení běžného/Reformer UAT, zpřesnění databázové readiness a zavedení runtime kontroly úplné resource mapy prošlo 221/221 jednotkových a integračních testů, produkční sestavení a 62/62 provedených Playwright scénářů; 13 nevhodných kombinací zůstalo záměrně přeskočeno. Stav z prohlížeče se před odesláním validuje a omezuje na 60 KiB, poškozený nebo nadlimitní vstup se zahodí a zablokované čtení, zápis i mazání úložiště nepřeruší aktuální relaci. Autentizovaný tok v Chromium i WebKitu při těchto simulovaných chybách stále prošel přihlášením, rezervací a stornem. Řízené UAT před každým zápisem odmítne nesprávný typ lekce, nadlimitní kredit, cenu či storno pravidlo a každou odpověď přijme jen s omezenými částkami a explicitně zónovanými časy; finální suite musí obsahovat různou běžnou a Reformer lekci, výslovné storno poplatky včetně nuly a unikátní korelační ID. PostgreSQL readiness nyní přijme jen přesnou verzi a klíčová omezení migrací booking ledgeru a sdíleného rate limiteru. Rate limiter navíc při živém zápisu odstraňuje nejvýše 100 bucketů vypršených déle než hodinu; skutečný PostgreSQL test prokazuje hranici dávky, zachování aktivního okna i bezpečnou obnovu právě používaného klíče. Booking runtime nad aktuálním živým feedem vyžaduje, aby nasazená mapa obsahovala všechna a pouze kladná čísla pozorovaných sálů; chybějící i přidaná položka nyní skončí 503 před otevřením bookingu. Tento odstavec nahrazuje předchozí lokální počty; nový veřejný Preview důkaz se doplní až po nasazení přesného commitu.
 
+**Bezpečnostní doplněk 13. 9.:** login audit potvrdil odmítání redirectu a bezpečné aplikační chyby/logy, ale odhalil infrastrukturní riziko samotného Luxart REST kontraktu: login, MD5 hesla a volitelná karta jsou v query stringu `/api/Login`. D1 atestace verze 4, preflight, resource-map mezibrána i release dossier proto nově odmítnou live login bez písemného potvrzení, že query string neukládá ani reverzní proxy, ani webserver, ani monitoring, případně že všechny tři citlivé parametry redigují. Celá lokální regrese prošla 223/223 testy, produkčním sestavením a 62/62 provedenými Playwright scénáři; 13 kombinací zůstalo záměrně přeskočeno. Tento odstavec nahrazuje předchozí lokální počty.
+
 Finanční hodnoty z Luxartu a demo stavu mají společný vysoký technický limit 1 miliarda Kč v absolutní hodnotě. Nejde o obchodní limit klienta; chrání cenu lekce, kredit, historii, storno poplatek a idempotentní ledger před poškozeným či extrémním upstream číslem. Překročení zneplatní celou odpověď nebo nejasnou mutaci a nikdy nevytvoří falešný finanční úspěch.
 Texty profilu, lekcí, UUID a kreditní historie z Luxartu mají nyní explicitní typové, délkové a kontrolní-znakové limity. Víceřádkový popis je povolený, ale jediná extrémní hodnota nemůže zahltit mobilní UI; profilové hodnoty se zalamují uvnitř karty.
 Personalizované `user_posible` se nyní zachová jako bezpečná rezervační způsobilost. Lekce se při zákazu klienta neschová, takže scope všech `api/Lesson` zůstává úplný; `0` však zablokuje akci a chybějící nebo nebinární hodnota v přihlášené mutační cestě zastaví zápis před Luxartem. Skutečný enum musí potvrdit Zone4You test DB.
@@ -243,7 +245,7 @@ Sedmidenní termín je dosažitelný pouze jako přísně řízený pilot všech
 | Den | Povinný výstup |
 |---|---|
 | D0 | IT požadavek, potvrzený scope, veřejný `/Help`, kontraktní mapper všech lekcí |
-| D1 | Přístup na Zone4You test API, živý login/User/Lesson fixture, potvrzené mapování sálů a kategorií |
+| D1 | Přístup na Zone4You test API, potvrzená redakce login query logů, živý login/User/Lesson fixture, potvrzené mapování sálů a kategorií |
 | D2 | Serverová session, všechny lekce a kredit na stagingu |
 | D3 | Vytvoření/seznam/storno rezervace proti test DB, bez duplicit |
 | D4 | Watchdog hlídání místa, chybové stavy, Luxart emailové šablony; Stripe staging test jen s klíči, databází a webhookem |
@@ -255,7 +257,7 @@ Pokud nebude do konce D1 dostupný Luxart test server, není bezpečné slíbit 
 
 ## 9. Nejbližší řízený krok
 
-1. Od IT Zone4You získat přesný veřejný HTTPS origin, potvrzení překladu portu `9191` na interní REST port `9759`, testovací databáze a auth režimu; termín v D1.
+1. Od IT Zone4You získat přesný veřejný HTTPS origin, potvrzení překladu portu `9191` na interní REST port `9759`, testovací databáze, auth režimu a redakce query stringu `/api/Login` ve všech přístupových logách; termín v D1.
 2. **Scope je potvrzený:** všechny `api/Lesson` položky včetně všech sálů a Reformeru; Squash/masáže zatím mimo pilot.
 3. Klient potvrdí D6, D7 a D10: finální pravidla, Stripe test klíče a pilotní tým/launch okno.
 4. Po zpřístupnění API živě ověřit hotovou cestu login/session → User/kredit → Lessons → Reservations → storno a lokálně namapovaný `watchdog_III`; následně potvrdit notifikaci a Payment.

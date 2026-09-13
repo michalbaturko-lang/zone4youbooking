@@ -36,6 +36,7 @@ export interface DeploymentPreflightReport {
     luxartMode: "live" | "invalid";
     luxartApiContract: LuxartApiContract | "invalid";
     luxartTransport: "https" | "approved_test_http" | "invalid";
+    loginQueryLogging: "redacted" | "invalid";
     gatewayAuthMode: LuxartGatewayAuthMode | "invalid";
     rateLimitMode: "memory" | "postgres" | "invalid";
     bookingMutations: "enabled" | "disabled";
@@ -291,6 +292,12 @@ export function deploymentRuntimeConfigurationProblems(
   if (target === "production" && environment.LUXART_ALLOW_INSECURE_TEST_HTTP !== "false") {
     issues.push(issue("PRODUCTION_INSECURE_HTTP_OVERRIDE", "LUXART_ALLOW_INSECURE_TEST_HTTP"));
   }
+  if (environment.LUXART_LOGIN_QUERY_LOGGING_CONFIRMED !== "true") {
+    issues.push(issue(
+      "LUXART_LOGIN_QUERY_LOGGING_UNCONFIRMED",
+      "LUXART_LOGIN_QUERY_LOGGING_CONFIRMED",
+    ));
+  }
   if (!Number.isInteger(Number(environment.LUXART_RESORT_ID)) || Number(environment.LUXART_RESORT_ID) !== 1) {
     issues.push(issue("LUXART_RESORT_ID", "LUXART_RESORT_ID"));
   }
@@ -426,6 +433,9 @@ export function buildDeploymentPreflightReport(
       luxartMode: environment.LUXART_MOCK === "false" ? "live" : "invalid",
       luxartApiContract: luxartApiContract(environment),
       luxartTransport: luxartTransport(environment, target),
+      loginQueryLogging: environment.LUXART_LOGIN_QUERY_LOGGING_CONFIRMED === "true"
+        ? "redacted"
+        : "invalid",
       gatewayAuthMode,
       rateLimitMode: ["memory", "postgres"].includes(environment.RATE_LIMIT_MODE ?? "")
         ? environment.RATE_LIMIT_MODE as "memory" | "postgres"

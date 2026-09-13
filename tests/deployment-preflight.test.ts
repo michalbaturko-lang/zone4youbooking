@@ -32,6 +32,7 @@ function readOnlyStagingEnvironment(overrides: Record<string, string | undefined
     LUXART_TIMEOUT_MS: "12000",
     LUXART_API_AUTH_MODE: "none",
     LUXART_API_AUTH_CONFIRMED: "true",
+    LUXART_LOGIN_QUERY_LOGGING_CONFIRMED: "true",
     RATE_LIMIT_MODE: "memory",
     RATE_LIMIT_SINGLE_INSTANCE: "true",
     SESSION_SECRET: fakeSessionSecret,
@@ -67,6 +68,7 @@ test("read-only staging preflight and live runtime region gate fail closed", asy
   assert.equal(report.configuration.bookingMutations, "disabled");
   assert.equal(report.configuration.payments, "disabled");
   assert.equal(report.configuration.luxartApiContract, "memberzone_rest_v1");
+  assert.equal(report.configuration.loginQueryLogging, "redacted");
   assert.equal(report.commit, commit);
   assert.deepEqual(report.issues, []);
   assert.equal(runtimeDeploymentRegion({ VERCEL_REGION: " FRA1 " }), "fra1");
@@ -162,6 +164,19 @@ test("preflight requires explicit confirmation of live Luxart notification templ
   }));
   assert.equal(wrongOwner.configuration.notifications, "invalid");
   assert.ok(wrongOwner.issues.some(({ code }) => code === "NOTIFICATION_PROVIDER"));
+});
+
+test("preflight requires IT/Luxart confirmation that login query strings are not retained in access logs", () => {
+  for (const value of [undefined, "false", "yes"]) {
+    const report = buildDeploymentPreflightReport(readOnlyStagingEnvironment({
+      LUXART_LOGIN_QUERY_LOGGING_CONFIRMED: value,
+    }));
+    assert.equal(report.ok, false);
+    assert.equal(report.configuration.loginQueryLogging, "invalid");
+    assert.ok(report.issues.some(({ code, variables }) =>
+      code === "LUXART_LOGIN_QUERY_LOGGING_UNCONFIRMED" &&
+      variables.includes("LUXART_LOGIN_QUERY_LOGGING_CONFIRMED")));
+  }
 });
 
 test("Stripe staging preflight accepts only the fully signed and durable payment phase", () => {

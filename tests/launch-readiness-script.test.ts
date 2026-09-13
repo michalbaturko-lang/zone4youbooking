@@ -91,6 +91,16 @@ test("launch gate does not infer active Luxart email templates from provider own
   assert.match(confirmedTemplates.output, /PASS  Notification ownership/);
 });
 
+test("launch gate requires explicit Luxart login query-log redaction confirmation", () => {
+  const missing = runLaunchCheck("booking_without_payments", "false");
+  assert.match(missing.output, /FAIL  Luxart login query-string log redaction/);
+
+  const confirmed = runLaunchCheck("booking_without_payments", "false", {
+    LUXART_LOGIN_QUERY_LOGGING_CONFIRMED: "true",
+  });
+  assert.match(confirmed.output, /PASS  Luxart login query-string log redaction/);
+});
+
 test("launch gate rejects placeholder alert owners", () => {
   for (const supportOwner of [
     "TBD",

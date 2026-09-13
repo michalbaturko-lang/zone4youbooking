@@ -13,10 +13,11 @@ Potřebujeme:
 5. HTTPS s platným certifikátem nebo návrh bezpečného reverse proxy/tunelu; testovací klientské přihlašovací údaje přes prosté HTTP neodešleme;
 6. přesný gateway auth režim: omezení sítí bez další hlavičky, HTTP Basic, Bearer token nebo vlastní `X-*` hlavička;
 7. bezpečný způsob předání případných serverových credentials přímo do secret store; testovací klientské údaje se nesmějí znovu použít jako gateway credentials;
-8. potvrzení, že cílem je testovací databáze Zone4You, a výslovné povolení nejprve read-only testu a následně jednoho řízeného vytvoření/storna rezervace;
-9. vlastníka nebo úplnou tabulku mapování `cislo_salu` na rezervační `id_resource` pro všechny sály a Reformer;
-10. technický kontakt a časové okno pro společný integrační test;
-11. vlastníka DNS pro `booking.zone4you.cz` a možnost zřídit oddělený staging hostname. Aktuálně `booking.zone4you.cz` i `staging.booking.zone4you.cz` už přes A/AAAA míří na existující nginx, kde HTTP vrací 404 a HTTPS certifikát požadovaný hostname nepokrývá. Prosíme potvrdit, zda jde o záměrnou předpřípravu/wildcard a kdo provede pozdější řízenou změnu; zatím prosíme DNS neměnit.
+8. potvrzení, že reverzní proxy, webserver i aplikační monitoring pro `/api/Login` neukládají celý query string, případně bezpečně redigují parametry `login`, `password` a `member_card_number`; Luxart REST kontrakt je posílá v URL a bez této ochrany by je zachytil přístupový log;
+9. potvrzení, že cílem je testovací databáze Zone4You, a výslovné povolení nejprve read-only testu a následně jednoho řízeného vytvoření/storna rezervace;
+10. vlastníka nebo úplnou tabulku mapování `cislo_salu` na rezervační `id_resource` pro všechny sály a Reformer;
+11. technický kontakt a časové okno pro společný integrační test;
+12. vlastníka DNS pro `booking.zone4you.cz` a možnost zřídit oddělený staging hostname. Aktuálně `booking.zone4you.cz` i `staging.booking.zone4you.cz` už přes A/AAAA míří na existující nginx, kde HTTP vrací 404 a HTTPS certifikát požadovaný hostname nepokrývá. Prosíme potvrdit, zda jde o záměrnou předpřípravu/wildcard a kdo provede pozdější řízenou změnu; zatím prosíme DNS neměnit.
 
 Napojení je server-to-server, proto nepotřebujeme CORS pro browser. První ověření bude pouze read-only; mutace spustíme až po samostatném schválení testovacího scénáře.
 

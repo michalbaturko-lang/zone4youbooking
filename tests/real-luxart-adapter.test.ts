@@ -124,6 +124,11 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
         response.end(JSON.stringify({ user_id: 0, current_balance: null }));
         return;
       }
+      if (url.searchParams.get("login") === "upstream-error@example.invalid") {
+        response.statusCode = 500;
+        response.end(JSON.stringify({ error: "unsafe upstream detail" }));
+        return;
+      }
       assert.equal(url.searchParams.get("login"), "test@example.invalid");
       assert.match(url.searchParams.get("password") ?? "", /^[A-F0-9]{32}$/);
       response.end(JSON.stringify(user));
@@ -367,6 +372,16 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
     /dočasně nedostupný/i,
   );
   assert.equal(redirectFollowed, false);
+  const sensitiveLogin = "upstream-error@example.invalid";
+  const sensitivePassword = "never-reflect-this-password";
+  await assert.rejects(
+    anonymousAdapter.login({ login: sensitiveLogin, password: sensitivePassword }),
+    (error: unknown) => error instanceof BookingApiError &&
+      error.code === "LUXART_UPSTREAM_ERROR" &&
+      !error.message.includes(sensitiveLogin) &&
+      !error.message.includes(sensitivePassword) &&
+      !error.message.includes("unsafe upstream detail"),
+  );
 
   const adapter = createRealLuxartAdapter({ userId: "42", locale: "en" });
   assert.equal((await adapter.getCurrentUser())?.creditBalanceKc, 1_400);

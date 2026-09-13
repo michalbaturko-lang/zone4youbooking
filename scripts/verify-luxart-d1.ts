@@ -114,6 +114,11 @@ export function loadLuxartD1Configuration(
   if (environment.LUXART_REQUIRE_AUTHENTICATED_PROBE !== "true") {
     throw new Error("Luxart D1 verification requires the authenticated read-only probe.");
   }
+  if (environment.LUXART_LOGIN_QUERY_LOGGING_CONFIRMED !== "true") {
+    throw new Error(
+      "Luxart D1 verification requires IT/Luxart confirmation that /api/Login query strings are omitted or redacted from access logs.",
+    );
+  }
   if (environment.LUXART_RESORT_ID !== "1") {
     throw new Error("Luxart D1 verification is locked to Zone4You resort 1.");
   }
@@ -237,7 +242,7 @@ export async function runLuxartD1Verification({
   const d1Evidence = {
     ...evidence,
     d1: {
-      schemaVersion: 3,
+      schemaVersion: 4,
       checkedAt: help.checkedAt,
       targetFingerprintSha256: configuration.targetFingerprintSha256,
       helpClassification: help.classification,
@@ -254,6 +259,7 @@ export async function runLuxartD1Verification({
       approvedOriginFingerprintVerified: true,
       authenticatedReadOnlyVerified: true,
       personalizedLessonSetVerified: true,
+      loginQueryLoggingConfirmed: true,
     },
   };
   const body = `${JSON.stringify(d1Evidence, null, 2)}\n`;

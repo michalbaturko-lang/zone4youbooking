@@ -29,6 +29,7 @@ function environment(outputPath: string) {
     LUXART_RESORT_ID: "1",
     LUXART_API_AUTH_MODE: "none",
     LUXART_API_AUTH_CONFIRMED: "true",
+    LUXART_LOGIN_QUERY_LOGGING_CONFIRMED: "true",
     LUXART_TEST_LOGIN: "test-client",
     LUXART_TEST_PASSWORD: "not-printed",
     ZONE4YOU_LUXART_EVIDENCE_OUTPUT_PATH: outputPath,
@@ -110,11 +111,12 @@ test("D1 configuration is locked to the exact approved HTTPS REST origin and a p
       { LUXART_API_CONTRACT: "soap_wcf" },
       { LUXART_ALLOW_INSECURE_TEST_HTTP: "true" },
       { LUXART_REQUIRE_AUTHENTICATED_PROBE: "false" },
+      { LUXART_LOGIN_QUERY_LOGGING_CONFIRMED: "false" },
     ];
     for (const drift of unsafe) {
       assert.throws(
         () => loadLuxartD1Configuration({ ...environment(outputPath), ...drift }, "/repository"),
-        /HTTPS|REST|same approved origin|SHA-256|does not match|must exactly equal|refuses|authenticated/i,
+        /HTTPS|REST|same approved origin|SHA-256|does not match|must exactly equal|refuses|authenticated|access logs/i,
       );
     }
 
@@ -204,7 +206,7 @@ test("D1 binds transport, gateway, semantic contract and authenticated read-only
     delete parsed.d1;
     assert.deepEqual(parsed, readonlyEvidence());
     assert.deepEqual(d1, {
-      schemaVersion: 3,
+      schemaVersion: 4,
       checkedAt: now.toISOString(),
       targetFingerprintSha256: approvedOriginFingerprint,
       helpClassification: "ready",
@@ -221,6 +223,7 @@ test("D1 binds transport, gateway, semantic contract and authenticated read-only
       approvedOriginFingerprintVerified: true,
       authenticatedReadOnlyVerified: true,
       personalizedLessonSetVerified: true,
+      loginQueryLoggingConfirmed: true,
     });
   } finally {
     rmSync(directory, { recursive: true, force: true });
