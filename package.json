@@ -16,6 +16,7 @@
     "verify:luxart-public-contract": "tsx scripts/verify-luxart-public-contract.ts",
     "verify:luxart-soap-public-contract": "tsx scripts/verify-luxart-soap-public-contract.ts",
     "verify:luxart-d1": "tsx scripts/verify-luxart-d1.ts",
+    "verify:luxart-resource-map": "tsx scripts/verify-luxart-resource-map.ts",
     "verify:deployment-preflight": "tsx scripts/verify-deployment-preflight.ts",
     "verify:luxart-gateway-config": "tsx scripts/verify-luxart-gateway-config.ts",
     "verify:luxart-readonly": "tsx scripts/verify-luxart-readonly.ts",
