@@ -35,6 +35,42 @@ test("PostgreSQL rate limiter atomically enforces one shared window across conne
 
     assert.equal((await limiter.take("second-client", rule)).allowed, true);
 
+    await pool.query(
+      `INSERT INTO zone4you_rate_limit_buckets (bucket_key, scope, request_count, reset_at, updated_at)
+       SELECT
+         'expired-' || number::text,
+         'cleanup-test',
+         1,
+         clock_timestamp() - interval '2 hours',
+         clock_timestamp() - interval '2 hours'
+       FROM generate_series(1, 150) AS number`,
+    );
+    await pool.query(
+      `INSERT INTO zone4you_rate_limit_buckets (bucket_key, scope, request_count, reset_at, updated_at)
+       VALUES
+         ('active-cleanup-control', 'cleanup-test', 1, clock_timestamp() + interval '1 hour', clock_timestamp()),
+         ('cleanup-trigger', 'cleanup-test', 2, clock_timestamp() - interval '2 hours', clock_timestamp() - interval '2 hours')`,
+    );
+
+    assert.equal((await limiter.take("cleanup-trigger", rule)).allowed, true);
+    const cleanupState = await pool.query<{
+      expired_count: number;
+      active_count: number;
+      trigger_count: number;
+      trigger_is_active: boolean;
+    }>(
+      `SELECT
+         COUNT(*) FILTER (WHERE bucket_key LIKE 'expired-%')::int AS expired_count,
+         COUNT(*) FILTER (WHERE bucket_key = 'active-cleanup-control')::int AS active_count,
+         MAX(request_count) FILTER (WHERE bucket_key = 'cleanup-trigger')::int AS trigger_count,
+         BOOL_AND(reset_at > clock_timestamp()) FILTER (WHERE bucket_key = 'cleanup-trigger') AS trigger_is_active
+       FROM zone4you_rate_limit_buckets`,
+    );
+    assert.equal(cleanupState.rows[0]?.expired_count, 50);
+    assert.equal(cleanupState.rows[0]?.active_count, 1);
+    assert.equal(cleanupState.rows[0]?.trigger_count, 1);
+    assert.equal(cleanupState.rows[0]?.trigger_is_active, true);
+
     await pool.query("ALTER TABLE zone4you_rate_limit_buckets DROP CONSTRAINT zone4you_rate_limit_buckets_pkey");
     await pool.query(
       "ALTER TABLE zone4you_rate_limit_buckets ADD CONSTRAINT zone4you_rate_limit_buckets_decoy_pkey PRIMARY KEY (bucket_key, scope)",

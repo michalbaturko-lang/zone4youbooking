@@ -29,6 +29,8 @@ interface PostgresRateLimitRow {
 const rateLimitTable = "zone4you_rate_limit_buckets";
 const rateLimitSchemaTable = "zone4you_rate_limit_schema";
 const rateLimitSchemaVersion = 1;
+const postgresCleanupBatchSize = 100;
+const postgresCleanupGraceMs = 60 * 60_000;
 
 export class InMemoryFixedWindowRateLimiter {
   private readonly buckets = new Map<string, Bucket>();
@@ -114,6 +116,19 @@ export class PostgresFixedWindowRateLimiter {
     const result = await this.pool.query<PostgresRateLimitRow>(
       `WITH observed AS (
          SELECT clock_timestamp() AS observed_at
+       ), expired AS (
+         SELECT bucket_key
+         FROM ${rateLimitTable}, observed
+         WHERE reset_at <= observed_at - ($5::bigint * interval '1 millisecond')
+           AND bucket_key <> $1
+         ORDER BY reset_at, bucket_key
+         LIMIT $6::integer
+         FOR UPDATE SKIP LOCKED
+       ), pruned AS (
+         DELETE FROM ${rateLimitTable} AS buckets
+         USING expired
+         WHERE buckets.bucket_key = expired.bucket_key
+         RETURNING buckets.bucket_key
        ), upserted AS (
          INSERT INTO ${rateLimitTable} (bucket_key, scope, request_count, reset_at, updated_at)
          SELECT $1, $2, 1, observed_at + ($3::bigint * interval '1 millisecond'), observed_at
@@ -134,8 +149,9 @@ export class PostgresFixedWindowRateLimiter {
        SELECT
          request_count::int,
          GREATEST(1, CEIL(EXTRACT(EPOCH FROM (reset_at - clock_timestamp()))))::int AS retry_after_seconds
-       FROM upserted`,
-      [key, rule.scope, rule.windowMs, rule.limit],
+       FROM upserted
+       CROSS JOIN (SELECT COUNT(*) FROM pruned) AS cleanup`,
+      [key, rule.scope, rule.windowMs, rule.limit, postgresCleanupGraceMs, postgresCleanupBatchSize],
     );
     const row = result.rows[0];
     if (!row) throw new Error("PostgreSQL rate limiter did not return a bucket.");

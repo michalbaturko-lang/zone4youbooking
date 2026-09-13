@@ -102,7 +102,7 @@ Pro čistou klientskou prezentaci otevřete veřejný Preview v novém anonymní
 - `src/lib/realLuxartAdapter.ts` mapuje zdokumentované Luxart login/User/Lesson/Reservations/watchdog/Payment kontrakty; živé ověření Zone4You instance stále chybí.
 - `src/lib/bookingMutationLedger.ts` serializuje booking změny jednoho klienta, přehrává dokončený výsledek a při nejasném timeoutu vyžaduje reconciliation; schéma je v `migrations/002_booking_mutation_ledger.sql`.
 - `src/lib/paymentLedger.ts` drží atomický PostgreSQL event/session ledger; schéma je v `migrations/001_payment_ledger.sql`.
-- `src/lib/rateLimit.ts` používá v produkčním multi-instance režimu atomický PostgreSQL fixed-window limiter; schéma je v `migrations/003_rate_limit.sql`. Paměťový režim je povolen jen pro demo nebo výslovně potvrzený single-instance pilot.
+- `src/lib/rateLimit.ts` používá v produkčním multi-instance režimu atomický PostgreSQL fixed-window limiter; schéma je v `migrations/003_rate_limit.sql`. Při každém zápisu opportunisticky odstraní nejvýše 100 záznamů vypršených déle než hodinu, přičemž právě používaný klíč a aktivní okna chrání. Paměťový režim je povolen jen pro demo nebo výslovně potvrzený single-instance pilot.
 - `src/lib/deploymentPreflight.ts` váže runtime konfiguraci na prostředí, fázi a celý Git commit; readiness a release dossier pak ověřují stejnou provenienci.
 - `src/app/api/*` jsou serverové BFF handlery; browser nevolá Luxart ani nepřipisuje kredit přímo.
 - `src/app/page.tsx` je klientsky booking dashboard pro prezentaci.
