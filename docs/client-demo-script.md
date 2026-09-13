@@ -1,6 +1,6 @@
 # Zone4You Booking - demo scénář pro klienta
 
-Aktualizace: 2026-09-12
+Aktualizace: 2026-09-13
 
 ## Cíl prezentace
 
@@ -8,7 +8,7 @@ Ukázat klientovi, že nový booking má reálnou produktovou podobu: rozvrh vš
 
 ## Před prezentací
 
-1. Použít aktuální izolovaný Vercel Preview z handoff zprávy nebo lokální náhled. Produkční doménu, alias ani DNS bez výslovného schválení neměnit.
+1. Použít ověřený izolovaný Vercel Preview `https://zone4youbooking-58efsjlv6-mbos-projects-220653ae.vercel.app/`. Produkční doménu, alias ani DNS bez výslovného schválení neměnit.
 2. Otevřít náhled ideálně v novém anonymním okně Chrome, aby prezentace začínala v čistém stavu.
 3. Ověřit viditelné označení ukázkové verze a informaci, že rezervace ani kredit se neukládají do Memberzone.
 4. Ověřit, že úvodní stav je odhlášený a v horní liště je tlačítko `Přihlásit se`.
@@ -21,13 +21,12 @@ Ukázat klientovi, že nový booking má reálnou produktovou podobu: rozvrh vš
 - Chrome smoke ověřil načtení aplikace, čistý odhlášený start, login demo klienta a vytvoření rezervace.
 - Serverless demo stav je izolovaný: nový návštěvník nezačíná s předchozím testovacím stavem.
 - Poslední lokální runtime probe ověřil 24 unikátních lekcí, Sál 1, Sál 2, Sál 3 a 3 položky Reformeru.
-- Aktuální lokální regrese 13. 9. prošla 207/207 integračními a jednotkovými testy, produkčním buildem a 60/60 provedenými lokálními browser scénáři v šesti projektech a dvou enginech; 8 kopií dvou stavových bezpečnostních toků mimo nejmenší mobil a jedna desktopová duplicita mobilní ergonomie se záměrně nepouštějí. Samostatný mobilní WebKit 390 × 844 bez loginu a mutací ověřil úplnost rozvrhu, ergonomii, WCAG/focus flow, angličtinu a oblíbené. Veřejný Preview byl znovu ověřen pro přesný commit `ca5c085ed7a820ecb78c678a1ab6c661a8d81f46` a region `fra1`: prošel 20/20 nízkoobjemovými scénáři v pěti viewpor-tech; čtyři nadbytečné login průchody a desktopová mobilní ergonomie byly záměrně přeskočené. Jednorázový mobilní Lighthouse lab nad stejným Preview naměřil výkon 97/100, přístupnost 100/100, LCP 2,344 s, TBT 2 ms, CLS 0 a přenos 168 051 B. Best Practices 92/100 snižuje pouze Vercel Preview toolbar, který se pokusil načíst cizí skript a naše CSP jej správně zablokovalo; SEO 60/100 je u izolovaného Preview záměrné kvůli `noindex`. INP p75 zůstává staging/UAT bodem, protože laboratorní běh bez interakce ho neposkytl. Runtime probe zároveň potvrdil 24 unikátních lekcí, všechny tři sály, 3 Reformery, stejný CS/EN hash výskytů a přesných 7 pražských dnů. Další externí běh smí začít jen nad Preview, které samo vrátí očekávaný přesný Git commit a region `fra1`. Watchdog zůstává v omezeném pilotu vypnutý i na přímé API úrovni; jeho případné smazání navíc vyžaduje záznam patřící přihlášenému klientovi. Počet volných míst se v živém adapteru bere přímo z Luxart `volno`, takže členskou kvótu nepřepíše prostý dopočet z kapacity. Chybné názvové nebo rezervační mapování a nekonzistentní ID lekce se odmítnou ještě před zápisem. Stejně se nesmí jako úspěšná uložit ani přehrát rezervace s jiným klientem nebo výskytem, zápornou cenou či poplatkem, nebo bez explicitní časové zóny. Bezpečnostní audit závislostí hlásí 0 známých zranitelností. Starší detailní počty v následujícím bodu jsou archivní.
-- Novější doplněk regrese 13. 9. po přidání před-UAT validace resource mapy a lokálního autentizovaného WebKit/Safari průchodu prošel 211/211 jednotkovými a integračními testy a 62/62 provedenými browser scénáři; 13 nevhodných kombinací projektu a scénáře bylo záměrně přeskočeno. Referenční mobil 390 × 844 zobrazil všech 37 položek rozšířeného feedu a dynamicky přidal nové sály bez overflow či ovládání pod 44 px. WebKit ve stejném viewportu proti izolovanému mocku ověřil přihlášení, rezervaci a storno běžné lekce i Reformeru; nejde o náhradu živého Luxart UAT. Tento výsledek nahrazuje počty v předchozím bodu.
-- Nejnovější lokální regrese 13. 9. po zabezpečení demo stavu, oddělení běžného/Reformer UAT a zpřesnění databázové readiness prošla 219/219 jednotkovými a integračními testy, produkčním sestavením a 62/62 provedenými browser scénáři; 13 nevhodných kombinací bylo záměrně přeskočeno. Chromium i WebKit při simulovaně zablokovaném úložišti stále dokončily přihlášení, rezervaci a storno; poškozený stav se vrátí do bezpečného odhlášeného stavu. Živé UAT nově musí rezervovat a stornovat dva různé výskyty — běžnou lekci i Reformer — a u každého bezpečně odmítne nesprávný typ, patologické částky, nezónované časy nebo chybějící storno poplatek. Tento výsledek nahrazuje předchozí lokální počty; veřejné Preview bude znovu ověřeno po nasazení přesného commitu.
+- Autoritativní regrese 13. 9. pro commit `20895127ec42dcb57fa35374791c7f5d47081108`: 226/226 jednotkových a integračních testů, produkční sestavení, 62/62 lokálních browser scénářů a 24/24 nízkoobjemových scénářů nad přesným veřejným Preview. Chromium i WebKit pokrývají mobile-first rozvrh, CS/EN, přihlášení, rezervaci a storno běžné lekce i Reformeru proti izolovanému mocku; 13 lokálních a 5 veřejných nevhodných kombinací je záměrně přeskočeno. Runtime potvrzuje 24 lekcí, všechny tři sály, 3 Reformery, sedm pražských dnů a region `fra1`. Bezpečnostní audit závislostí i celé Git historie je čistý. To není náhrada živého Luxart UAT.
+- Následující technické body popisují vlastnosti ověřené v průběžných regresích; starší mezipočty už nejsou aktuální release evidence.
 - Extrémní finanční hodnota z poškozeného Luxart nebo demo payloadu se nezobrazí ani neuloží jako úspěšná rezervace; technický limit je oddělený od obchodních pravidel Zone4You.
 - Textové hodnoty z Luxartu jsou omezené podle použití; extrémní nebo řídicí obsah neshodí mobilní rozvrh a dlouhé legitimní profilové údaje se zalomí uvnitř karty.
 - Reformer v demu záměrně neukazuje půlnoční storno běžných lekcí jako své pravidlo. Detail v češtině i angličtině pravdivě uvádí, že jeho storno podmínky čekají na potvrzení; rezervaci/storno v živém režimu brána do té doby nepovolí.
-- Poslední automatická sada prošla 207/207 testy, samostatnými 1/1 booking, 1/1 payment a 1/1 rate-limit PostgreSQL souběžnými testy a 60/60 provedenými desktop/mobile browser scénáři v šesti projektech a dvou enginech; runtime probe navíc porovnává českou a anglickou aplikační cestu a ukládá skutečný stav schedule/bookingu/plateb pro release dossier. Browser umí bezpečný persistentní výpadek/retry a vypršení session s kódem pro podporu. Samostatný session scénář dokazuje, že nepřihlášený klient neodešle rezervaci, login přežije reload a logout odstraní klientská data i přístup k chráněným rezervacím. Live logout smaže cookie i bez Luxartu/limiteru, zatímco cizí Origin ji změnit nesmí. Login i detail lekce mají WCAG scan a skutečně ověřený klávesnicový focus, Tab trap, `Escape` a návrat na původní ovládací prvek. Feed je uzamčený na sedm pražských kalendářních dnů a resort 1 bez možnosti přepsání z URL; kontraktní test navíc přímo dokazuje Luxart `pocet_dni_dopredu=7` a runtime odmítá neplatný časový interval, neúplnou lekci, duplicitní occurrence ID nebo osmý pražský den. Readiness vrátí `schedule=ready` pouze pro validní neprázdný sedmidenní feed. Sdílený limiter chrání i veřejná a účtová čtení. Reálné Luxart/UAT/rollback/alert producenty jsou přímo testované proti finálnímu release kontraktu; ten odmítne diagnostický Luxart důkaz bez testovacího loginu, rozdílný interval, lekci mimo sedm dnů, opakovaná request ID i alert bez support vlastníka. D1 váže cílový Luxart origin na výslovně schválený SHA-256 otisk bez toho, aby svévolně zakázal legitimní hostname, a dossier schématu 6 navíc vyžaduje přímo uloženou D1 atestaci, čerstvý technický Memberzone fallback důkaz a nepřepisovatelnou startovní rollback účtenku svázanou SHA-256 s výsledkem drillu; samostatný diagnostický read-only výstup už jako release důkaz neprojde. Bez nastavené launch fáze zůstává gate správně `NO-GO` (6/27); pro zamýšlený pilot `booking_without_payments` je aktuálně 8/23 a čtyři Stripe kontroly transparentně přeskakuje.
+- Aktuální launch gate je záměrně `NO-GO`: bez zvolené fáze prochází 6/28 relevantních kontrol; pro `booking_without_payments` prochází 7/24 a čtyři Stripe kontroly jsou správně mimo rozsah. Autoritou je vždy čerstvý výstup `npm run check:launch`, nikoli historický počet v dokumentaci.
 
 ## Doporučený průchod
 
@@ -38,7 +37,7 @@ Ukázat klientovi, že nový booking má reálnou produktovou podobu: rozvrh vš
 2. Rozvrh lekcí.
    - Přepnout Den / Týden.
    - Vyzkoušet filtr podle místnosti a typu lekce.
-   - Ukázat cenu, obsazenost, instruktora a indikaci 48h rezervačního okna.
+   - Ukázat cenu, obsazenost a instruktora. Případné časové omezení v demu výslovně označit jako ukázkové, protože živé rezervační okno ještě není potvrzené.
 
 3. Detail lekce.
    - Otevřít lekci.
@@ -73,7 +72,7 @@ Ukázat klientovi, že nový booking má reálnou produktovou podobu: rozvrh vš
 
 - UI a flow jsou připravené proti adapteru.
 - Veřejná `/Help` dokumentace je dostupná a reálný adapter je lokálně namapovaný a kontraktně otestovaný.
-- IT potvrdilo zveřejnění portu 9191, ale nedodalo veřejný hostname/IP ani potvrzení překladu na interní REST port 9759. SOAP/WCF na `api.memberzone.online:9191` je jiná služba. Čekáme na přesný HTTPS REST origin, test DB a auth režim. Dále chybí mapování sálů na `id_resource` a povolení bezpečných mutačních testů.
+- Nejpravděpodobnější zamýšlený host je `api.memberzone.online:9191`, ale aktuálně je port navázaný na jinou SOAP/WCF aplikaci: veřejný kořen má directory listing a REST `/Help` vrací 404. Čekáme na opravu překladu na interní Zone4You REST port 9759, přesný HTTPS origin, test DB a auth režim. Dále chybí mapování sálů na `id_resource` a povolení bezpečných mutačních testů.
 - Luxart musí živě potvrdit Reservations, storno, watchdog notifikaci a `zpusob_uhrady`/deduplikaci pro Payment.
 
 ## Co neprezentovat jako hotové
