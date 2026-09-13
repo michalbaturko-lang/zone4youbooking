@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmodSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import {
   loadProductionCutoverConfig,
   runProductionCutoverVerification,
+  writeProductionCutoverEvidence,
 } from "../scripts/verify-production-cutover";
 import { lessonContentSetSha256 } from "../scripts/lesson-content-evidence.mjs";
 import type { Lesson } from "../src/lib/domain";
@@ -308,6 +309,59 @@ test("production cutover verifier proves DNS, security, runtime provenance and m
   assert.equal(evidence.requestIds.lessonsCs, "lessons-cs");
   assert.equal(evidence.requestIds.lessonsEn, "lessons-en");
   assert.equal(JSON.stringify(evidence).includes("203.0.113.10"), false);
+});
+
+test("production cutover writes one immutable owner-only release receipt outside the repository", async () => {
+  const outputPath = join(fixtureDirectory, `production-cutover-${fixtureCounter += 1}.json`);
+  const receipt = await writeProductionCutoverEvidence({
+    environment: {
+      ...baseEnvironment,
+      ZONE4YOU_PRODUCTION_CUTOVER_EVIDENCE_OUTPUT_PATH: outputPath,
+    },
+    fetchImpl: liveFetch(),
+    resolveAnyImpl: async () => [{ type: "A", address: "203.0.113.10", ttl: 60 }],
+    now: checkedAt,
+  });
+
+  assert.equal(receipt.schemaVersion, 1);
+  assert.equal(receipt.ok, true);
+  assert.equal(receipt.evidenceStoredOwnerOnly, true);
+  assert.match(receipt.evidenceSha256, /^[a-f0-9]{64}$/);
+  assert.equal(statSync(outputPath).mode & 0o777, 0o600);
+  const stored = JSON.parse(readFileSync(outputPath, "utf8")) as Record<string, unknown>;
+  assert.equal(stored.schemaVersion, 1);
+  assert.equal(stored.preCutoverEvidenceSha256, approvedPreCutover.sha256);
+  assert.equal(stored.expectedCommit, commit);
+  assert.equal("evidenceSha256" in stored, false);
+
+  await assert.rejects(
+    writeProductionCutoverEvidence({
+      environment: {
+        ...baseEnvironment,
+        ZONE4YOU_PRODUCTION_CUTOVER_EVIDENCE_OUTPUT_PATH: outputPath,
+      },
+      fetchImpl: liveFetch(),
+      resolveAnyImpl: async () => [{ type: "A", address: "203.0.113.10", ttl: 60 }],
+      now: checkedAt,
+    }),
+    /already exists and will not be overwritten/i,
+  );
+});
+
+test("production cutover refuses to store its release receipt inside the repository", async () => {
+  await assert.rejects(
+    writeProductionCutoverEvidence({
+      environment: {
+        ...baseEnvironment,
+        ZONE4YOU_PRODUCTION_CUTOVER_EVIDENCE_OUTPUT_PATH: join(fixtureDirectory, "inside-repository.json"),
+      },
+      repositoryRoot: fixtureDirectory,
+      fetchImpl: liveFetch(),
+      resolveAnyImpl: async () => [{ type: "A", address: "203.0.113.10", ttl: 60 }],
+      now: checkedAt,
+    }),
+    /must be stored outside the repository/i,
+  );
 });
 
 test("production verifier independently enforces the approved chronology", async () => {

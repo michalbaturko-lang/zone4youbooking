@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import type { AnyRecord } from "node:dns";
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { existsSync, lstatSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import type { BookingCapabilities, Lesson } from "../src/lib/domain";
 import { lessonContentSetSha256 } from "./lesson-content-evidence.mjs";
 import { lessonPlacementEvidence } from "./lesson-placement-evidence";
@@ -68,6 +69,14 @@ export interface ProductionCutoverDependencies {
   now?: () => Date;
 }
 
+export interface ProductionCutoverWriteOptions {
+  environment?: Environment;
+  fetchImpl?: FetchLike;
+  resolveAnyImpl?: ResolveAnyLike;
+  now?: Date;
+  repositoryRoot?: string;
+}
+
 interface ApiResult<T> {
   body: T;
   requestId: string;
@@ -92,6 +101,8 @@ interface PreCutoverReceipt {
   };
 }
 
+const repositoryRootDefault = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
 function required(environment: Environment, name: string) {
   const value = environment[name]?.trim();
   if (!value) throw new Error(`${name} is required.`);
@@ -110,6 +121,28 @@ function boundedInteger(
     throw new Error(`${name} must be an integer between ${minimum} and ${maximum}.`);
   }
   return value;
+}
+
+function outputTarget(raw: string, repositoryRoot: string) {
+  const outputPath = resolve(raw);
+  if (!outputPath.endsWith(".json")) {
+    throw new Error("ZONE4YOU_PRODUCTION_CUTOVER_EVIDENCE_OUTPUT_PATH must end in .json.");
+  }
+  const fromRepository = relative(resolve(repositoryRoot), outputPath);
+  if (fromRepository === "" || (!fromRepository.startsWith("..") && !isAbsolute(fromRepository))) {
+    throw new Error("Production cutover evidence must be stored outside the repository.");
+  }
+  if (existsSync(outputPath)) {
+    throw new Error("Production cutover evidence output already exists and will not be overwritten.");
+  }
+  const parent = lstatSync(dirname(outputPath));
+  if (!parent.isDirectory() || parent.isSymbolicLink()) {
+    throw new Error("Production cutover evidence parent must be a real directory.");
+  }
+  if ((parent.mode & 0o077) !== 0) {
+    throw new Error("Production cutover evidence parent must not be accessible by group or other users.");
+  }
+  return outputPath;
 }
 
 function approvedLessonFeed(value: unknown): ApprovedLessonFeedEvidence {
@@ -641,6 +674,7 @@ export async function runProductionCutoverVerification(
   }
 
   return {
+    schemaVersion: 1,
     ok: true,
     checkedAt: checkedAt.toISOString(),
     target: config.target.origin,
@@ -698,10 +732,47 @@ export async function runProductionCutoverVerification(
   };
 }
 
+export async function writeProductionCutoverEvidence(
+  options: ProductionCutoverWriteOptions = {},
+) {
+  const environment = options.environment ?? process.env;
+  const now = options.now ?? new Date();
+  if (!Number.isFinite(now.getTime())) throw new Error("Production cutover evidence time is invalid.");
+  const outputPath = outputTarget(
+    required(environment, "ZONE4YOU_PRODUCTION_CUTOVER_EVIDENCE_OUTPUT_PATH"),
+    options.repositoryRoot ?? repositoryRootDefault,
+  );
+  const evidence = await runProductionCutoverVerification(
+    loadProductionCutoverConfig(environment, now),
+    {
+      ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
+      ...(options.resolveAnyImpl ? { resolveAnyImpl: options.resolveAnyImpl } : {}),
+      now: () => now,
+    },
+  );
+  const body = `${JSON.stringify(evidence, null, 2)}\n`;
+  writeFileSync(outputPath, body, { encoding: "utf8", flag: "wx", mode: 0o600 });
+  const stored = readStableReleaseJson(outputPath, "Production cutover evidence", {
+    maximumBytes: 512 * 1024,
+    ownerOnly: true,
+  });
+  if (!stored.bytes.equals(Buffer.from(body, "utf8"))) {
+    throw new Error("Production cutover evidence changed while it was being stored.");
+  }
+  if ((lstatSync(outputPath).mode & 0o777) !== 0o600) {
+    throw new Error("Production cutover evidence file permissions are not owner-only.");
+  }
+  return {
+    ...evidence,
+    evidenceSha256: stored.sha256,
+    evidenceStoredOwnerOnly: true,
+  };
+}
+
 const isDirectRun = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isDirectRun) {
-  runProductionCutoverVerification(loadProductionCutoverConfig())
-    .then((evidence) => console.log(JSON.stringify(evidence, null, 2)))
+  writeProductionCutoverEvidence()
+    .then((receipt) => console.log(JSON.stringify(receipt, null, 2)))
     .catch((error: unknown) => {
       console.error(
         `Production cutover verification failed: ${error instanceof Error ? error.message : "Unknown error."}`,
