@@ -7,6 +7,7 @@ import {
   canCancelLessonAt,
   freeCancellationDeadlineForLesson,
   isReformerLesson,
+  reservationTimingForLesson,
 } from "../src/lib/bookingRules";
 import type { BookingRules, Lesson } from "../src/lib/domain";
 
@@ -78,4 +79,30 @@ test("Luxart reported availability takes precedence over capacity arithmetic", (
   });
   assert.equal(availablePlacesForLesson(quotaRestricted), 1);
   assert.equal(availablePlacesForLesson({ ...quotaRestricted, availableCount: undefined }), 4);
+});
+
+test("reservation timing distinguishes a future opening from a closed past lesson", () => {
+  const rules = { ...bookingRules, reservationWindowHours: 48 };
+  const target = lesson({ startsAt: "2026-09-12T17:30:00.000Z" });
+
+  assert.equal(
+    reservationTimingForLesson(target, rules, new Date("2026-09-10T17:29:59.999Z")),
+    "not_open",
+  );
+  assert.equal(
+    reservationTimingForLesson(target, rules, new Date("2026-09-10T17:30:00.000Z")),
+    "open",
+  );
+  assert.equal(
+    reservationTimingForLesson(target, rules, new Date("2026-09-12T17:29:59.999Z")),
+    "open",
+  );
+  assert.equal(
+    reservationTimingForLesson(target, rules, new Date("2026-09-12T17:30:00.000Z")),
+    "closed",
+  );
+  assert.equal(
+    reservationTimingForLesson(target, rules, new Date("invalid")),
+    "closed",
+  );
 });

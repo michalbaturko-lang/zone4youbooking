@@ -32,6 +32,7 @@ import {
   canCancelLessonAt,
   freeCancellationDeadlineForLesson,
   isReformerLesson,
+  reservationTimingForLesson,
 } from "@/lib/bookingRules";
 import type { BookingCapabilities, BookingRules, BookingSnapshot, Lesson, LoginInput, Reservation, WaitlistEntry } from "@/lib/domain";
 import { useI18n } from "./providers";
@@ -295,12 +296,6 @@ function displayRoomName(roomName: string, locale: Locale) {
 function displayCategory(category: string, locale: Locale) {
   if (locale !== "en") return category;
   return ({ Síla: "Strength", Zdraví: "Health", Ostatní: "Other" } as Record<string, string>)[category] ?? category;
-}
-
-function canReserve(lesson: Lesson, rules: BookingRules) {
-  const now = Date.now();
-  const start = new Date(lesson.startsAt).getTime();
-  return start > now && start - now <= rules.reservationWindowHours * 60 * 60 * 1000;
 }
 
 function hasMinimumCredit(creditBalanceKc: number, rules: BookingRules) {
@@ -1302,7 +1297,8 @@ function LessonRow({
   const state = occupancyState(lesson, t);
   const booked = Boolean(reservation);
   const listed = Boolean(waitlistEntry);
-  const reservable = canReserve(lesson, rules);
+  const reservationTiming = reservationTimingForLesson(lesson, rules);
+  const reservable = reservationTiming === "open";
 
   return (
     <button className="lesson-row" onClick={onOpen}>
@@ -1332,7 +1328,9 @@ function LessonRow({
         {isFavorite && <Star className="favorite-indicator" size={15} fill="currentColor" aria-hidden="true" />}
         {!booked && !listed && (!reservationsEnabled || !reservable) && (
           <span className="reservation-badge muted">
-            {reservationsEnabled ? t("status.reservationLater") : t("status.bookingUnavailable")}
+            {reservationsEnabled
+              ? t(reservationTiming === "closed" ? "status.reservationClosed" : "status.reservationLater")
+              : t("status.bookingUnavailable")}
           </span>
         )}
         <span className={`lesson-status ${occupancyClass(lesson, t)}`}>{state.label}</span>
@@ -1461,7 +1459,8 @@ function LessonModal({
   const { locale, t } = useI18n();
   const state = occupancyState(lesson, t);
   const isFull = state.free === 0;
-  const reservable = canReserve(lesson, rules);
+  const reservationTiming = reservationTimingForLesson(lesson, rules);
+  const reservable = reservationTiming === "open";
   const hasEnoughCredit = creditBalanceKc !== undefined && hasMinimumCredit(creditBalanceKc, rules);
   const actionBusy = busy === `reserve-${lesson.id}` || busy === `waitlist-${lesson.id}`;
   const policyVisible = ["demo", "confirmed"].includes(businessRulesStatus);
@@ -1610,9 +1609,13 @@ function LessonModal({
                 {actionBusy ? <Loader2 className="spin" size={16} /> : <Clock size={16} />}
                 {waitlistEntry ? t("lesson.waitlistLeave", { position: waitlistEntry.position }) : t("lesson.waitlistJoin")}
               </button>
-            ) : isFull || !reservable ? (
+            ) : isFull ? (
               <button className="btn btn-outline" disabled>
-                {t("lesson.reservationLater")}
+                {t("status.full")}
+              </button>
+            ) : !reservable ? (
+              <button className="btn btn-outline" disabled>
+                {t(reservationTiming === "closed" ? "lesson.reservationClosed" : "lesson.reservationLater")}
               </button>
             ) : !hasEnoughCredit ? (
               <button className="btn btn-outline" disabled>

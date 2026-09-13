@@ -13,6 +13,21 @@ export function availablePlacesForLesson(lesson: Lesson) {
   return lesson.availableCount ?? lesson.capacity - lesson.occupiedCount;
 }
 
+export type ReservationTiming = "open" | "not_open" | "closed";
+
+export function reservationTimingForLesson(
+  lesson: Pick<Lesson, "startsAt">,
+  rules: BookingRules = bookingRules,
+  now: Date = new Date(),
+): ReservationTiming {
+  const nowTime = now.getTime();
+  const startTime = new Date(lesson.startsAt).getTime();
+  if (!Number.isFinite(nowTime) || !Number.isFinite(startTime) || startTime <= nowTime) return "closed";
+  return startTime - nowTime <= rules.reservationWindowHours * 60 * 60 * 1000
+    ? "open"
+    : "not_open";
+}
+
 export function cancellationPolicyForLesson(
   lesson: Lesson,
   rules: BookingRules = bookingRules,
