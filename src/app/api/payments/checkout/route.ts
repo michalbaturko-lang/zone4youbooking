@@ -2,7 +2,7 @@ import { fail, ok } from "@/lib/apiResponse";
 import { getRequestLuxartAdapter, isRealLuxartMode } from "@/lib/adapterProvider";
 import { BookingApiError } from "@/lib/errors";
 import { getPostgresPaymentLedger } from "@/lib/paymentLedger";
-import { assertPaymentRuntimeReady } from "@/lib/paymentConfig";
+import { assertPaymentWriteDeploymentReady } from "@/lib/paymentWriteGate";
 import { assertRateLimit, rateLimitRules } from "@/lib/rateLimit";
 import { assertTrustedMutation } from "@/lib/requestSecurity";
 import { readBoundedJson } from "@/lib/requestBody";
@@ -17,7 +17,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     assertTrustedMutation(request);
-    assertPaymentRuntimeReady();
+    assertPaymentWriteDeploymentReady();
     if (!isRealLuxartMode()) {
       throw new BookingApiError(503, "PAYMENTS_DISABLED", "Stripe Checkout není v demo režimu dostupný.");
     }

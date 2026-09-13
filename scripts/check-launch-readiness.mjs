@@ -10,6 +10,7 @@ const realAdapter = readFileSync(realAdapterPath, "utf8");
 const stripeWebhookPath = join(repositoryRoot, "src/app/api/payments/webhook/route.ts");
 const stripeCheckoutPath = join(repositoryRoot, "src/app/api/payments/checkout/route.ts");
 const paymentProcessorPath = join(repositoryRoot, "src/lib/paymentProcessor.ts");
+const paymentWriteGatePath = join(repositoryRoot, "src/lib/paymentWriteGate.ts");
 const paymentLedgerPath = join(repositoryRoot, "src/lib/paymentLedger.ts");
 const paymentMigrationPath = join(repositoryRoot, "migrations/001_payment_ledger.sql");
 const bookingLedgerPath = join(repositoryRoot, "src/lib/bookingMutationLedger.ts");
@@ -34,6 +35,7 @@ const bookingRulesImplementationPath = join(repositoryRoot, "config/booking-rule
 const stripeWebhook = existsSync(stripeWebhookPath) ? readFileSync(stripeWebhookPath, "utf8") : "";
 const stripeCheckout = existsSync(stripeCheckoutPath) ? readFileSync(stripeCheckoutPath, "utf8") : "";
 const paymentProcessor = existsSync(paymentProcessorPath) ? readFileSync(paymentProcessorPath, "utf8") : "";
+const paymentWriteGate = existsSync(paymentWriteGatePath) ? readFileSync(paymentWriteGatePath, "utf8") : "";
 const paymentLedger = existsSync(paymentLedgerPath) ? readFileSync(paymentLedgerPath, "utf8") : "";
 const paymentMigration = existsSync(paymentMigrationPath) ? readFileSync(paymentMigrationPath, "utf8") : "";
 const bookingLedger = existsSync(bookingLedgerPath) ? readFileSync(bookingLedgerPath, "utf8") : "";
@@ -425,18 +427,23 @@ check(
   "Stripe Checkout endpoint",
   stripeCheckout.includes("checkout.sessions.create") &&
     stripeCheckout.includes("readBookingSession") &&
+    stripeCheckout.includes("assertPaymentWriteDeploymentReady") &&
     stripeCheckout.includes("assertReady") &&
     stripeCheckout.includes("approvedStripeCheckoutUrl"),
-  "Checkout must be created server-side for the authenticated client only after the durable ledger is reachable.",
+  "Checkout must be created server-side for the authenticated client only after the complete deployment gate and durable ledger are ready.",
 );
 check(
   "Stripe webhook verification and processing",
   stripeWebhook.includes("request.text()") &&
-    stripeWebhook.includes("constructEvent") &&
-    stripeWebhook.includes("processStripeTopupEvent") &&
+  stripeWebhook.includes("constructEvent") &&
+  stripeWebhook.includes("processStripeTopupEvent") &&
+    stripeWebhook.includes("assertPaymentWriteDeploymentReady") &&
     paymentProcessor.includes("retrieveSession") &&
-    paymentProcessor.includes("applyVerifiedStripeTopup"),
-  "The webhook must verify the raw Stripe signature and pass a validated paid session to the idempotent top-up processor.",
+    paymentProcessor.includes("applyVerifiedStripeTopup") &&
+    paymentProcessor.includes("assertPaymentWriteDeploymentReady") &&
+    paymentWriteGate.includes("livePersonalizedAccessProblems") &&
+    paymentWriteGate.includes("PAYMENT_DEPLOYMENT_PHASE"),
+  "The webhook must share the complete deployment gate, verify the raw Stripe signature and pass a validated paid session to the idempotent top-up processor.",
 );
 check(
   "Durable payment ledger",

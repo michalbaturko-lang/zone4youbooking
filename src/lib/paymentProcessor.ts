@@ -1,7 +1,7 @@
 import type Stripe from "stripe";
 import { getLuxartAdapter, isRealLuxartMode } from "./adapterProvider";
 import { BookingApiError } from "./errors";
-import { assertPaymentRuntimeReady } from "./paymentConfig";
+import { assertPaymentWriteDeploymentReady } from "./paymentWriteGate";
 import {
   applyVerifiedStripeTopup,
   verifyPaidStripeTopupSession,
@@ -17,7 +17,7 @@ const topupEventTypes = new Set<Stripe.Event.Type>([
 export function createLuxartCreditSink(): IdempotentCreditSink {
   return {
     async apply(topup, eventId) {
-      assertPaymentRuntimeReady();
+      assertPaymentWriteDeploymentReady();
       if (!isRealLuxartMode()) {
         throw new BookingApiError(503, "PAYMENTS_DISABLED", "Živé dobití není v demo režimu dostupné.");
       }

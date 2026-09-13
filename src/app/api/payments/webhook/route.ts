@@ -3,10 +3,10 @@ import { BookingApiError } from "@/lib/errors";
 import { getPostgresPaymentLedger } from "@/lib/paymentLedger";
 import { createLuxartCreditSink, processStripeTopupEvent } from "@/lib/paymentProcessor";
 import {
-  assertPaymentRuntimeReady,
   stripeExpectedLivemode,
   stripeWebhookSecret,
 } from "@/lib/paymentConfig";
+import { assertPaymentWriteDeploymentReady } from "@/lib/paymentWriteGate";
 import { createStripeClient } from "@/lib/stripeClient";
 import type Stripe from "stripe";
 
@@ -22,7 +22,7 @@ interface StripeWebhookRouteDependencies {
 
 function defaultDependencies(): StripeWebhookRouteDependencies {
   return {
-    assertRuntimeReady: assertPaymentRuntimeReady,
+    assertRuntimeReady: assertPaymentWriteDeploymentReady,
     constructEvent(rawBody, signature) {
       return createStripeClient().webhooks.constructEvent(rawBody, signature, stripeWebhookSecret());
     },

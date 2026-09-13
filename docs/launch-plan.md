@@ -70,6 +70,7 @@ Poznámka: audit neprovedl vytvoření ani zrušení skutečné rezervace. Tyto 
 - atomický PostgreSQL rate limit pro login a mutace sdílený mezi serverless/multi-instance procesy; při výpadku ochrany požadavek fail-closed odmítne a readiness přejde do `not_ready`;
 - Vercel rate-limit klíč používá pouze validovanou platformní klientskou IP z `x-vercel-forwarded-for`; obecné podvržené proxy hlavičky se v hostovaném runtime ignorují;
 - serverem vytvářený Stripe Checkout endpoint, ověření raw webhook podpisu, opětovné načtení Checkout Session ze Stripe, PostgreSQL event/session ledger a Luxart `POST api/Payment` sink podle veřejného payloadu;
+- jednotná platební zápisová brána pro Checkout, webhook i Luxart kreditní sink; všechny tři cesty vyžadují úplný HTTPS deployment preflight, region `fra1`, fázi `booking_with_stripe`, potvrzenou gateway/query-log ochranu, notifikace, pravidla a databázové readiness, přičemž vypnutý nebo neúplný stav zastaví Checkout ještě před načtením těla požadavku a jakýkoli kreditní zápis před voláním Luxartu;
 - potvrzený a hashovaný platební produktový profil drží live Stripe vypnutý při jakémkoli driftu schválených částek 500 / 1 000 / 2 000 / 5 000 / 10 000 Kč;
 - read-only runtime probe, provozní/rollback runbook a UAT checklist;
 - automatický privacy-safe rollback drill ověřující do pěti minut rozvrh a fail-closed rezervaci, storno, watchdog i Stripe Checkout;

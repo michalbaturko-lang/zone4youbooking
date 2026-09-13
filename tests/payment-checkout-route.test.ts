@@ -14,14 +14,16 @@ test("live Checkout endpoint fails before session, database or Stripe when payme
     process.env.APP_BASE_URL = "https://booking.zone4you.cz/";
     process.env.BOOKING_MUTATIONS_ENABLED = "true";
     process.env.PAYMENT_MUTATIONS_ENABLED = "false";
-    const response = await POST(new Request("https://booking.zone4you.cz/api/payments/checkout", {
+    const request = new Request("https://booking.zone4you.cz/api/payments/checkout", {
       method: "POST",
       headers: { origin: "https://booking.zone4you.cz", "content-type": "application/json" },
       body: JSON.stringify({ amountKc: 500 }),
-    }));
+    });
+    const response = await POST(request);
     const body = await response.json();
     assert.equal(response.status, 503);
     assert.equal(body.code, "PAYMENTS_DISABLED");
+    assert.equal(request.bodyUsed, false);
   } finally {
     if (previous.luxartMock === undefined) delete process.env.LUXART_MOCK;
     else process.env.LUXART_MOCK = previous.luxartMock;
