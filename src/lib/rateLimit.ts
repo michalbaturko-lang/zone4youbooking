@@ -8,6 +8,7 @@ export interface RateLimitRule {
   scope: string;
   limit: number;
   windowMs: number;
+  keyBy?: "address" | "address-and-discriminator" | "discriminator";
 }
 
 interface Bucket {
@@ -178,7 +179,19 @@ const globalPostgresRateLimitState = globalThis as typeof globalThis & {
 export const rateLimitRules = {
   scheduleRead: { scope: "schedule-read", limit: 120, windowMs: 60_000 },
   accountRead: { scope: "account-read", limit: 120, windowMs: 60_000 },
-  login: { scope: "auth-login", limit: 5, windowMs: 10 * 60_000 },
+  loginDemo: { scope: "auth-login-demo", limit: 5, windowMs: 10 * 60_000 },
+  loginAddress: {
+    scope: "auth-login-address",
+    limit: 30,
+    windowMs: 10 * 60_000,
+    keyBy: "address",
+  },
+  loginAccount: {
+    scope: "auth-login-account",
+    limit: 15,
+    windowMs: 10 * 60_000,
+    keyBy: "discriminator",
+  },
   reservationCreate: { scope: "reservation-create", limit: 12, windowMs: 60_000 },
   reservationCancel: { scope: "reservation-cancel", limit: 12, windowMs: 60_000 },
   waitlistJoin: { scope: "waitlist-join", limit: 12, windowMs: 60_000 },
@@ -204,10 +217,19 @@ export function clientAddress(
     "unknown";
 }
 
-function rateLimitKey(request: Request, rule: RateLimitRule, discriminator = "") {
-  const normalizedDiscriminator = discriminator.trim().toLocaleLowerCase("cs-CZ").slice(0, 160);
+export function rateLimitKey(request: Request, rule: RateLimitRule, discriminator = "") {
+  const normalizedDiscriminator = discriminator
+    .trim()
+    .normalize("NFKC")
+    .toLocaleLowerCase("cs-CZ")
+    .slice(0, 256);
+  const identity = rule.keyBy === "address"
+    ? clientAddress(request)
+    : rule.keyBy === "discriminator"
+      ? normalizedDiscriminator
+      : `${clientAddress(request)}|${normalizedDiscriminator}`;
   return createHash("sha256")
-    .update(`${rule.scope}|${clientAddress(request)}|${normalizedDiscriminator}`)
+    .update(`${rule.scope}|${identity}`)
     .digest("base64url");
 }
 

@@ -13,13 +13,21 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   try {
     assertTrustedMutation(request);
-    if (isRealLuxartMode()) assertLivePersonalizedAccessReady();
+    const live = isRealLuxartMode();
+    if (live) {
+      assertLivePersonalizedAccessReady();
+      await assertRateLimit(request, rateLimitRules.loginAddress);
+    }
     const body = await readJsonWithDemoState<LoginInput>(request);
     const input = parseLoginInput(body);
-    await assertRateLimit(request, rateLimitRules.login, input.login);
+    await assertRateLimit(
+      request,
+      live ? rateLimitRules.loginAccount : rateLimitRules.loginDemo,
+      input.login,
+    );
     const result = await getLuxartAdapter().login(input);
     const response = ok(withDemoState({ user: result.user }));
-    if (isRealLuxartMode()) setBookingSession(response, result.user.id);
+    if (live) setBookingSession(response, result.user.id);
     return response;
   } catch (error) {
     return fail(error);

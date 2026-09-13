@@ -21,9 +21,9 @@ Potřebujeme:
 
 Napojení je server-to-server, proto nepotřebujeme CORS pro browser. První ověření bude pouze read-only; mutace spustíme až po samostatném schválení testovacího scénáře.
 
-## Co jsme bezpečně ověřili 11. 9. 2026
+## Co jsme bezpečně ověřili 11.–13. 9. 2026
 
-- `api.memberzone.online:9295/Help` je funkční referenční Luxart dokumentace, nikoli potvrzená Zone4You instance.
+- `api.memberzone.online:9295/Help` je funkční referenční Luxart dokumentace, nikoli potvrzená Zone4You instance. Anonymní kontrola 13. 9. ve 21:23 CEST potvrdila HTTP 200, vypnutý directory listing a přesnou shodu všech 11/11 očekávaných částí REST kontraktu.
 - `api.memberzone.online:9191/Service1.svc` odpovídá, ale jde o SOAP/WCF kontrakt odlišný od objednaného Zone4You REST API; `/Help` vrací 404 a HTTPS na tomto portu nefunguje. Tento host proto nepovažujeme za veřejnou Zone4You cestu bez výslovného potvrzení IT.
 - HTTPS na `api.memberzone.online` nebylo dostupné ani na standardním portu 443, ani na 9191/9295. Žádné klientské přihlašovací údaje jsme na tyto adresy neposlali.
 - Běžné veřejné názvy Zone4You na portech `9191` i `9759` při HTTP i HTTPS z našeho IPv4 připojení timeoutují. Může jít o jiný hostname, neaplikované pravidlo, VPN nebo allowlist; bez přesné adresy to nelze rozlišit.

@@ -13,6 +13,7 @@
 5. `http://api.memberzone.online:9191/Service1.svc` veřejně vrací starší SOAP/WCF kontrakt. Ten se neshoduje s objednaným REST API ani s dokumentací na `9295`; samotná shoda čísla portu proto není důkazem, že jde o Zone4You instanci.
 6. HTTPS na `api.memberzone.online` na portech `443`, `9191` ani `9295` nebylo 11. 9. 2026 použitelné. Testovací klientské údaje se proto na tyto adresy neposílaly.
 7. Opakované anonymní ověření 13. 9. 2026 potvrzuje, že `api.memberzone.online:9295/Help` nadále obsahuje zdokumentované REST cesty `api/Lesson`, které bez autorizace odpovídají `401`. Na stejném hostiteli vrací port `9191` pro `/Help` i plně parametrizovaný `api/Lesson` stav `404`, zatímco `Service1.svc` odpovídá `200`. Port je tedy veřejně otevřený, ale je na něm publikovaná jiná IIS aplikace. Kořen navíc zobrazuje veřejný adresářový výpis, který musí IT vypnout.
+8. Přímé srovnání 13. 9. 2026 v 21:23 CEST bez credentials znovu ověřilo `9295/Help` jako REST dokumentaci HTTP 200 bez directory listingu a všech 11/11 očekávaných dokumentačních částí se shodným sémantickým SHA-256. Ve stejném okamžiku `9191/Help` zůstalo na HTTP 404 s klasifikací SOAP/WCF a veřejným directory listingem. Nejde tedy pouze o změnu čísla portu stejné aplikace.
 
 ## Očekávaná topologie k potvrzení IT
 

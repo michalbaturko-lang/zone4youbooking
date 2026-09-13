@@ -80,6 +80,8 @@ Síťové rozhodnutí a důkaz, proč se čeká na veřejný Zone4You hostname m
 
 Browserová vrstva nenechá požadavky viset bez omezení: čtení končí po 20 sekundách bezpečným retry stavem, rezervace/storno po 45 sekundách stavem vyžadujícím reconciliation. Zastaralý snapshot i ztracená odpověď booking mutace fyzicky vypnou zapisující ovládací prvky; uživatel není vybízen k opakování a u nejisté mutace dostane trvalou instrukci kontaktovat recepci. Potvrzený zápis současně nezměníme na falešné selhání jen proto, že selhalo následné obnovení dat.
 
+Přihlášení chrání dvě nezávislé hashované rate-limit brány: jedna omezuje celkový počet pokusů z jedné zdrojové adresy bez ohledu na zadaný účet, druhá omezuje pokusy o stejný účet napříč adresami. Ani PostgreSQL úložiště limiteru proto neobsahuje login nebo IP v čitelné podobě a změna loginu či zdrojové adresy neobejde celý ochranný profil.
+
 `inspect:business-rules` ukáže verzovaný profil pravidel a jeho SHA-256. Dokud je profil `provisional`, živé rezervace ani platby nelze odemknout; samotné `BOOKING_RULES_CONFIRMED=true` nestačí.
 
 `inspect:payment-product` ukáže potvrzený profil pěti CZK top-up částek a jeho SHA-256. Live Stripe vyžaduje přesnou shodu profilu s implementací i explicitní `PAYMENT_PRODUCT_CONFIRMED=true`.

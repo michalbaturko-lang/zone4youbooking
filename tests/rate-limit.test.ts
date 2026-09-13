@@ -4,6 +4,7 @@ import {
   clientAddress,
   InMemoryFixedWindowRateLimiter,
   rateLimitConfigurationProblems,
+  rateLimitKey,
 } from "../src/lib/rateLimit";
 
 test("rate limiter rejects requests over the limit and resets at the next window", () => {
@@ -68,4 +69,43 @@ test("Vercel rate-limit identity trusts only the validated platform client IP", 
     },
   });
   assert.equal(clientAddress(spoofOnly, { VERCEL_ENV: "production" }), "unknown");
+});
+
+test("login buckets independently bound address spraying and distributed account attacks", () => {
+  const request = (address: string) => new Request("https://booking.zone4you.cz/api/auth/login", {
+    headers: { "x-forwarded-for": address },
+  });
+  const addressRule = {
+    scope: "auth-login-address",
+    limit: 30,
+    windowMs: 10 * 60_000,
+    keyBy: "address" as const,
+  };
+  const accountRule = {
+    scope: "auth-login-account",
+    limit: 15,
+    windowMs: 10 * 60_000,
+    keyBy: "discriminator" as const,
+  };
+
+  assert.equal(
+    rateLimitKey(request("203.0.113.10"), addressRule, "first@example.test"),
+    rateLimitKey(request("203.0.113.10"), addressRule, "second@example.test"),
+  );
+  assert.notEqual(
+    rateLimitKey(request("203.0.113.10"), addressRule),
+    rateLimitKey(request("203.0.113.11"), addressRule),
+  );
+  assert.equal(
+    rateLimitKey(request("203.0.113.10"), accountRule, "Member@Example.Test"),
+    rateLimitKey(request("203.0.113.11"), accountRule, "member@example.test"),
+  );
+  assert.equal(
+    rateLimitKey(request("203.0.113.10"), accountRule, "Nováková"),
+    rateLimitKey(request("203.0.113.11"), accountRule, "Nováková"),
+  );
+  assert.notEqual(
+    rateLimitKey(request("203.0.113.10"), accountRule, "first@example.test"),
+    rateLimitKey(request("203.0.113.10"), accountRule, "second@example.test"),
+  );
 });
