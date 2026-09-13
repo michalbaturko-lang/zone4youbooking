@@ -1,6 +1,7 @@
 import { BookingApiError } from "./errors";
 import { isRealLuxartMode } from "./adapterProvider";
 import { assertBookingMutationRuntimeReady } from "./bookingMutationConfig";
+import { assertBookingWriteDeploymentReady } from "./bookingWriteGate";
 
 export function isTrustedMutationOrigin(request: Request, appBaseUrl: string) {
   const origin = request.headers.get("origin");
@@ -44,6 +45,7 @@ export function assertBookingMutationsEnabled() {
   }
   if (!isRealLuxartMode()) return;
   assertBookingMutationRuntimeReady();
+  assertBookingWriteDeploymentReady();
 }
 
 export function assertWaitlistMutationsEnabled() {

@@ -1,5 +1,5 @@
 import type { BookingCapabilities } from "./domain";
-import { bookingMutationRuntimeReady } from "./bookingMutationConfig";
+import { bookingWriteDeploymentReady } from "./bookingWriteGate";
 import { paymentRuntimeReady } from "./paymentConfig";
 import { businessRulesRuntimeReady } from "./businessRuleConfirmation";
 
@@ -27,7 +27,7 @@ export function capabilitiesForMode(
 }
 
 export function getPilotCapabilities(): BookingCapabilities {
-  const bookingReady = process.env.LUXART_MOCK !== "false" || bookingMutationRuntimeReady();
+  const bookingReady = process.env.LUXART_MOCK !== "false" || bookingWriteDeploymentReady();
   const rulesConfirmed = businessRulesRuntimeReady();
   return capabilitiesForMode(process.env.LUXART_MOCK === "false" ? "live" : "demo", {
     bookingMutationsEnabled: bookingReady,

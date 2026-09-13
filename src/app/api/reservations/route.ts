@@ -7,6 +7,7 @@ import { BookingApiError } from "@/lib/errors";
 import { assertBookingMutationsEnabled, assertTrustedMutation, readIdempotencyKey } from "@/lib/requestSecurity";
 import { assertRateLimit, rateLimitRules } from "@/lib/rateLimit";
 import { readBookingSession } from "@/lib/session";
+import { assertLiveBookingCreationReady } from "@/lib/bookingService";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,7 @@ export async function POST(request: Request) {
 
     const session = readBookingSession(request);
     if (!session) throw new BookingApiError(401, "AUTH_REQUIRED", "Pro tuto akci se přihlaste.");
+    await assertLiveBookingCreationReady(adapter);
     const ledger = getPostgresBookingMutationLedger();
     await ledger.assertReady();
     const result = await processBookingMutation({

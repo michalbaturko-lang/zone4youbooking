@@ -128,6 +128,15 @@ export function assertLessonResourceMappingReady(
   return observed;
 }
 
+export async function assertLiveBookingCreationReady(
+  adapter: LuxartAdapter,
+  query: LessonQuery = pilotLessonQuery(),
+  rawResourceMap: string | undefined = process.env.LUXART_RESOURCE_MAP_JSON,
+) {
+  const lessons = assertLessonFeedReady(await adapter.getLessons(query), query);
+  return assertLessonResourceMappingReady(lessons, rawResourceMap);
+}
+
 export async function getBookingSnapshotForAdapter(
   adapter: LuxartAdapter = getLuxartAdapter(),
   query: LessonQuery = pilotLessonQuery(),

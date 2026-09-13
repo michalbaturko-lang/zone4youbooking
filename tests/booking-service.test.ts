@@ -4,6 +4,7 @@ import {
   assertLessonFeedWithinQuery,
   assertLessonFeedReady,
   assertLessonResourceMappingReady,
+  assertLiveBookingCreationReady,
   getBookingSnapshotForAdapter,
   pilotLessonQuery,
   queryFromRequest,
@@ -194,4 +195,46 @@ test("booking readiness refuses a live lesson without a positive room number", (
       error.status === 503 &&
       error.code === "LUXART_RESOURCE_MAP_MISMATCH",
   );
+});
+
+test("every new live booking rechecks the complete current room mapping", async () => {
+  const query = pilotLessonQuery(new Date("2026-08-30T10:00:00.000Z"));
+  const unsupported = async (): Promise<never> => {
+    throw new Error("Unexpected adapter call.");
+  };
+  const lessons = [
+    { ...lesson("2026-08-30T10:30:00.000Z"), luxartRoomNumber: 2 },
+    { ...lesson("2026-08-30T11:30:00.000Z"), luxartRoomNumber: 4 },
+  ];
+  let scheduleReads = 0;
+  const adapter: LuxartAdapter = {
+    login: unsupported,
+    logout: async () => undefined,
+    getCurrentUser: unsupported,
+    getLessons: async () => {
+      scheduleReads += 1;
+      return lessons;
+    },
+    getReservations: unsupported,
+    getWaitlist: unsupported,
+    getCreditTransactions: unsupported,
+    createReservation: unsupported,
+    cancelReservation: unsupported,
+    joinWaitlist: unsupported,
+    leaveWaitlist: unsupported,
+    createTopup: unsupported,
+  };
+
+  assert.deepEqual(
+    await assertLiveBookingCreationReady(adapter, query, JSON.stringify({ 2: 202, 4: 404 })),
+    [2, 4],
+  );
+  await assert.rejects(
+    assertLiveBookingCreationReady(adapter, query, JSON.stringify({ 2: 202 })),
+    (error: unknown) =>
+      error instanceof BookingApiError &&
+      error.status === 503 &&
+      error.code === "LUXART_RESOURCE_MAP_MISMATCH",
+  );
+  assert.equal(scheduleReads, 2);
 });

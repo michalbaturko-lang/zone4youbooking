@@ -1,5 +1,6 @@
 import { fail, ok } from "@/lib/apiResponse";
-import { getRequestLuxartAdapter } from "@/lib/adapterProvider";
+import { getRequestLuxartAdapter, isRealLuxartMode } from "@/lib/adapterProvider";
+import { assertLiveBookingCreationReady } from "@/lib/bookingService";
 import { readJsonWithDemoState, withDemoState } from "@/lib/demoStateTransport";
 import { assertTrustedMutation, assertWaitlistMutationsEnabled } from "@/lib/requestSecurity";
 import { assertRateLimit, rateLimitRules } from "@/lib/rateLimit";
@@ -23,7 +24,9 @@ export async function POST(request: Request) {
     const body = await readJsonWithDemoState<{ lessonId?: string }>(request);
     if (!body.lessonId) throw new Error("Missing lessonId.");
     await assertRateLimit(request, rateLimitRules.waitlistJoin, body.lessonId);
-    const waitlistEntry = await getRequestLuxartAdapter(request).joinWaitlist({ lessonId: body.lessonId });
+    const adapter = getRequestLuxartAdapter(request);
+    if (isRealLuxartMode()) await assertLiveBookingCreationReady(adapter);
+    const waitlistEntry = await adapter.joinWaitlist({ lessonId: body.lessonId });
     return ok(withDemoState({ waitlistEntry }), { status: 201 });
   } catch (error) {
     return fail(error);
