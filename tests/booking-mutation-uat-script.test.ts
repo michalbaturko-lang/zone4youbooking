@@ -2,12 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { BookingCapabilities, BookingRules, Lesson, Reservation, User } from "../src/lib/domain";
 import {
+  assertUatReservation,
   loadBookingMutationUatConfig,
   redactUatSecrets,
   runBookingMutationUat,
 } from "../scripts/verify-booking-mutations";
 import { validateBookingUatEvidence } from "../scripts/verify-pilot-release";
 import { luxartResourceMappingSha256 } from "../src/lib/luxartResourceMappingFingerprint";
+import { maximumOperationalAmountKc } from "../src/lib/moneyBounds";
 
 const target = "https://staging.booking.zone4you.cz/";
 const commit = "1234567890abcdef1234567890abcdef12345678";
@@ -52,7 +54,49 @@ test("mutation UAT configuration refuses production and stale confirmations", ()
     () => loadBookingMutationUatConfig({ ...baseEnvironment, ZONE4YOU_UAT_EXPECTED_PHASE: "read_only" }),
     /booking_without_payments or booking_with_stripe/i,
   );
+  assert.throws(
+    () => loadBookingMutationUatConfig({
+      ...baseEnvironment,
+      ZONE4YOU_UAT_EXPECTED_CANCELLATION_FEE_KC: String(maximumOperationalAmountKc + 1),
+    }),
+    /between 0 and/i,
+  );
   assert.equal(loadBookingMutationUatConfig(baseEnvironment).target.origin, "https://staging.booking.zone4you.cz");
+});
+
+test("mutation UAT rejects malformed financial reservation evidence", () => {
+  const config = loadBookingMutationUatConfig(baseEnvironment);
+  const active: Reservation = {
+    id: "987",
+    userId: config.expectedUserId,
+    lessonId: config.lessonId,
+    status: "active",
+    reservedAt: "2026-09-01T12:00:00.000Z",
+    priceKc: 180,
+  };
+  assert.doesNotThrow(() => assertUatReservation(active, config, "active"));
+  assert.throws(
+    () => assertUatReservation({ ...active, priceKc: maximumOperationalAmountKc + 1 }, config, "active"),
+    /financial bounds/i,
+  );
+  assert.throws(
+    () => assertUatReservation({ ...active, reservedAt: "2026-09-01T12:00:00" }, config, "active"),
+    /financial bounds/i,
+  );
+  assert.throws(
+    () => assertUatReservation({
+      ...active,
+      status: "cancelled",
+      cancelledAt: "2026-09-01T13:00:00.000Z",
+    }, config, "cancelled"),
+    /financial bounds/i,
+  );
+  assert.doesNotThrow(() => assertUatReservation({
+    ...active,
+    status: "cancelled",
+    cancelledAt: "2026-09-01T13:00:00.000Z",
+    cancellationFeeKc: 0,
+  }, config, "cancelled"));
 });
 
 test("mutation UAT error evidence redacts test credentials", () => {
@@ -132,6 +176,8 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
   let authoritativeAvailableCount = 8;
   let readinessCommit = commit;
   let readinessResourceMapSha256 = resourceMapSha256;
+  let snapshotCreditBalanceKc = user.creditBalanceKc;
+  let snapshotLessonPriceKc = lesson.priceKc;
   let corruptPreExistingReservation = false;
   let failSnapshotAfterCancellation = false;
   let cleanupRequests = 0;
@@ -171,11 +217,12 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
         return response({ code: "LUXART_UNAVAILABLE", error: "snapshot unavailable" }, 503);
       }
       return response({
-        user,
+        user: { ...user, creditBalanceKc: snapshotCreditBalanceKc },
         lessons: [{
           ...lesson,
           canCurrentUserReserve: personalizedEligibility,
           availableCount: authoritativeAvailableCount,
+          priceKc: snapshotLessonPriceKc,
         }],
         reservations,
         rules,
@@ -233,6 +280,20 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
     }
     return response({ code: "NOT_FOUND", error: "not found" }, 404);
   };
+
+  snapshotCreditBalanceKc = maximumOperationalAmountKc + 1;
+  await assert.rejects(
+    runBookingMutationUat(config, fakeFetch),
+    /invalid financial values/i,
+  );
+  snapshotCreditBalanceKc = user.creditBalanceKc;
+  snapshotLessonPriceKc = maximumOperationalAmountKc + 1;
+  await assert.rejects(
+    runBookingMutationUat(config, fakeFetch),
+    /invalid financial values/i,
+  );
+  snapshotLessonPriceKc = lesson.priceKc;
+  assert.equal(createWrites, 0);
 
   const evidence = await runBookingMutationUat(config, fakeFetch);
   validateBookingUatEvidence(

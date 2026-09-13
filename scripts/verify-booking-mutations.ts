@@ -7,7 +7,9 @@ import {
   cancellationPolicyForLesson,
   freeCancellationDeadlineForLesson,
 } from "../src/lib/bookingRules";
+import { parseExplicitLuxartDateTime } from "../src/lib/luxartContract";
 import { luxartResourceMappingSha256 } from "../src/lib/luxartResourceMappingFingerprint";
+import { isBoundedKcAmount, maximumOperationalAmountKc } from "../src/lib/moneyBounds";
 
 type FetchLike = typeof fetch;
 type Environment = Record<string, string | undefined>;
@@ -60,9 +62,16 @@ function required(environment: Environment, name: string) {
   return value;
 }
 
-function exactInteger(environment: Environment, name: string, minimum = 0) {
+function exactInteger(
+  environment: Environment,
+  name: string,
+  minimum = 0,
+  maximum = maximumOperationalAmountKc,
+) {
   const value = Number(required(environment, name));
-  if (!Number.isSafeInteger(value) || value < minimum) throw new Error(`${name} must be an integer >= ${minimum}.`);
+  if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
+    throw new Error(`${name} must be an integer between ${minimum} and ${maximum}.`);
+  }
   return value;
 }
 
@@ -194,20 +203,29 @@ function activeReservationIdentitySet(snapshot: Snapshot) {
     .sort();
 }
 
-function assertReservation(
+export function assertUatReservation(
   reservation: Reservation | undefined,
   config: BookingMutationUatConfig,
   expectedStatus: "active" | "cancelled",
   expectedId?: string,
 ) {
+  const cancelledFinancialsAreValid = expectedStatus === "active" || (
+    Boolean(parseExplicitLuxartDateTime(reservation?.cancelledAt)) &&
+    isBoundedKcAmount(reservation?.cancellationFeeKc, 0)
+  );
   if (
     !reservation ||
     reservation.userId !== config.expectedUserId ||
     reservation.lessonId !== config.lessonId ||
     reservation.status !== expectedStatus ||
-    (expectedId !== undefined && reservation.id !== expectedId)
+    (expectedId !== undefined && reservation.id !== expectedId) ||
+    !parseExplicitLuxartDateTime(reservation.reservedAt) ||
+    !isBoundedKcAmount(reservation.priceKc, 0) ||
+    !cancelledFinancialsAreValid
   ) {
-    throw new Error(`Reservation response does not match the approved test user, lesson or ${expectedStatus} state.`);
+    throw new Error(
+      `Reservation response does not match the approved test user, lesson, financial bounds or ${expectedStatus} state.`,
+    );
   }
 }
 
@@ -321,6 +339,16 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
   const beforeActiveReservations = activeReservationIdentitySet(before);
   const lesson = before.lessons.find((candidate) => candidate.id === config.lessonId);
   if (!lesson) throw new Error("ZONE4YOU_UAT_LESSON_ID is not present in the current staging schedule.");
+  if (
+    !isBoundedKcAmount(before.user.creditBalanceKc) ||
+    !isBoundedKcAmount(lesson.priceKc, 0) ||
+    !isBoundedKcAmount(before.rules.minimumCreditForReservationKc, 0) ||
+    !isBoundedKcAmount(before.rules.reservationHoldKc, 0) ||
+    !isBoundedKcAmount(before.rules.lateCancelFeeKc, 0) ||
+    !isBoundedKcAmount(before.rules.noShowFeeKc, 0)
+  ) {
+    throw new Error("The approved UAT snapshot contains invalid financial values; no mutation was attempted.");
+  }
   if (exactActiveReservation(before, config.lessonId).length !== 0) {
     throw new Error("The approved UAT lesson already has an active reservation for this test user; no mutation was attempted.");
   }
@@ -382,13 +410,13 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
   try {
     const created = await reservationRequest(config, fetchImpl, cookie, createKey);
     requestIds.push(created.requestId);
-    assertReservation(created.body.reservation, config, "active");
+    assertUatReservation(created.body.reservation, config, "active");
     verifiedReservation = created.body.reservation;
 
     for (let replay = 0; replay < 3; replay += 1) {
       const repeated = await reservationRequest(config, fetchImpl, cookie, createKey);
       requestIds.push(repeated.requestId);
-      assertReservation(repeated.body.reservation, config, "active", verifiedReservation.id);
+      assertUatReservation(repeated.body.reservation, config, "active", verifiedReservation.id);
     }
 
     const crossKeyResults = await Promise.all(
@@ -406,7 +434,7 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
       requestIds.push(result.requestId);
       if (!(result instanceof UatApiError)) {
         parallelSuccesses += 1;
-        assertReservation(result.body.reservation, config, "active", verifiedReservation.id);
+        assertUatReservation(result.body.reservation, config, "active", verifiedReservation.id);
       }
     }
     if (parallelSuccesses < 1) throw new Error("Neither parallel browser key returned the confirmed reservation result.");
@@ -422,14 +450,14 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
     const cancelKey = `uat:cancel:${randomUUID()}`;
     const cancellation = await cancellationRequest(config, fetchImpl, cookie, verifiedReservation.id, cancelKey);
     requestIds.push(cancellation.requestId);
-    assertReservation(cancellation.body.reservation, config, "cancelled", verifiedReservation.id);
-    if (Number(cancellation.body.reservation.cancellationFeeKc ?? 0) !== config.expectedCancellationFeeKc) {
+    assertUatReservation(cancellation.body.reservation, config, "cancelled", verifiedReservation.id);
+    if (cancellation.body.reservation.cancellationFeeKc !== config.expectedCancellationFeeKc) {
       throw new Error("Cancellation fee does not match ZONE4YOU_UAT_EXPECTED_CANCELLATION_FEE_KC.");
     }
     for (let replay = 0; replay < 3; replay += 1) {
       const repeated = await cancellationRequest(config, fetchImpl, cookie, verifiedReservation.id, cancelKey);
       requestIds.push(repeated.requestId);
-      assertReservation(repeated.body.reservation, config, "cancelled", verifiedReservation.id);
+      assertUatReservation(repeated.body.reservation, config, "cancelled", verifiedReservation.id);
     }
     const crossKeyCancellation = await cancellationRequest(
       config,
@@ -439,7 +467,7 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
       `uat:cancel:other:${randomUUID()}`,
     );
     requestIds.push(crossKeyCancellation.requestId);
-    assertReservation(crossKeyCancellation.body.reservation, config, "cancelled", verifiedReservation.id);
+    assertUatReservation(crossKeyCancellation.body.reservation, config, "cancelled", verifiedReservation.id);
 
     const after = await waitForSnapshot(
       config,
@@ -495,8 +523,8 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
           verifiedReservation.id,
           `uat:cleanup:${randomUUID()}`,
         );
-        assertReservation(cleanup.body.reservation, config, "cancelled", verifiedReservation.id);
-        if (Number(cleanup.body.reservation.cancellationFeeKc ?? 0) !== config.expectedCancellationFeeKc) {
+        assertUatReservation(cleanup.body.reservation, config, "cancelled", verifiedReservation.id);
+        if (cleanup.body.reservation.cancellationFeeKc !== config.expectedCancellationFeeKc) {
           throw new Error("Cleanup cancellation fee did not match the approved UAT expectation.");
         }
       } catch {
