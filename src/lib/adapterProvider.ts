@@ -3,6 +3,7 @@ import { mockLuxartAdapter } from "./mockLuxart";
 import { createRealLuxartAdapter } from "./realLuxartAdapter";
 import { readBookingSession } from "./session";
 import type { Locale } from "./i18n";
+import { assertLivePersonalizedAccessReady } from "./liveAccessGate";
 
 export interface LuxartAdapterContext {
   userId?: string;
@@ -32,6 +33,7 @@ export function getLuxartAdapter(context: LuxartAdapterContext = {}): LuxartAdap
 export function getRequestLuxartAdapter(request: Request): LuxartAdapter {
   if (!isRealLuxartMode()) return getLuxartAdapter();
   const session = readBookingSession(request);
+  if (session) assertLivePersonalizedAccessReady();
   const locale = request.headers.get("x-zone4you-locale") === "en" ? "en" : "cs";
   return getLuxartAdapter({ userId: session?.userId, locale });
 }

@@ -3,13 +3,9 @@ import {
   type BusinessRulesEnvironment,
   type BusinessRulesProfile,
 } from "./businessRuleConfirmation";
-import {
-  approvedRuntimeRegion,
-  deploymentPhase,
-  deploymentRuntimeConfigurationProblems,
-  runtimeDeploymentRegion,
-} from "./deploymentPreflight";
+import { deploymentPhase } from "./deploymentPreflight";
 import { BookingApiError } from "./errors";
+import { livePersonalizedAccessProblems } from "./liveAccessGate";
 
 const bookingPhases = new Set(["booking_without_payments", "booking_with_stripe"]);
 
@@ -17,14 +13,10 @@ export function bookingWriteDeploymentProblems(
   environment: BusinessRulesEnvironment = process.env,
   profile: BusinessRulesProfile = businessRulesProfile,
 ) {
-  const problems = deploymentRuntimeConfigurationProblems(environment, profile)
-    .map(({ code }) => code);
+  const problems = livePersonalizedAccessProblems(environment, profile);
 
   if (!bookingPhases.has(deploymentPhase(environment))) {
     problems.push("BOOKING_DEPLOYMENT_PHASE");
-  }
-  if (runtimeDeploymentRegion(environment) !== approvedRuntimeRegion) {
-    problems.push("BOOKING_DEPLOYMENT_REGION");
   }
 
   return [...new Set(problems)].sort();

@@ -6,12 +6,14 @@ import { setBookingSession } from "@/lib/session";
 import { assertTrustedMutation } from "@/lib/requestSecurity";
 import { assertRateLimit, rateLimitRules } from "@/lib/rateLimit";
 import { parseLoginInput } from "@/lib/loginInput";
+import { assertLivePersonalizedAccessReady } from "@/lib/liveAccessGate";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
     assertTrustedMutation(request);
+    if (isRealLuxartMode()) assertLivePersonalizedAccessReady();
     const body = await readJsonWithDemoState<LoginInput>(request);
     const input = parseLoginInput(body);
     await assertRateLimit(request, rateLimitRules.login, input.login);

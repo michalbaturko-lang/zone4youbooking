@@ -19,6 +19,9 @@ const rateLimitPath = join(repositoryRoot, "src/lib/rateLimit.ts");
 const rateLimitMigrationPath = join(repositoryRoot, "migrations/003_rate_limit.sql");
 const readinessRoutePath = join(repositoryRoot, "src/app/api/readiness/route.ts");
 const bookingWriteGatePath = join(repositoryRoot, "src/lib/bookingWriteGate.ts");
+const liveAccessGatePath = join(repositoryRoot, "src/lib/liveAccessGate.ts");
+const adapterProviderPath = join(repositoryRoot, "src/lib/adapterProvider.ts");
+const loginRoutePath = join(repositoryRoot, "src/app/api/auth/login/route.ts");
 const requestSecurityPath = join(repositoryRoot, "src/lib/requestSecurity.ts");
 const bookingServicePath = join(repositoryRoot, "src/lib/bookingService.ts");
 const pilotCapabilitiesPath = join(repositoryRoot, "src/lib/pilotCapabilities.ts");
@@ -39,6 +42,9 @@ const bookingMigration = existsSync(bookingMigrationPath) ? readFileSync(booking
 const rateLimit = existsSync(rateLimitPath) ? readFileSync(rateLimitPath, "utf8") : "";
 const rateLimitMigration = existsSync(rateLimitMigrationPath) ? readFileSync(rateLimitMigrationPath, "utf8") : "";
 const bookingWriteGate = existsSync(bookingWriteGatePath) ? readFileSync(bookingWriteGatePath, "utf8") : "";
+const liveAccessGate = existsSync(liveAccessGatePath) ? readFileSync(liveAccessGatePath, "utf8") : "";
+const adapterProvider = existsSync(adapterProviderPath) ? readFileSync(adapterProviderPath, "utf8") : "";
+const loginRoute = existsSync(loginRoutePath) ? readFileSync(loginRoutePath, "utf8") : "";
 const requestSecurity = existsSync(requestSecurityPath) ? readFileSync(requestSecurityPath, "utf8") : "";
 const bookingService = existsSync(bookingServicePath) ? readFileSync(bookingServicePath, "utf8") : "";
 const pilotCapabilities = existsSync(pilotCapabilitiesPath) ? readFileSync(pilotCapabilitiesPath, "utf8") : "";
@@ -485,14 +491,18 @@ check(
     Array.isArray(vercelConfig.regions) &&
     vercelConfig.regions.length === 1 &&
     vercelConfig.regions[0] === "fra1" &&
-    bookingWriteGate.includes("deploymentRuntimeConfigurationProblems") &&
-    bookingWriteGate.includes("approvedRuntimeRegion") &&
+    bookingWriteGate.includes("livePersonalizedAccessProblems") &&
+    liveAccessGate.includes("deploymentRuntimeConfigurationProblems") &&
+    liveAccessGate.includes("approvedRuntimeRegion") &&
+    liveAccessGate.includes("PERSONALIZED_HTTPS_REQUIRED") &&
+    adapterProvider.includes("assertLivePersonalizedAccessReady") &&
+    loginRoute.includes("assertLivePersonalizedAccessReady") &&
     requestSecurity.includes("assertBookingWriteDeploymentReady") &&
     pilotCapabilities.includes("bookingWriteDeploymentReady") &&
     bookingService.includes("assertLiveBookingCreationReady") &&
     bookingService.includes("assertLessonResourceMappingReady") &&
     reservationRoute.includes("assertLiveBookingCreationReady(adapter)"),
-  "Readiness, UI capabilities and direct live writes must share the exact fra1 deployment gate; every new booking must recheck the complete current room map.",
+  "Login, personalized reads, UI capabilities and direct live writes must share the exact HTTPS/fra1 deployment gate; every new booking must recheck the complete current room map.",
 );
 check(
   "Pilot alert delivery",
