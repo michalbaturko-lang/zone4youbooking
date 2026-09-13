@@ -12,6 +12,7 @@
 4. IT Zone4You 11. 9. 2026 sděluje, že je s Luxartem domluveno zveřejnění portu `9191` pro rezervace. Nesděluje však veřejný hostname/IP ani potvrzení překladu na interní `9759`.
 5. `http://api.memberzone.online:9191/Service1.svc` veřejně vrací starší SOAP/WCF kontrakt. Ten se neshoduje s objednaným REST API ani s dokumentací na `9295`; samotná shoda čísla portu proto není důkazem, že jde o Zone4You instanci.
 6. HTTPS na `api.memberzone.online` na portech `443`, `9191` ani `9295` nebylo 11. 9. 2026 použitelné. Testovací klientské údaje se proto na tyto adresy neposílaly.
+7. Opakované anonymní ověření 13. 9. 2026 potvrzuje, že `api.memberzone.online:9295/Help` nadále obsahuje zdokumentované REST cesty `api/Lesson`, které bez autorizace odpovídají `401`. Na stejném hostiteli vrací port `9191` pro `/Help` i plně parametrizovaný `api/Lesson` stav `404`, zatímco `Service1.svc` odpovídá `200`. Port je tedy veřejně otevřený, ale je na něm publikovaná jiná IIS aplikace. Kořen navíc zobrazuje veřejný adresářový výpis, který musí IT vypnout.
 
 ## Očekávaná topologie k potvrzení IT
 
@@ -35,5 +36,6 @@ booking backend
 5. síťová omezení a gateway autentizaci;
 6. potvrzení, že cílem je testovací databáze Zone4You;
 7. povolení nejprve read-only testu a později samostatně schváleného rezervačního UAT.
+8. vypnutí directory browsing na veřejném IIS webu.
 
 SOAP audit zůstává pouze negativním srovnávacím důkazem. Nesmí otevřít D1, změnit `LUXART_API_CONTRACT` ani autorizovat release.

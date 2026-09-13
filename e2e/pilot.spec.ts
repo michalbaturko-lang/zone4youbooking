@@ -236,6 +236,24 @@ test("přihlášení, rezervace a storno projdou uživatelským flow", { tag: "@
     "Ve veřejném Preview stačí jeden autentizovaný průchod; úplná matice by záměrně narazila na login rate limit.",
   );
   const browserErrors = captureUnexpectedBrowserErrors(page);
+  await page.addInitScript(() => {
+    const demoStateKey = "zone4youbooking.demoState";
+    const originalGetItem = Storage.prototype.getItem;
+    const originalSetItem = Storage.prototype.setItem;
+    const originalRemoveItem = Storage.prototype.removeItem;
+    Storage.prototype.getItem = function getItem(key: string) {
+      if (key === demoStateKey) throw new DOMException("Blocked by browser privacy settings", "SecurityError");
+      return originalGetItem.call(this, key);
+    };
+    Storage.prototype.setItem = function setItem(key: string, value: string) {
+      if (key === demoStateKey) throw new DOMException("Storage quota unavailable", "QuotaExceededError");
+      return originalSetItem.call(this, key, value);
+    };
+    Storage.prototype.removeItem = function removeItem(key: string) {
+      if (key === demoStateKey) throw new DOMException("Blocked by browser privacy settings", "SecurityError");
+      return originalRemoveItem.call(this, key);
+    };
+  });
   await openCleanDemo(page);
 
   await page.getByRole("button", { name: "Přihlásit se" }).first().click();
@@ -622,6 +640,17 @@ test("angličtina a oblíbené lekce přežijí reload", { tag: "@preview" }, as
   await page.reload();
   await page.getByRole("button", { name: "Oblíbené" }).click();
   await expect(page.locator(".lesson-row").filter({ hasText: "HEAT easy" }).first()).toBeVisible();
+
+  await page.evaluate(() => {
+    window.localStorage.setItem("zone4youbooking.demoState", JSON.stringify({ loggedIn: true }));
+  });
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Přihlásit se" }).first()).toBeVisible();
+  const recoveredDemoState = await page.evaluate(() => {
+    const raw = window.localStorage.getItem("zone4youbooking.demoState");
+    return raw ? JSON.parse(raw) as { loggedIn?: unknown } : null;
+  });
+  expect(recoveredDemoState?.loggedIn).toBe(false);
 
   await page.evaluate(() => {
     window.localStorage.setItem(

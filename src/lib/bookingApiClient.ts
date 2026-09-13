@@ -1,6 +1,7 @@
 import type { BookingCapabilities, BookingRules, BookingSnapshot, LoginInput, PaymentTopup, Reservation, WaitlistEntry } from "./domain";
 import type { MockLuxartState } from "./mockLuxart";
 import type { Locale } from "./i18n";
+import { isSafeMockLuxartState, safeSerializedDemoState } from "./demoState";
 
 export interface BookingSnapshotResponse extends BookingSnapshot {
   rules: BookingRules;
@@ -10,6 +11,7 @@ export interface BookingSnapshotResponse extends BookingSnapshot {
 const demoStateStorageKey = "zone4youbooking.demoState";
 const readRequestTimeoutMs = 20_000;
 const bookingMutationRequestTimeoutMs = 45_000;
+let inMemoryDemoState: MockLuxartState | undefined;
 
 export interface BookingApiRequestOptions {
   timeoutMs?: number;
@@ -34,14 +36,23 @@ export class BookingApiClientError extends Error {
 }
 
 function readStoredDemoState() {
-  if (typeof window === "undefined") return undefined;
-  const raw = window.localStorage.getItem(demoStateStorageKey);
-  if (!raw) return undefined;
+  if (typeof window === "undefined") return inMemoryDemoState;
   try {
-    return JSON.parse(raw) as MockLuxartState;
+    const raw = window.localStorage.getItem(demoStateStorageKey);
+    if (!raw) return inMemoryDemoState;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!isSafeMockLuxartState(parsed) || !safeSerializedDemoState(parsed)) {
+      throw new Error("Stored demo state is invalid.");
+    }
+    inMemoryDemoState = parsed;
+    return parsed;
   } catch {
-    window.localStorage.removeItem(demoStateStorageKey);
-    return undefined;
+    try {
+      window.localStorage.removeItem(demoStateStorageKey);
+    } catch {
+      // Browser privacy settings can block storage entirely.
+    }
+    return inMemoryDemoState;
   }
 }
 
@@ -49,8 +60,14 @@ function writeStoredDemoState(json: unknown) {
   if (typeof window === "undefined") return;
   if (!json || typeof json !== "object" || !("demoState" in json)) return;
   const demoState = (json as StatefulResponse).demoState;
-  if (!demoState) return;
-  window.localStorage.setItem(demoStateStorageKey, JSON.stringify(demoState));
+  const serialized = safeSerializedDemoState(demoState);
+  if (!demoState || !serialized) return;
+  inMemoryDemoState = demoState;
+  try {
+    window.localStorage.setItem(demoStateStorageKey, serialized);
+  } catch {
+    // In-memory state preserves the current demo session when storage is blocked.
+  }
 }
 
 function bodyWithDemoState<T extends object>(body?: T) {
@@ -239,8 +256,13 @@ export const bookingApiClient = {
   },
 
   resetDemo() {
+    inMemoryDemoState = undefined;
     if (typeof window !== "undefined") {
-      window.localStorage.removeItem(demoStateStorageKey);
+      try {
+        window.localStorage.removeItem(demoStateStorageKey);
+      } catch {
+        // The reset request still produces a clean in-memory demo state.
+      }
     }
     return apiRequest("/api/demo/reset", { method: "POST" });
   },
