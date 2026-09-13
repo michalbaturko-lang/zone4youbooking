@@ -58,6 +58,16 @@ interface ApiResult<T> {
   setCookie?: string;
 }
 
+export interface BookingMutationUatSession {
+  cookie: string;
+  userId: string;
+}
+
+export interface BookingMutationUatAuthentication {
+  session: BookingMutationUatSession;
+  requestIds: string[];
+}
+
 class UatApiError extends Error {
   constructor(
     readonly status: number,
@@ -366,7 +376,7 @@ async function waitForSnapshot(
   throw new Error("Luxart state did not converge within the bounded read-only verification window.");
 }
 
-export async function runBookingMutationUat(config: BookingMutationUatConfig, fetchImpl: FetchLike = fetch) {
+async function verifyUatReadiness(config: BookingMutationUatConfig, fetchImpl: FetchLike) {
   const readiness = await api<{
     status?: string;
     mode?: string;
@@ -407,7 +417,14 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
   ) {
     throw new Error("Target is not the exact approved ready live staging runtime.");
   }
+  return readiness;
+}
 
+export async function authenticateBookingMutationUat(
+  config: BookingMutationUatConfig,
+  fetchImpl: FetchLike = fetch,
+): Promise<BookingMutationUatAuthentication> {
+  const readiness = await verifyUatReadiness(config, fetchImpl);
   const login = await api<{ user: User }>(config, fetchImpl, "/api/auth/login", {
     method: "POST",
     body: JSON.stringify({
@@ -419,9 +436,36 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
   if (login.body.user?.id !== config.expectedUserId) {
     throw new Error("Login returned a different user than ZONE4YOU_UAT_EXPECTED_USER_ID.");
   }
-  const cookie = cookieFromSetCookie(login.setCookie);
+  return {
+    session: {
+      cookie: cookieFromSetCookie(login.setCookie),
+      userId: login.body.user.id,
+    },
+    requestIds: [readiness.requestId, login.requestId],
+  };
+}
+
+export async function runBookingMutationUat(
+  config: BookingMutationUatConfig,
+  fetchImpl: FetchLike = fetch,
+  authenticatedSession?: BookingMutationUatSession,
+) {
+  let cookie: string;
+  const requestIds: string[] = [];
+  if (authenticatedSession) {
+    const readiness = await verifyUatReadiness(config, fetchImpl);
+    requestIds.push(readiness.requestId);
+    if (authenticatedSession.userId !== config.expectedUserId || !authenticatedSession.cookie) {
+      throw new Error("Shared UAT session does not match the approved test user.");
+    }
+    cookie = authenticatedSession.cookie;
+  } else {
+    const authentication = await authenticateBookingMutationUat(config, fetchImpl);
+    cookie = authentication.session.cookie;
+    requestIds.push(...authentication.requestIds);
+  }
   const beforeResult = await authenticatedSnapshot(config, fetchImpl, cookie);
-  const requestIds: string[] = [readiness.requestId, login.requestId, beforeResult.requestId];
+  requestIds.push(beforeResult.requestId);
   const before = beforeResult.body;
   if (before.user?.id !== config.expectedUserId) throw new Error("Authenticated snapshot user does not match the approved test user.");
   const beforeActiveReservations = activeReservationIdentitySet(before);
@@ -639,6 +683,7 @@ export async function runBookingMutationUatSuite(
   config: BookingMutationUatSuiteConfig,
   fetchImpl: FetchLike = fetch,
   runScenario: typeof runBookingMutationUat = runBookingMutationUat,
+  authenticate: typeof authenticateBookingMutationUat = authenticateBookingMutationUat,
 ) {
   validateBookingMutationUatSuiteConfig(config);
   const sharedFields = [
@@ -659,9 +704,18 @@ export async function runBookingMutationUatSuite(
   }))) {
     throw new Error("Booking mutation UAT suite must bind every mapped room to one approved staging user and deployment.");
   }
+  const authentication = await authenticate(first, fetchImpl);
+  if (
+    authentication.session.userId !== first.expectedUserId ||
+    authentication.requestIds.length !== 2 ||
+    new Set(authentication.requestIds).size !== authentication.requestIds.length ||
+    authentication.requestIds.some((requestId) => !requestId)
+  ) {
+    throw new Error("Booking mutation UAT suite authentication evidence is invalid.");
+  }
   const scenarios = [];
   for (const scenario of config.scenarios) {
-    scenarios.push(await runScenario(scenario, fetchImpl));
+    scenarios.push(await runScenario(scenario, fetchImpl, authentication.session));
   }
   return {
     schemaVersion: bookingMutationUatEvidenceSchemaVersion,
@@ -672,6 +726,7 @@ export async function runBookingMutationUatSuite(
     commit: first.expectedCommit,
     phase: first.expectedPhase,
     region: "fra1",
+    authenticationRequestIds: authentication.requestIds,
     scenarioCount: scenarios.length,
     scenarios,
   };

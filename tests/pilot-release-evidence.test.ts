@@ -257,6 +257,7 @@ function validFixture() {
       commit,
       phase: "booking_without_payments",
       region: "fra1",
+      authenticationRequestIds: ["authentication-readiness", "authentication-login"],
       scenarioCount: 3,
       scenarios: [
         bookingUatScenario("standard", checkedAt, 1, "c".repeat(16), "d".repeat(16), "room-1-request"),
@@ -621,6 +622,23 @@ test("pilot release dossier rejects evidence that cannot come from the real guar
         mutableBookingUatScenario(artifact).requestIds = Array.from({ length: 16 }, () => "reused-request-id");
       },
       /booking UAT standard evidence request IDs must be unique/i,
+    ],
+    [
+      "bookingMutationUat",
+      (artifact: Record<string, unknown>) => {
+        artifact.authenticationRequestIds = ["same-auth-request", "same-auth-request"];
+      },
+      /authenticationRequestIds must contain exactly two unique request IDs/i,
+    ],
+    [
+      "bookingMutationUat",
+      (artifact: Record<string, unknown>) => {
+        artifact.authenticationRequestIds = [
+          "authentication-readiness",
+          (mutableBookingUatScenario(artifact).requestIds as string[])[0],
+        ];
+      },
+      /request IDs must be unique across all room scenarios/i,
     ],
     [
       "bookingMutationUat",

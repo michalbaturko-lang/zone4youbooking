@@ -603,7 +603,7 @@ export function validateBookingUatScenarioEvidence(
   trueValue(evidence.finalStateRestored, `${label} finalStateRestored`);
   trueValue(evidence.cancellationFeeMatched, `${label} cancellationFeeMatched`);
   const requestIds = stringArray(evidence.requestIds, `${label} requestIds`);
-  if (requestIds.length < 16) {
+  if (requestIds.length < 15) {
     throw new Error(`${label} evidence contains too few correlated request IDs.`);
   }
   if (new Set(requestIds).size !== requestIds.length) {
@@ -640,6 +640,13 @@ export function validateBookingUatEvidence(
   exactString(stringValue(evidence.commit, "booking UAT commit").toLowerCase(), expectedCommit, "booking UAT commit");
   exactString(evidence.phase, launchMode, "booking UAT phase");
   exactString(evidence.region, "fra1", "booking UAT region");
+  const authenticationRequestIds = stringArray(
+    evidence.authenticationRequestIds,
+    "booking UAT authenticationRequestIds",
+  );
+  if (authenticationRequestIds.length !== 2 || new Set(authenticationRequestIds).size !== 2) {
+    throw new Error("booking UAT authenticationRequestIds must contain exactly two unique request IDs.");
+  }
   const expectedScenarioCount = resourceMap.size;
   if (integerValue(evidence.scenarioCount, "booking UAT scenarioCount", 1) !== expectedScenarioCount) {
     throw new Error("booking UAT scenarioCount must exactly equal the number of rooms in LUXART_RESOURCE_MAP_JSON.");
@@ -679,7 +686,10 @@ export function validateBookingUatEvidence(
   if (new Set(reservationIds).size !== reservationIds.length) {
     throw new Error("booking UAT scenarios must record distinct reservations.");
   }
-  const allRequestIds = scenarios.flatMap((scenario) => scenario.requestIds);
+  const allRequestIds = [
+    ...authenticationRequestIds,
+    ...scenarios.flatMap((scenario) => scenario.requestIds),
+  ];
   if (new Set(allRequestIds).size !== allRequestIds.length) {
     throw new Error("booking UAT request IDs must be unique across all room scenarios.");
   }

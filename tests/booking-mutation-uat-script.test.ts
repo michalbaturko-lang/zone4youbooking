@@ -152,8 +152,10 @@ test("mutation UAT suite requires and records one scenario for every mapped room
     ]),
   });
   const calls: string[] = [];
-  const evidence = await runBookingMutationUatSuite(suite, fetch, async (scenario) => {
+  let authenticationCalls = 0;
+  const evidence = await runBookingMutationUatSuite(suite, fetch, async (scenario, _fetchImpl, session) => {
     calls.push(`${scenario.expectedRoomNumber}:${scenario.expectedLessonKind}`);
+    assert.deepEqual(session, { cookie: "z4y_booking_session=shared", userId: "42" });
     return {
       schemaVersion: bookingMutationUatScenarioEvidenceSchemaVersion,
       ok: true,
@@ -186,10 +188,18 @@ test("mutation UAT suite requires and records one scenario for every mapped room
       cancellationFeeMatched: true,
       requestIds: Array.from({ length: 16 }, (_, index) => `${scenario.expectedRoomNumber}-${index}`),
     };
+  }, async () => {
+    authenticationCalls += 1;
+    return {
+      session: { cookie: "z4y_booking_session=shared", userId: "42" },
+      requestIds: ["authentication-readiness", "authentication-login"],
+    };
   });
   assert.deepEqual(calls, ["1:standard", "2:standard", "3:reformer"]);
+  assert.equal(authenticationCalls, 1);
   assert.equal(evidence.schemaVersion, bookingMutationUatEvidenceSchemaVersion);
   assert.equal(evidence.scenarioCount, 3);
+  assert.deepEqual(evidence.authenticationRequestIds, ["authentication-readiness", "authentication-login"]);
   assert.deepEqual(evidence.scenarios.map((scenario) => scenario.lessonRoomNumber), [1, 2, 3]);
 
   let invalidCalls = 0;
