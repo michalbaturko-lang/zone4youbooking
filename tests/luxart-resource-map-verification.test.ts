@@ -25,7 +25,9 @@ function d1Evidence(overrides: Record<string, unknown> = {}) {
       english: localized,
     },
     d1: {
-      schemaVersion: 5,
+      schemaVersion: 6,
+      directoryBrowsingChecked: true,
+      directoryBrowsingDetected: false,
       contractBaselineVerified: true,
       approvedOriginFingerprintVerified: true,
       authenticatedReadOnlyVerified: true,
@@ -110,7 +112,12 @@ test("resource map verifier rejects room drift and non-release-grade D1 evidence
     );
 
     writeFileSync(evidencePath, JSON.stringify(d1Evidence({
-      d1: { schemaVersion: 5, authenticatedReadOnlyVerified: false },
+      d1: {
+        schemaVersion: 6,
+        directoryBrowsingChecked: true,
+        directoryBrowsingDetected: false,
+        authenticatedReadOnlyVerified: false,
+      },
     })), { mode: 0o600 });
     assert.throws(
       () => verifyLuxartResourceMap({ environment, repositoryRoot: "/repository" }),

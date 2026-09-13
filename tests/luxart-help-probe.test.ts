@@ -38,15 +38,15 @@ test("Luxart Help probe derives /Help from the API base without credentials", ()
 });
 
 test("Luxart Help probe sends no authentication data and recognizes the documentation", async () => {
-  let observedUrl = "";
-  let observedInit: RequestInit | undefined;
+  const observed: Array<{ url: URL; init?: RequestInit }> = [];
   const result = await runLuxartHelpProbe({
     environment: secureEnvironment,
     now: new Date("2026-09-11T12:00:00.000Z"),
     fetchImpl: async (url, init) => {
-      observedUrl = url.href;
-      observedInit = init;
-      return new Response("<html><title>API dokumentace</title></html>", {
+      observed.push({ url, init });
+      return new Response(url.pathname === "/Help"
+        ? "<html><title>API dokumentace</title></html>"
+        : "<html><title>Memberzone API</title></html>", {
         status: 200,
         headers: { "content-type": "text/html" },
       });
@@ -55,15 +55,38 @@ test("Luxart Help probe sends no authentication data and recognizes the document
 
   assert.equal(result.ok, true);
   assert.equal(result.classification, "ready");
+  assert.equal(result.directoryBrowsingChecked, true);
+  assert.equal(result.directoryBrowsingDetected, false);
   assert.equal(result.launchAuthority, false);
   assert.equal(result.credentialsAuthorized, false);
-  assert.equal(observedUrl, secureEnvironment.LUXART_HELP_URL);
-  assert.equal(observedInit?.method, "GET");
-  assert.equal(observedInit?.redirect, "manual");
-  const headers = new Headers(observedInit?.headers);
-  assert.equal(headers.has("authorization"), false);
-  assert.equal(headers.has("cookie"), false);
+  assert.deepEqual(observed.map(({ url }) => url.pathname).sort(), ["/", "/Help"]);
+  for (const request of observed) {
+    assert.equal(request.init?.method, "GET");
+    assert.equal(request.init?.redirect, "manual");
+    const headers = new Headers(request.init?.headers);
+    assert.equal(headers.has("authorization"), false);
+    assert.equal(headers.has("cookie"), false);
+  }
   assert.equal(JSON.stringify(result).includes("luxart-zone4you.example.com"), false);
+});
+
+test("Luxart Help probe rejects valid REST documentation when the public root exposes a directory listing", async () => {
+  const result = await runLuxartHelpProbe({
+    environment: secureEnvironment,
+    fetchImpl: async (url) => new Response(
+      url.pathname === "/Help"
+        ? "<html><title>API dokumentace</title></html>"
+        : '<html><title>luxart-zone4you.example.com - /</title><a href="/Web.config">Web.config</a></html>',
+      { status: 200 },
+    ),
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.classification, "directory_listing_detected");
+  assert.equal(result.directoryBrowsingChecked, true);
+  assert.equal(result.directoryBrowsingDetected, true);
+  assert.equal(result.launchAuthority, false);
+  assert.equal(result.credentialsAuthorized, false);
 });
 
 test("Luxart Help probe distinguishes auth, redirects and non-document responses", async () => {

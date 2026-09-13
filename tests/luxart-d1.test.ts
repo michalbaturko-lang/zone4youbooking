@@ -180,6 +180,8 @@ test("D1 binds transport, gateway, semantic contract and authenticated read-only
           httpStatus: 200,
           classification: "ready",
           bodySha256: "c".repeat(64),
+          directoryBrowsingChecked: true,
+          directoryBrowsingDetected: false,
         };
       },
       contractVerifier: async ({ origin }) => {
@@ -215,7 +217,7 @@ test("D1 binds transport, gateway, semantic contract and authenticated read-only
     delete parsed.d1;
     assert.deepEqual(parsed, readonlyEvidence());
     assert.deepEqual(d1, {
-      schemaVersion: 5,
+      schemaVersion: 6,
       checkedAt: now.toISOString(),
       targetFingerprintSha256: approvedOriginFingerprint,
       helpClassification: "ready",
@@ -232,6 +234,8 @@ test("D1 binds transport, gateway, semantic contract and authenticated read-only
       approvedOriginFingerprintVerified: true,
       authenticatedReadOnlyVerified: true,
       personalizedLessonSetVerified: true,
+      directoryBrowsingChecked: true,
+      directoryBrowsingDetected: false,
       loginQueryLoggingConfirmed: true,
       loginQueryLoggingConfirmedBy: "Zone4You IT administrator",
       loginQueryLoggingConfirmedAt: "2026-09-11T13:30:00.000Z",
@@ -441,6 +445,8 @@ test("D1 accepts an authentication challenge only when a non-empty gateway mode 
         reached: true,
         httpStatus: 401,
         classification: "authentication_required",
+        directoryBrowsingChecked: true,
+        directoryBrowsingDetected: false,
       }),
       contractVerifier: async () => contractEvidence(),
       readonlyVerifier: async () => readonlyEvidence("basic"),
@@ -480,6 +486,8 @@ test("D1 rejects semantic contract drift before authenticated reads or evidence 
           httpStatus: 200,
           classification: "ready",
           bodySha256: "c".repeat(64),
+          directoryBrowsingChecked: true,
+          directoryBrowsingDetected: false,
         }),
         contractVerifier: async () => contractEvidence({
           ok: false,

@@ -130,7 +130,7 @@ test("standalone Luxart evidence remains diagnostic while D1-attested evidence s
   validateLuxartEvidence({
     ...evidence,
     d1: {
-      schemaVersion: 5,
+      schemaVersion: 6,
       checkedAt: now.toISOString(),
       targetFingerprintSha256: createHash("sha256").update(target).digest("hex"),
       helpClassification: "ready",
@@ -147,6 +147,8 @@ test("standalone Luxart evidence remains diagnostic while D1-attested evidence s
       approvedOriginFingerprintVerified: true,
       authenticatedReadOnlyVerified: true,
       personalizedLessonSetVerified: true,
+      directoryBrowsingChecked: true,
+      directoryBrowsingDetected: false,
       loginQueryLoggingConfirmed: true,
       loginQueryLoggingConfirmedBy: "Zone4You IT administrator",
       loginQueryLoggingConfirmedAt: "2026-09-05T07:30:00.000Z",

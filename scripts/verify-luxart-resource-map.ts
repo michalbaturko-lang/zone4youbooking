@@ -63,7 +63,9 @@ function verifiedD1RoomNumbers(data: unknown) {
 
   const d1 = record(evidence.d1, "Luxart D1 attestation");
   if (
-    d1.schemaVersion !== 5 ||
+    d1.schemaVersion !== 6 ||
+    d1.directoryBrowsingChecked !== true ||
+    d1.directoryBrowsingDetected !== false ||
     d1.contractBaselineVerified !== true ||
     d1.approvedOriginFingerprintVerified !== true ||
     d1.authenticatedReadOnlyVerified !== true ||

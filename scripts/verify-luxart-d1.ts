@@ -255,6 +255,9 @@ export async function runLuxartD1Verification({
   if (!helpAccepted(help, gateway)) {
     throw new Error(`Luxart Help transport check did not pass safely (${help.classification}).`);
   }
+  if (help.directoryBrowsingChecked !== true || help.directoryBrowsingDetected !== false) {
+    throw new Error("Luxart Help evidence does not prove that public directory browsing is disabled.");
+  }
 
   const contract = await contractVerifier({
     environment,
@@ -294,7 +297,7 @@ export async function runLuxartD1Verification({
   const d1Evidence = {
     ...evidence,
     d1: {
-      schemaVersion: 5,
+      schemaVersion: 6,
       checkedAt: help.checkedAt,
       targetFingerprintSha256: configuration.targetFingerprintSha256,
       helpClassification: help.classification,
@@ -311,6 +314,8 @@ export async function runLuxartD1Verification({
       approvedOriginFingerprintVerified: true,
       authenticatedReadOnlyVerified: true,
       personalizedLessonSetVerified: true,
+      directoryBrowsingChecked: true,
+      directoryBrowsingDetected: false,
       loginQueryLoggingConfirmed: true,
       loginQueryLoggingConfirmedBy: configuration.loginQueryLoggingConfirmedBy,
       loginQueryLoggingConfirmedAt: configuration.loginQueryLoggingConfirmedAt,

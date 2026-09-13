@@ -278,8 +278,8 @@ export function validateLuxartEvidence(
   const expectedPort = expectedOrigin.port || (expectedOrigin.protocol === "https:" ? "443" : "80");
   const expectedFingerprint = createHash("sha256").update(expectedOrigin.origin).digest("hex");
   const d1 = objectValue(evidence.d1, "artifacts.luxartReadOnly.d1");
-  if (d1.schemaVersion !== 5) {
-    throw new Error("artifacts.luxartReadOnly.d1.schemaVersion must be 5.");
+  if (d1.schemaVersion !== 6) {
+    throw new Error("artifacts.luxartReadOnly.d1.schemaVersion must be 6.");
   }
   exactString(d1.apiContract, supportedLuxartApiContract, "Luxart D1 apiContract");
   exactString(evidence.apiContract, supportedLuxartApiContract, "Luxart evidence apiContract");
@@ -313,6 +313,8 @@ export function validateLuxartEvidence(
   trueValue(d1.approvedOriginFingerprintVerified, "Luxart D1 approvedOriginFingerprintVerified");
   trueValue(d1.authenticatedReadOnlyVerified, "Luxart D1 authenticatedReadOnlyVerified");
   trueValue(d1.personalizedLessonSetVerified, "Luxart D1 personalizedLessonSetVerified");
+  trueValue(d1.directoryBrowsingChecked, "Luxart D1 directoryBrowsingChecked");
+  falseValue(d1.directoryBrowsingDetected, "Luxart D1 directoryBrowsingDetected");
   trueValue(d1.loginQueryLoggingConfirmed, "Luxart D1 loginQueryLoggingConfirmed");
   approvalIdentity(d1.loginQueryLoggingConfirmedBy, "Luxart D1 loginQueryLoggingConfirmedBy");
   const loginQueryLoggingConfirmedAt = approvedAt(

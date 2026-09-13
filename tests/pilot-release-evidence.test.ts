@@ -107,7 +107,7 @@ function validFixture() {
       apiContract: "memberzone_rest_v1",
       gatewayAuthMode: "none",
       d1: {
-        schemaVersion: 5,
+        schemaVersion: 6,
         checkedAt,
         targetFingerprintSha256: luxartTargetFingerprint,
         helpClassification: "ready",
@@ -124,6 +124,8 @@ function validFixture() {
         approvedOriginFingerprintVerified: true,
         authenticatedReadOnlyVerified: true,
         personalizedLessonSetVerified: true,
+        directoryBrowsingChecked: true,
+        directoryBrowsingDetected: false,
         loginQueryLoggingConfirmed: true,
         loginQueryLoggingConfirmedBy: "Zone4You IT administrator",
         loginQueryLoggingConfirmedAt: "2026-09-05T07:20:00.000Z",
@@ -522,6 +524,20 @@ test("pilot release dossier rejects evidence that cannot come from the real guar
         (artifact.d1 as Record<string, unknown>).contractEndpointCount = 10;
       },
       /D1 contractEndpointCount must be 11/i,
+    ],
+    [
+      "luxartReadOnly",
+      (artifact: Record<string, unknown>) => {
+        delete (artifact.d1 as Record<string, unknown>).directoryBrowsingChecked;
+      },
+      /D1 directoryBrowsingChecked must be true/i,
+    ],
+    [
+      "luxartReadOnly",
+      (artifact: Record<string, unknown>) => {
+        (artifact.d1 as Record<string, unknown>).directoryBrowsingDetected = true;
+      },
+      /D1 directoryBrowsingDetected must be false/i,
     ],
     [
       "luxartReadOnly",

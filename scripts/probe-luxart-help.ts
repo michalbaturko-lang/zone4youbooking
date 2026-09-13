@@ -27,6 +27,7 @@ export interface LuxartHelpProbeResult {
   bodySha256?: string;
   networkCode?: string;
   candidateContract?: "soap_wcf" | "unknown";
+  directoryBrowsingChecked?: boolean;
   directoryBrowsingDetected?: boolean;
 }
 
@@ -134,22 +135,46 @@ async function readPublicCandidateDocument(
   }
 }
 
+function looksLikeDirectoryListing(root: string) {
+  return /<title>[^<]*\s-\s\/\s*<\/title>/i.test(root) &&
+    /href=["']\/(?:Web\.config|bin\/|App_Data\/)/i.test(root);
+}
+
+async function inspectPublicRoot(
+  helpUrl: URL,
+  fetchImpl: FetchLike,
+  signal: AbortSignal,
+) {
+  try {
+    const response = await fetchImpl(new URL("/", helpUrl.origin), {
+      method: "GET",
+      redirect: "manual",
+      cache: "no-store",
+      headers: { Accept: "text/html,application/xhtml+xml" },
+      signal,
+    });
+    if (response.status !== 200) {
+      await response.body?.cancel().catch(() => undefined);
+      return { checked: true, detected: false };
+    }
+    const root = await readLimitedText(response);
+    return { checked: true, detected: looksLikeDirectoryListing(root) };
+  } catch {
+    return { checked: false, detected: false };
+  }
+}
+
 async function diagnoseUnexpectedCandidate(
   helpUrl: URL,
   fetchImpl: FetchLike,
   signal: AbortSignal,
 ) {
-  const rootUrl = new URL("/", helpUrl.origin);
   const wsdlUrl = new URL("/Service1.svc?wsdl", helpUrl.origin);
-  const [root, wsdl] = await Promise.all([
-    readPublicCandidateDocument(rootUrl, fetchImpl, signal),
+  const [rootInspection, wsdl] = await Promise.all([
+    inspectPublicRoot(helpUrl, fetchImpl, signal),
     readPublicCandidateDocument(wsdlUrl, fetchImpl, signal),
   ]);
-  const directoryBrowsingDetected = Boolean(
-    root &&
-    /<title>[^<]*\s-\s\/\s*<\/title>/i.test(root) &&
-    /href=["']\/(?:Web\.config|bin\/|App_Data\/)/i.test(root),
-  );
+  const directoryBrowsingDetected = rootInspection.detected;
   const soapWcfDetected = Boolean(
     wsdl &&
     /<(?:wsdl:)?definitions\b/i.test(wsdl) &&
@@ -163,8 +188,35 @@ async function diagnoseUnexpectedCandidate(
         ? "directory_listing_detected" as const
         : "unexpected_response" as const,
     candidateContract: soapWcfDetected ? "soap_wcf" as const : "unknown" as const,
+    directoryBrowsingChecked: rootInspection.checked,
     directoryBrowsingDetected,
   };
+}
+
+function unsafePublicRootResult(
+  base: Omit<LuxartHelpProbeResult, "ok" | "classification">,
+  inspection: { checked: boolean; detected: boolean },
+) {
+  if (!inspection.checked) {
+    return {
+      ...base,
+      ok: false,
+      classification: "unexpected_response" as const,
+      directoryBrowsingChecked: false,
+      directoryBrowsingDetected: false,
+    };
+  }
+  if (inspection.detected) {
+    return {
+      ...base,
+      ok: false,
+      classification: "directory_listing_detected" as const,
+      candidateContract: "unknown" as const,
+      directoryBrowsingChecked: true,
+      directoryBrowsingDetected: true,
+    };
+  }
+  return undefined;
 }
 
 function safeNetworkCode(error: unknown) {
@@ -207,7 +259,16 @@ export async function runLuxartHelpProbe({
     };
 
     if (response.status === 401 || response.status === 403) {
-      return { ...base, ok: false, classification: "authentication_required" as const };
+      const rootInspection = await inspectPublicRoot(configuration.helpUrl, fetchImpl, controller.signal);
+      const unsafeRoot = unsafePublicRootResult(base, rootInspection);
+      if (unsafeRoot) return unsafeRoot;
+      return {
+        ...base,
+        ok: false,
+        classification: "authentication_required" as const,
+        directoryBrowsingChecked: true,
+        directoryBrowsingDetected: false,
+      };
     }
     if (response.status >= 300 && response.status < 400) {
       return { ...base, ok: false, classification: "redirect_rejected" as const };
@@ -225,11 +286,16 @@ export async function runLuxartHelpProbe({
       const candidate = await diagnoseUnexpectedCandidate(configuration.helpUrl, fetchImpl, controller.signal);
       return { ...base, ...candidate, ok: false };
     }
+    const rootInspection = await inspectPublicRoot(configuration.helpUrl, fetchImpl, controller.signal);
+    const unsafeRoot = unsafePublicRootResult(base, rootInspection);
+    if (unsafeRoot) return unsafeRoot;
     return {
       ...base,
       ok: true,
       classification: "ready" as const,
       bodySha256: createHash("sha256").update(body).digest("hex"),
+      directoryBrowsingChecked: true,
+      directoryBrowsingDetected: false,
     };
   } catch (error) {
     return {
