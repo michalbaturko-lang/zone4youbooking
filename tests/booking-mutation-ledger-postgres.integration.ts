@@ -11,6 +11,10 @@ import { BookingApiError } from "../src/lib/errors";
 const connectionString = process.env.BOOKING_TEST_DATABASE_URL;
 if (!connectionString) throw new Error("BOOKING_TEST_DATABASE_URL is required for the PostgreSQL ledger integration test.");
 
+function quoteIdentifier(value: string) {
+  return `"${value.replaceAll('"', '""')}"`;
+}
+
 test("PostgreSQL booking ledger serializes a user and replays one reservation result", async () => {
   const schema = `z4y_booking_test_${process.pid}_${Date.now()}`;
   const admin = new Pool({ connectionString, max: 1 });
@@ -23,6 +27,7 @@ test("PostgreSQL booking ledger serializes a user and replays one reservation re
     status: "active",
     reservedAt: "2026-08-29T12:00:00.000Z",
     priceKc: 180,
+    luxartCategoryId: 12,
   };
 
   try {
@@ -135,6 +140,24 @@ test("PostgreSQL booking ledger serializes a user and replays one reservation re
     });
     assert.equal(blocked.claim, "uncertain");
     await blocked.release();
+
+    const uniqueConstraint = await pool.query<{ conname: string }>(
+      `SELECT conname FROM pg_constraint
+       WHERE conrelid = to_regclass('zone4you_booking_mutations')
+         AND contype = 'u'
+         AND pg_get_constraintdef(oid) = 'UNIQUE (user_id, idempotency_key)'`,
+    );
+    assert.equal(uniqueConstraint.rowCount, 1);
+    await pool.query(
+      `ALTER TABLE zone4you_booking_mutations DROP CONSTRAINT ${quoteIdentifier(uniqueConstraint.rows[0]!.conname)}`,
+    );
+    await pool.query(
+      "ALTER TABLE zone4you_booking_mutations ADD CONSTRAINT zone4you_booking_mutations_decoy_key UNIQUE (idempotency_key)",
+    );
+    await assert.rejects(
+      ledger.assertReady(),
+      (error: unknown) => error instanceof BookingApiError && error.code === "BOOKING_LEDGER_NOT_READY",
+    );
   } finally {
     await pool.end();
     await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);

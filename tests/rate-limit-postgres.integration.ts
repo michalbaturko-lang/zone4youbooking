@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { Pool } from "pg";
+import { BookingApiError } from "../src/lib/errors";
 import { PostgresFixedWindowRateLimiter } from "../src/lib/rateLimit";
 
 const connectionString = process.env.RATE_LIMIT_TEST_DATABASE_URL;
@@ -33,6 +34,15 @@ test("PostgreSQL rate limiter atomically enforces one shared window across conne
     assert.equal(stored.rows[0]?.request_count, rule.limit + 1);
 
     assert.equal((await limiter.take("second-client", rule)).allowed, true);
+
+    await pool.query("ALTER TABLE zone4you_rate_limit_buckets DROP CONSTRAINT zone4you_rate_limit_buckets_pkey");
+    await pool.query(
+      "ALTER TABLE zone4you_rate_limit_buckets ADD CONSTRAINT zone4you_rate_limit_buckets_decoy_pkey PRIMARY KEY (bucket_key, scope)",
+    );
+    await assert.rejects(
+      limiter.assertReady(),
+      (error: unknown) => error instanceof BookingApiError && error.code === "RATE_LIMIT_NOT_READY",
+    );
   } finally {
     await pool.end();
     await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);

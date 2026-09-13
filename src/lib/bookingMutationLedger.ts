@@ -150,13 +150,34 @@ export class PostgresBookingMutationLedger implements DurableBookingMutationLedg
     if (result.rows[0]?.table_name !== mutationTable || result.rows[0]?.schema_table_name !== schemaTable) {
       throw new BookingApiError(503, "BOOKING_LEDGER_NOT_READY", "Ochrana rezervací není připravena.");
     }
-    const schema = await this.pool.query<{ version: number; uniqueness_constraints: number }>(
+    const schema = await this.pool.query<{
+      version: number;
+      version_rows: number;
+      primary_key_valid: boolean;
+      idempotency_unique_valid: boolean;
+    }>(
       `SELECT
         COALESCE((SELECT MAX(version) FROM ${schemaTable}), 0)::int AS version,
-        (SELECT COUNT(*) FROM pg_constraint
-          WHERE conrelid = to_regclass('${mutationTable}') AND contype IN ('p', 'u'))::int AS uniqueness_constraints`,
+        (SELECT COUNT(*) FROM ${schemaTable})::int AS version_rows,
+        EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conrelid = to_regclass('${mutationTable}')
+            AND contype = 'p'
+            AND pg_get_constraintdef(oid) = 'PRIMARY KEY (id)'
+        ) AS primary_key_valid,
+        EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conrelid = to_regclass('${mutationTable}')
+            AND contype = 'u'
+            AND pg_get_constraintdef(oid) = 'UNIQUE (user_id, idempotency_key)'
+        ) AS idempotency_unique_valid`,
     );
-    if (schema.rows[0]?.version !== schemaVersion || schema.rows[0]?.uniqueness_constraints < 2) {
+    if (
+      schema.rows[0]?.version !== schemaVersion ||
+      schema.rows[0]?.version_rows !== 1 ||
+      schema.rows[0]?.primary_key_valid !== true ||
+      schema.rows[0]?.idempotency_unique_valid !== true
+    ) {
       throw new BookingApiError(503, "BOOKING_LEDGER_NOT_READY", "Ochrana rezervací má neplatnou verzi.");
     }
   }

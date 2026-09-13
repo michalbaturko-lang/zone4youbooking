@@ -86,13 +86,26 @@ export class PostgresFixedWindowRateLimiter {
     ) {
       throw new BookingApiError(503, "RATE_LIMIT_NOT_READY", "Ochrana proti zneužití není připravena.");
     }
-    const schema = await this.pool.query<{ version: number; primary_keys: number }>(
+    const schema = await this.pool.query<{
+      version: number;
+      version_rows: number;
+      bucket_primary_key_valid: boolean;
+    }>(
       `SELECT
         COALESCE((SELECT MAX(version) FROM ${rateLimitSchemaTable}), 0)::int AS version,
-        (SELECT COUNT(*) FROM pg_constraint
-          WHERE conrelid = to_regclass('${rateLimitTable}') AND contype = 'p')::int AS primary_keys`,
+        (SELECT COUNT(*) FROM ${rateLimitSchemaTable})::int AS version_rows,
+        EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conrelid = to_regclass('${rateLimitTable}')
+            AND contype = 'p'
+            AND pg_get_constraintdef(oid) = 'PRIMARY KEY (bucket_key)'
+        ) AS bucket_primary_key_valid`,
     );
-    if (schema.rows[0]?.version !== rateLimitSchemaVersion || schema.rows[0]?.primary_keys !== 1) {
+    if (
+      schema.rows[0]?.version !== rateLimitSchemaVersion ||
+      schema.rows[0]?.version_rows !== 1 ||
+      schema.rows[0]?.bucket_primary_key_valid !== true
+    ) {
       throw new BookingApiError(503, "RATE_LIMIT_NOT_READY", "Ochrana proti zneužití má neplatnou verzi.");
     }
   }
