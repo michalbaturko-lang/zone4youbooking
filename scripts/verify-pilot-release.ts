@@ -613,7 +613,10 @@ export function validateBookingUatScenarioEvidence(
   if (!Number.isFinite(scenarioCheckedAt.getTime())) throw new Error(`${label}.checkedAt must be a valid timestamp.`);
   return {
     checkedAt: scenarioCheckedAt,
+    lessonKind: expectedLessonKind,
+    lessonRoomNumber,
     lessonIdSha256: stringValue(evidence.lessonIdSha256, `${label} lessonIdSha256`),
+    reservationIdSha256: stringValue(evidence.reservationIdSha256, `${label} reservationIdSha256`),
     requestIds,
   };
 }
@@ -637,44 +640,55 @@ export function validateBookingUatEvidence(
   exactString(stringValue(evidence.commit, "booking UAT commit").toLowerCase(), expectedCommit, "booking UAT commit");
   exactString(evidence.phase, launchMode, "booking UAT phase");
   exactString(evidence.region, "fra1", "booking UAT region");
-  if (integerValue(evidence.scenarioCount, "booking UAT scenarioCount", 2) !== 2) {
-    throw new Error("booking UAT scenarioCount must exactly equal 2.");
+  const expectedScenarioCount = resourceMap.size;
+  if (integerValue(evidence.scenarioCount, "booking UAT scenarioCount", 1) !== expectedScenarioCount) {
+    throw new Error("booking UAT scenarioCount must exactly equal the number of rooms in LUXART_RESOURCE_MAP_JSON.");
   }
-  const scenarios = objectValue(evidence.scenarios, "booking UAT scenarios");
-  if (JSON.stringify(Object.keys(scenarios).sort()) !== JSON.stringify(["reformer", "standard"])) {
-    throw new Error("booking UAT scenarios must contain exactly standard and reformer evidence.");
+  if (!Array.isArray(evidence.scenarios) || evidence.scenarios.length !== expectedScenarioCount) {
+    throw new Error("booking UAT scenarios must contain exactly one evidence item for every mapped room.");
   }
-  const standard = validateBookingUatScenarioEvidence(
-    objectValue(scenarios.standard, "booking UAT scenarios.standard"),
-    stagingOrigin,
-    resourceMap,
-    resourceMapSha256,
-    expectedCommit,
-    launchMode,
-    "standard",
-  );
-  const reformer = validateBookingUatScenarioEvidence(
-    objectValue(scenarios.reformer, "booking UAT scenarios.reformer"),
-    stagingOrigin,
-    resourceMap,
-    resourceMapSha256,
-    expectedCommit,
-    launchMode,
-    "reformer",
-  );
-  if (standard.lessonIdSha256 === reformer.lessonIdSha256) {
-    throw new Error("Standard and Reformer booking UAT must use different lesson occurrences.");
+  const scenarios = evidence.scenarios.map((rawScenario, index) => {
+    const scenario = objectValue(rawScenario, `booking UAT scenarios[${index}]`);
+    const lessonKind = stringValue(scenario.lessonKind, `booking UAT scenarios[${index}].lessonKind`);
+    if (!(lessonKind === "standard" || lessonKind === "reformer")) {
+      throw new Error(`booking UAT scenarios[${index}].lessonKind must be standard or reformer.`);
+    }
+    return validateBookingUatScenarioEvidence(
+      scenario,
+      stagingOrigin,
+      resourceMap,
+      resourceMapSha256,
+      expectedCommit,
+      launchMode,
+      lessonKind,
+    );
+  });
+  const expectedRoomNumbers = [...resourceMap.keys()].map(Number).sort((left, right) => left - right);
+  const observedRoomNumbers = scenarios.map((scenario) => scenario.lessonRoomNumber).sort((left, right) => left - right);
+  if (JSON.stringify(observedRoomNumbers) !== JSON.stringify(expectedRoomNumbers)) {
+    throw new Error("booking UAT scenarios must cover every mapped room exactly once.");
   }
-  const allRequestIds = [...standard.requestIds, ...reformer.requestIds];
+  if (!scenarios.some((scenario) => scenario.lessonKind === "standard") || !scenarios.some((scenario) => scenario.lessonKind === "reformer")) {
+    throw new Error("booking UAT scenarios must include both standard and Reformer lessons.");
+  }
+  const lessonIds = scenarios.map((scenario) => scenario.lessonIdSha256);
+  if (new Set(lessonIds).size !== lessonIds.length) {
+    throw new Error("booking UAT scenarios must use distinct lesson occurrences.");
+  }
+  const reservationIds = scenarios.map((scenario) => scenario.reservationIdSha256);
+  if (new Set(reservationIds).size !== reservationIds.length) {
+    throw new Error("booking UAT scenarios must record distinct reservations.");
+  }
+  const allRequestIds = scenarios.flatMap((scenario) => scenario.requestIds);
   if (new Set(allRequestIds).size !== allRequestIds.length) {
-    throw new Error("Standard and Reformer booking UAT request IDs must be unique across both scenarios.");
+    throw new Error("booking UAT request IDs must be unique across all room scenarios.");
   }
   const suiteCheckedAt = new Date(stringValue(evidence.checkedAt, "booking UAT.checkedAt"));
   if (!Number.isFinite(suiteCheckedAt.getTime())) throw new Error("booking UAT.checkedAt must be a valid timestamp.");
-  for (const [kind, scenario] of [["standard", standard], ["reformer", reformer]] as const) {
+  for (const scenario of scenarios) {
     const ageMs = suiteCheckedAt.getTime() - scenario.checkedAt.getTime();
     if (ageMs < 0 || ageMs > 2 * 3_600_000) {
-      throw new Error(`booking UAT ${kind}.checkedAt must be no more than two hours before the suite evidence.`);
+      throw new Error(`booking UAT room ${scenario.lessonRoomNumber}.checkedAt must be no more than two hours before the suite evidence.`);
     }
   }
 }

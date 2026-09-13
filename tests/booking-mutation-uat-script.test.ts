@@ -17,7 +17,7 @@ import { maximumOperationalAmountKc } from "../src/lib/moneyBounds";
 
 const target = "https://staging.booking.zone4you.cz/";
 const commit = "1234567890abcdef1234567890abcdef12345678";
-const resourceMapJson = JSON.stringify({ 1: 101 });
+const resourceMapJson = JSON.stringify({ 1: 101, 2: 102, 3: 203 });
 const resourceMapSha256 = luxartResourceMappingSha256(resourceMapJson);
 const baseEnvironment = {
   ZONE4YOU_UAT_APP_URL: target,
@@ -28,6 +28,7 @@ const baseEnvironment = {
   ZONE4YOU_UAT_LOGIN: "approved-test-user",
   ZONE4YOU_UAT_PASSWORD: "test-secret",
   ZONE4YOU_UAT_EXPECTED_USER_ID: "42",
+  ZONE4YOU_UAT_EXPECTED_ROOM_NUMBER: "1",
   ZONE4YOU_UAT_EXPECTED_LESSON_KIND: "standard",
   ZONE4YOU_UAT_LESSON_ID: "luxart:1:12:321:2026-09-01T14:30:00.000Z",
   ZONE4YOU_UAT_EXPECTED_CANCELLATION_FEE_KC: "0",
@@ -74,21 +75,35 @@ test("mutation UAT configuration refuses production and stale confirmations", ()
 
   const suiteEnvironment = {
     ...baseEnvironment,
-    ZONE4YOU_UAT_STANDARD_LESSON_ID: "luxart:1:12:321:2026-09-01T14:30:00.000Z",
-    ZONE4YOU_UAT_STANDARD_EXPECTED_CANCELLATION_FEE_KC: "0",
-    ZONE4YOU_UAT_REFORMER_LESSON_ID: "luxart:1:22:654:2026-09-02T14:30:00.000Z",
-    ZONE4YOU_UAT_REFORMER_EXPECTED_CANCELLATION_FEE_KC: "0",
+    ZONE4YOU_UAT_ROOM_SCENARIOS_JSON: JSON.stringify([
+      { roomNumber: 1, lessonId: "luxart:1:12:321:2026-09-01T14:30:00.000Z", lessonKind: "standard", expectedCancellationFeeKc: 0 },
+      { roomNumber: 2, lessonId: "luxart:2:13:322:2026-09-01T15:30:00.000Z", lessonKind: "standard", expectedCancellationFeeKc: 0 },
+      { roomNumber: 3, lessonId: "luxart:3:22:654:2026-09-02T14:30:00.000Z", lessonKind: "reformer", expectedCancellationFeeKc: 0 },
+    ]),
   };
   const suite = loadBookingMutationUatSuiteConfig(suiteEnvironment);
-  assert.equal(suite.standard.expectedLessonKind, "standard");
-  assert.equal(suite.reformer.expectedLessonKind, "reformer");
+  assert.deepEqual(suite.expectedRoomNumbers, [1, 2, 3]);
+  assert.deepEqual(suite.scenarios.map((scenario) => scenario.expectedLessonKind), ["standard", "standard", "reformer"]);
   assert.throws(
     () => loadBookingMutationUatSuiteConfig({
       ...suiteEnvironment,
-      ZONE4YOU_UAT_REFORMER_LESSON_ID: suiteEnvironment.ZONE4YOU_UAT_STANDARD_LESSON_ID,
-      ZONE4YOU_UAT_REFORMER_EXPECTED_CANCELLATION_FEE_KC: "0",
+      ZONE4YOU_UAT_ROOM_SCENARIOS_JSON: JSON.stringify([
+        { roomNumber: 1, lessonId: "same", lessonKind: "standard", expectedCancellationFeeKc: 0 },
+        { roomNumber: 2, lessonId: "same", lessonKind: "standard", expectedCancellationFeeKc: 0 },
+        { roomNumber: 3, lessonId: "reformer", lessonKind: "reformer", expectedCancellationFeeKc: 0 },
+      ]),
     }),
-    /different lesson occurrences/i,
+    /one distinct lesson for every mapped room/i,
+  );
+  assert.throws(
+    () => loadBookingMutationUatSuiteConfig({
+      ...suiteEnvironment,
+      ZONE4YOU_UAT_ROOM_SCENARIOS_JSON: JSON.stringify([
+        { roomNumber: 1, lessonId: "one", lessonKind: "standard", expectedCancellationFeeKc: 0 },
+        { roomNumber: 3, lessonId: "three", lessonKind: "reformer", expectedCancellationFeeKc: 0 },
+      ]),
+    }),
+    /one distinct lesson for every mapped room/i,
   );
 });
 
@@ -127,17 +142,18 @@ test("mutation UAT rejects malformed financial reservation evidence", () => {
   }, config, "cancelled"));
 });
 
-test("mutation UAT suite requires and records separate standard and Reformer scenarios", async () => {
+test("mutation UAT suite requires and records one scenario for every mapped room", async () => {
   const suite = loadBookingMutationUatSuiteConfig({
     ...baseEnvironment,
-    ZONE4YOU_UAT_STANDARD_LESSON_ID: "luxart:1:12:321:2026-09-01T14:30:00.000Z",
-    ZONE4YOU_UAT_STANDARD_EXPECTED_CANCELLATION_FEE_KC: "0",
-    ZONE4YOU_UAT_REFORMER_LESSON_ID: "luxart:1:22:654:2026-09-02T14:30:00.000Z",
-    ZONE4YOU_UAT_REFORMER_EXPECTED_CANCELLATION_FEE_KC: "0",
+    ZONE4YOU_UAT_ROOM_SCENARIOS_JSON: JSON.stringify([
+      { roomNumber: 1, lessonId: "luxart:1:12:321:2026-09-01T14:30:00.000Z", lessonKind: "standard", expectedCancellationFeeKc: 0 },
+      { roomNumber: 2, lessonId: "luxart:2:13:322:2026-09-01T15:30:00.000Z", lessonKind: "standard", expectedCancellationFeeKc: 0 },
+      { roomNumber: 3, lessonId: "luxart:3:22:654:2026-09-02T14:30:00.000Z", lessonKind: "reformer", expectedCancellationFeeKc: 0 },
+    ]),
   });
   const calls: string[] = [];
   const evidence = await runBookingMutationUatSuite(suite, fetch, async (scenario) => {
-    calls.push(scenario.expectedLessonKind);
+    calls.push(`${scenario.expectedRoomNumber}:${scenario.expectedLessonKind}`);
     return {
       schemaVersion: bookingMutationUatScenarioEvidenceSchemaVersion,
       ok: true,
@@ -154,9 +170,9 @@ test("mutation UAT suite requires and records separate standard and Reformer sce
       reservationWindowVerified: true,
       onlineCancellationVerified: true,
       resourceMapSha256: scenario.expectedResourceMapSha256,
-      lessonRoomNumber: scenario.expectedLessonKind === "standard" ? 1 : 2,
-      lessonIdSha256: scenario.expectedLessonKind === "standard" ? "a".repeat(16) : "b".repeat(16),
-      reservationIdSha256: scenario.expectedLessonKind === "standard" ? "c".repeat(16) : "d".repeat(16),
+      lessonRoomNumber: scenario.expectedRoomNumber,
+      lessonIdSha256: String(scenario.expectedRoomNumber).repeat(16),
+      reservationIdSha256: String(scenario.expectedRoomNumber + 3).repeat(16),
       expectedCancellationFeeKc: scenario.expectedCancellationFeeKc,
       sameKeyCreateReplays: 3,
       parallelCreateRequests: 2,
@@ -168,23 +184,22 @@ test("mutation UAT suite requires and records separate standard and Reformer sce
       preExistingActiveReservationsPreserved: true,
       finalStateRestored: true,
       cancellationFeeMatched: true,
-      requestIds: Array.from({ length: 16 }, (_, index) => `${scenario.expectedLessonKind}-${index}`),
+      requestIds: Array.from({ length: 16 }, (_, index) => `${scenario.expectedRoomNumber}-${index}`),
     };
   });
-  assert.deepEqual(calls, ["standard", "reformer"]);
+  assert.deepEqual(calls, ["1:standard", "2:standard", "3:reformer"]);
   assert.equal(evidence.schemaVersion, bookingMutationUatEvidenceSchemaVersion);
-  assert.equal(evidence.scenarioCount, 2);
-  assert.equal(evidence.scenarios.standard.lessonKind, "standard");
-  assert.equal(evidence.scenarios.reformer.lessonKind, "reformer");
+  assert.equal(evidence.scenarioCount, 3);
+  assert.deepEqual(evidence.scenarios.map((scenario) => scenario.lessonRoomNumber), [1, 2, 3]);
 
   let invalidCalls = 0;
   await assert.rejects(
     runBookingMutationUatSuite({
       ...suite,
-      reformer: { ...suite.reformer, expectedCommit: "f".repeat(40) },
+      scenarios: suite.scenarios.map((scenario, index) => index === 2 ? { ...scenario, expectedCommit: "f".repeat(40) } : scenario),
     }, fetch, async (scenario) => {
       invalidCalls += 1;
-      return evidence.scenarios[scenario.expectedLessonKind];
+      return evidence.scenarios.find((item) => item.lessonRoomNumber === scenario.expectedRoomNumber)!;
     }),
     /one approved staging user and deployment/i,
   );
@@ -376,6 +391,12 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
   await assert.rejects(
     runBookingMutationUat({ ...config, expectedLessonKind: "reformer" }, fakeFetch),
     /not the required reformer scenario.*no mutation was attempted/i,
+  );
+  assert.equal(createWrites, 0);
+
+  await assert.rejects(
+    runBookingMutationUat({ ...config, expectedRoomNumber: 2 }, fakeFetch),
+    /different Luxart room than expected.*no mutation was attempted/i,
   );
   assert.equal(createWrites, 0);
 

@@ -10,6 +10,7 @@ import {
 } from "../src/lib/bookingRules";
 import { parseExplicitLuxartDateTime } from "../src/lib/luxartContract";
 import { luxartResourceMappingSha256 } from "../src/lib/luxartResourceMappingFingerprint";
+import { parseLuxartResourceMapping } from "../src/lib/luxartMappings";
 import { isBoundedKcAmount, maximumOperationalAmountKc } from "../src/lib/moneyBounds";
 
 type FetchLike = typeof fetch;
@@ -18,7 +19,7 @@ type BookingMutationUatPhase = "booking_without_payments" | "booking_with_stripe
 export type BookingMutationUatLessonKind = "standard" | "reformer";
 
 export const bookingMutationUatScenarioEvidenceSchemaVersion = 1;
-export const bookingMutationUatEvidenceSchemaVersion = 2;
+export const bookingMutationUatEvidenceSchemaVersion = 3;
 
 interface Snapshot {
   user: User;
@@ -38,6 +39,7 @@ export interface BookingMutationUatConfig {
   memberCardNumber?: string;
   expectedUserId: string;
   lessonId: string;
+  expectedRoomNumber: number;
   expectedLessonKind: BookingMutationUatLessonKind;
   expectedCancellationFeeKc: number;
   minimumHoursBeforeStart: number;
@@ -45,8 +47,8 @@ export interface BookingMutationUatConfig {
 }
 
 export interface BookingMutationUatSuiteConfig {
-  standard: BookingMutationUatConfig;
-  reformer: BookingMutationUatConfig;
+  expectedRoomNumbers: number[];
+  scenarios: BookingMutationUatConfig[];
 }
 
 interface ApiResult<T> {
@@ -140,6 +142,7 @@ export function loadBookingMutationUatConfig(environment: Environment = process.
     memberCardNumber: environment.ZONE4YOU_UAT_MEMBER_CARD_NUMBER?.trim() || undefined,
     expectedUserId: required(environment, "ZONE4YOU_UAT_EXPECTED_USER_ID"),
     lessonId: required(environment, "ZONE4YOU_UAT_LESSON_ID"),
+    expectedRoomNumber: exactInteger(environment, "ZONE4YOU_UAT_EXPECTED_ROOM_NUMBER", 1, Number.MAX_SAFE_INTEGER),
     expectedLessonKind,
     expectedCancellationFeeKc: exactInteger(environment, "ZONE4YOU_UAT_EXPECTED_CANCELLATION_FEE_KC"),
     minimumHoursBeforeStart,
@@ -150,30 +153,70 @@ export function loadBookingMutationUatConfig(environment: Environment = process.
 export function loadBookingMutationUatSuiteConfig(
   environment: Environment = process.env,
 ): BookingMutationUatSuiteConfig {
-  const scenario = (
-    kind: BookingMutationUatLessonKind,
-    lessonIdName: string,
-    cancellationFeeName: string,
-  ) => loadBookingMutationUatConfig({
-    ...environment,
-    ZONE4YOU_UAT_EXPECTED_LESSON_KIND: kind,
-    ZONE4YOU_UAT_LESSON_ID: required(environment, lessonIdName),
-    ZONE4YOU_UAT_EXPECTED_CANCELLATION_FEE_KC: required(environment, cancellationFeeName),
-  });
-  const standard = scenario(
-    "standard",
-    "ZONE4YOU_UAT_STANDARD_LESSON_ID",
-    "ZONE4YOU_UAT_STANDARD_EXPECTED_CANCELLATION_FEE_KC",
-  );
-  const reformer = scenario(
-    "reformer",
-    "ZONE4YOU_UAT_REFORMER_LESSON_ID",
-    "ZONE4YOU_UAT_REFORMER_EXPECTED_CANCELLATION_FEE_KC",
-  );
-  if (standard.lessonId === reformer.lessonId) {
-    throw new Error("Standard and Reformer mutation UAT must use different lesson occurrences.");
+  const resourceMapping = parseLuxartResourceMapping(required(environment, "LUXART_RESOURCE_MAP_JSON"));
+  const expectedRoomNumbers = Object.keys(resourceMapping).map(Number).sort((left, right) => left - right);
+  let rawScenarios: unknown;
+  try {
+    rawScenarios = JSON.parse(required(environment, "ZONE4YOU_UAT_ROOM_SCENARIOS_JSON"));
+  } catch {
+    throw new Error("ZONE4YOU_UAT_ROOM_SCENARIOS_JSON must be valid JSON.");
   }
-  return { standard, reformer };
+  if (!Array.isArray(rawScenarios)) {
+    throw new Error("ZONE4YOU_UAT_ROOM_SCENARIOS_JSON must be an array.");
+  }
+  const scenarios = rawScenarios.map((raw, index) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      throw new Error(`ZONE4YOU_UAT_ROOM_SCENARIOS_JSON[${index}] must be an object.`);
+    }
+    const candidate = raw as Record<string, unknown>;
+    const allowedKeys = ["roomNumber", "lessonId", "lessonKind", "expectedCancellationFeeKc"];
+    if (Object.keys(candidate).some((key) => !allowedKeys.includes(key))) {
+      throw new Error(`ZONE4YOU_UAT_ROOM_SCENARIOS_JSON[${index}] contains an unsupported field.`);
+    }
+    const roomNumber = candidate.roomNumber;
+    const lessonId = candidate.lessonId;
+    const lessonKind = candidate.lessonKind;
+    const expectedCancellationFeeKc = candidate.expectedCancellationFeeKc;
+    if (!Number.isSafeInteger(roomNumber) || Number(roomNumber) <= 0) {
+      throw new Error(`ZONE4YOU_UAT_ROOM_SCENARIOS_JSON[${index}].roomNumber must be a positive integer.`);
+    }
+    if (typeof lessonId !== "string" || !lessonId.trim()) {
+      throw new Error(`ZONE4YOU_UAT_ROOM_SCENARIOS_JSON[${index}].lessonId is required.`);
+    }
+    if (!(lessonKind === "standard" || lessonKind === "reformer")) {
+      throw new Error(`ZONE4YOU_UAT_ROOM_SCENARIOS_JSON[${index}].lessonKind must be standard or reformer.`);
+    }
+    if (!Number.isSafeInteger(expectedCancellationFeeKc) || !isBoundedKcAmount(Number(expectedCancellationFeeKc), 0)) {
+      throw new Error(`ZONE4YOU_UAT_ROOM_SCENARIOS_JSON[${index}].expectedCancellationFeeKc is invalid.`);
+    }
+    return loadBookingMutationUatConfig({
+      ...environment,
+      ZONE4YOU_UAT_EXPECTED_ROOM_NUMBER: String(roomNumber),
+      ZONE4YOU_UAT_EXPECTED_LESSON_KIND: lessonKind,
+      ZONE4YOU_UAT_LESSON_ID: lessonId,
+      ZONE4YOU_UAT_EXPECTED_CANCELLATION_FEE_KC: String(expectedCancellationFeeKc),
+    });
+  });
+  validateBookingMutationUatSuiteConfig({ expectedRoomNumbers, scenarios });
+  return { expectedRoomNumbers, scenarios };
+}
+
+function validateBookingMutationUatSuiteConfig(config: BookingMutationUatSuiteConfig) {
+  const expectedRooms = [...config.expectedRoomNumbers].sort((left, right) => left - right);
+  const scenarioRooms = config.scenarios.map((scenario) => scenario.expectedRoomNumber).sort((left, right) => left - right);
+  const lessonIds = config.scenarios.map((scenario) => scenario.lessonId);
+  const kinds = new Set(config.scenarios.map((scenario) => scenario.expectedLessonKind));
+  if (
+    expectedRooms.length === 0 ||
+    expectedRooms.some((room, index) => !Number.isSafeInteger(room) || room <= 0 || room === expectedRooms[index - 1]) ||
+    scenarioRooms.length !== expectedRooms.length ||
+    JSON.stringify(scenarioRooms) !== JSON.stringify(expectedRooms) ||
+    new Set(lessonIds).size !== lessonIds.length ||
+    !kinds.has("standard") ||
+    !kinds.has("reformer")
+  ) {
+    throw new Error("Booking mutation UAT suite must contain one distinct lesson for every mapped room, including standard and Reformer lessons.");
+  }
 }
 
 function cookieFromSetCookie(setCookie: string | undefined) {
@@ -409,6 +452,9 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
   if (!Number.isSafeInteger(lesson.luxartRoomNumber) || Number(lesson.luxartRoomNumber) <= 0) {
     throw new Error("The approved UAT lesson has no valid Luxart room number; no mutation was attempted.");
   }
+  if (lesson.luxartRoomNumber !== config.expectedRoomNumber) {
+    throw new Error("The approved UAT lesson belongs to a different Luxart room than expected; no mutation was attempted.");
+  }
   const availableCount = availablePlacesForLesson(lesson);
   if (
     !Number.isSafeInteger(lesson.capacity) ||
@@ -594,6 +640,7 @@ export async function runBookingMutationUatSuite(
   fetchImpl: FetchLike = fetch,
   runScenario: typeof runBookingMutationUat = runBookingMutationUat,
 ) {
+  validateBookingMutationUatSuiteConfig(config);
   const sharedFields = [
     "target",
     "expectedCommit",
@@ -604,31 +651,29 @@ export async function runBookingMutationUatSuite(
     "memberCardNumber",
     "expectedUserId",
   ] as const;
-  if (
-    config.standard.expectedLessonKind !== "standard" ||
-    config.reformer.expectedLessonKind !== "reformer" ||
-    config.standard.lessonId === config.reformer.lessonId ||
-    sharedFields.some((field) => {
-      const standardValue = field === "target" ? config.standard.target.origin : config.standard[field];
-      const reformerValue = field === "target" ? config.reformer.target.origin : config.reformer[field];
-      return standardValue !== reformerValue;
-    })
-  ) {
-    throw new Error("Booking mutation UAT suite must bind distinct standard and Reformer lessons to one approved staging user and deployment.");
+  const first = config.scenarios[0];
+  if (!first || config.scenarios.some((scenario) => sharedFields.some((field) => {
+    const firstValue = field === "target" ? first.target.origin : first[field];
+    const scenarioValue = field === "target" ? scenario.target.origin : scenario[field];
+    return firstValue !== scenarioValue;
+  }))) {
+    throw new Error("Booking mutation UAT suite must bind every mapped room to one approved staging user and deployment.");
   }
-  const standard = await runScenario(config.standard, fetchImpl);
-  const reformer = await runScenario(config.reformer, fetchImpl);
+  const scenarios = [];
+  for (const scenario of config.scenarios) {
+    scenarios.push(await runScenario(scenario, fetchImpl));
+  }
   return {
     schemaVersion: bookingMutationUatEvidenceSchemaVersion,
     ok: true,
     checkedAt: new Date().toISOString(),
-    target: config.standard.target.origin,
+    target: first.target.origin,
     deploymentProvenanceVerified: true,
-    commit: config.standard.expectedCommit,
-    phase: config.standard.expectedPhase,
+    commit: first.expectedCommit,
+    phase: first.expectedPhase,
     region: "fra1",
-    scenarioCount: 2,
-    scenarios: { standard, reformer },
+    scenarioCount: scenarios.length,
+    scenarios,
   };
 }
 

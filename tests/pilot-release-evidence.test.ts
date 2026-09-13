@@ -77,8 +77,10 @@ function mutableBookingUatScenario(
   artifact: Record<string, unknown>,
   lessonKind: "standard" | "reformer" = "standard",
 ) {
-  const scenarios = artifact.scenarios as Record<string, Record<string, unknown>>;
-  return scenarios[lessonKind];
+  const scenarios = artifact.scenarios as Array<Record<string, unknown>>;
+  const scenario = scenarios.find((candidate) => candidate.lessonKind === lessonKind);
+  assert.ok(scenario);
+  return scenario;
 }
 
 function validFixture() {
@@ -247,7 +249,7 @@ function validFixture() {
       },
     },
     bookingMutationUat: {
-      schemaVersion: 2,
+      schemaVersion: 3,
       ok: true,
       checkedAt,
       target: stagingTarget,
@@ -255,11 +257,12 @@ function validFixture() {
       commit,
       phase: "booking_without_payments",
       region: "fra1",
-      scenarioCount: 2,
-      scenarios: {
-        standard: bookingUatScenario("standard", checkedAt, 1, "c".repeat(16), "d".repeat(16), "standard-request"),
-        reformer: bookingUatScenario("reformer", checkedAt, 3, "e".repeat(16), "f".repeat(16), "reformer-request"),
-      },
+      scenarioCount: 3,
+      scenarios: [
+        bookingUatScenario("standard", checkedAt, 1, "c".repeat(16), "d".repeat(16), "room-1-request"),
+        bookingUatScenario("standard", checkedAt, 2, "e".repeat(16), "f".repeat(16), "room-2-request"),
+        bookingUatScenario("reformer", checkedAt, 3, "a".repeat(16), "b".repeat(16), "room-3-request"),
+      ],
     },
     rollbackTimer,
     rollback: {
@@ -561,7 +564,7 @@ test("pilot release dossier rejects evidence that cannot come from the real guar
       (artifact: Record<string, unknown>) => {
         artifact.schemaVersion = 1;
       },
-      /Booking UAT evidence schemaVersion must be 2/i,
+      /Booking UAT evidence schemaVersion must be 3/i,
     ],
     [
       "bookingMutationUat",
@@ -573,16 +576,16 @@ test("pilot release dossier rejects evidence that cannot come from the real guar
     [
       "bookingMutationUat",
       (artifact: Record<string, unknown>) => {
-        delete (artifact.scenarios as Record<string, unknown>).reformer;
+        (artifact.scenarios as Array<Record<string, unknown>>)[1].lessonRoomNumber = 1;
       },
-      /scenarios must contain exactly standard and reformer evidence/i,
+      /cover every mapped room exactly once/i,
     ],
     [
       "bookingMutationUat",
       (artifact: Record<string, unknown>) => {
         mutableBookingUatScenario(artifact, "reformer").lessonKind = "standard";
       },
-      /booking UAT reformer lessonKind must exactly equal reformer/i,
+      /must include both standard and Reformer lessons/i,
     ],
     [
       "bookingMutationUat",
@@ -624,7 +627,7 @@ test("pilot release dossier rejects evidence that cannot come from the real guar
       (artifact: Record<string, unknown>) => {
         mutableBookingUatScenario(artifact, "reformer").requestIds = mutableBookingUatScenario(artifact).requestIds;
       },
-      /request IDs must be unique across both scenarios/i,
+      /request IDs must be unique across all room scenarios/i,
     ],
     [
       "bookingMutationUat",
@@ -645,7 +648,7 @@ test("pilot release dossier rejects evidence that cannot come from the real guar
       (artifact: Record<string, unknown>) => {
         mutableBookingUatScenario(artifact, "reformer").lessonIdSha256 = mutableBookingUatScenario(artifact).lessonIdSha256;
       },
-      /must use different lesson occurrences/i,
+      /must use distinct lesson occurrences/i,
     ],
     [
       "rollbackTimer",
@@ -1097,8 +1100,9 @@ test("Stripe launch mode cannot pass without its own end-to-end UAT artifact", (
   const runtimeSha = writeJson(join(fixture.directory, "runtimeProbe.json"), runtime);
   const bookingMutationUat = structuredClone(fixture.files.bookingMutationUat) as Record<string, unknown>;
   bookingMutationUat.phase = "booking_with_stripe";
-  mutableBookingUatScenario(bookingMutationUat).phase = "booking_with_stripe";
-  mutableBookingUatScenario(bookingMutationUat, "reformer").phase = "booking_with_stripe";
+  for (const scenario of bookingMutationUat.scenarios as Array<Record<string, unknown>>) {
+    scenario.phase = "booking_with_stripe";
+  }
   const bookingMutationUatSha = writeJson(
     join(fixture.directory, "bookingMutationUat.json"),
     bookingMutationUat,
