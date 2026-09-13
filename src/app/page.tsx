@@ -46,7 +46,7 @@ type ViewMode = "day" | "week";
 type Section = "schedule" | "reservations" | "credit" | "profile";
 type Modal = "login" | "lesson" | null;
 type LoadFailure = { requestId?: string };
-type ToastState = { message: string; tone: "success" | "warning" | "error" };
+type ToastState = { message: string; tone: "success" | "warning" | "error"; persistent?: boolean };
 const allFilter = "__all__";
 const favoriteServicesStoragePrefix = "zone4youbooking.favoriteServices";
 const modalFocusableSelector = [
@@ -308,6 +308,7 @@ export default function Home() {
   const [modal, setModal] = useState<Modal>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [paymentReturn, setPaymentReturn] = useState<"success" | "cancelled" | null>(null);
+  const [mutationOutcomeUncertain, setMutationOutcomeUncertain] = useState(false);
 
   async function refresh(nextLocale: Locale = locale) {
     try {
@@ -359,7 +360,7 @@ export default function Home() {
   }, [favoriteOwner, snapshot]);
 
   useEffect(() => {
-    if (!toast) return;
+    if (!toast || toast.persistent) return;
     const timer = window.setTimeout(() => setToast(null), 3600);
     return () => window.clearTimeout(timer);
   }, [toast]);
@@ -425,20 +426,47 @@ export default function Home() {
   const activeReservations = reservations.filter((reservation) => reservation.status === "active");
   const waitingEntries = waitlist.filter((entry) => entry.status === "waiting");
   const hasActiveFilters = room !== allFilter || category !== allFilter || favoriteOnly || query.trim().length > 0;
+  const mutationBlockReason = mutationOutcomeUncertain
+    ? "reconciliation"
+    : loadFailure
+      ? "stale"
+      : null;
 
   async function withBusy<T>(
     key: string,
     action: () => Promise<T>,
     success?: string,
-    refreshAfter = true,
+    options: {
+      refreshAfter?: boolean;
+      preserveConfirmedResultOnRefreshFailure?: boolean;
+      lockOnTransportFailure?: boolean;
+    } = {},
   ) {
+    const refreshAfter = options.refreshAfter ?? true;
     setBusy(key);
     try {
       const result = await action();
-      if (refreshAfter) await refresh();
+      if (refreshAfter) {
+        try {
+          await refresh();
+        } catch (error) {
+          if (!options.preserveConfirmedResultOnRefreshFailure) throw error;
+          if (success) setToast({ message: success, tone: "success" });
+          return result;
+        }
+      }
       if (success) setToast({ message: success, tone: "success" });
       return result;
     } catch (error) {
+      const reconciliationRequired =
+        error instanceof BookingApiClientError &&
+        (
+          error.code === "BOOKING_RECONCILIATION_REQUIRED" ||
+          (options.lockOnTransportFailure === true && error.status === 0)
+        );
+      if (reconciliationRequired) {
+        setMutationOutcomeUncertain(true);
+      }
       const authenticationExpired =
         error instanceof BookingApiClientError &&
         error.status === 401 &&
@@ -471,12 +499,25 @@ export default function Home() {
               : "",
           ].filter(Boolean).join(" "),
           tone: "error",
+          persistent: reconciliationRequired,
         });
       }
       return null;
     } finally {
       setBusy(null);
     }
+  }
+
+  function mutationIsBlocked() {
+    if (!mutationOutcomeUncertain && !loadFailure) return false;
+    setToast({
+      message: mutationOutcomeUncertain
+        ? t("toast.reconciliationRequired")
+        : t("toast.staleMutationBlocked"),
+      tone: mutationOutcomeUncertain ? "error" : "warning",
+      persistent: mutationOutcomeUncertain,
+    });
+    return true;
   }
 
   function openLesson(lesson: Lesson) {
@@ -499,6 +540,7 @@ export default function Home() {
   }
 
   async function handleReservation(lesson: Lesson) {
+    if (mutationIsBlocked()) return;
     if (!capabilities.reservationsEnabled) {
       setToast({ message: t("toast.bookingReadOnly"), tone: "warning" });
       return;
@@ -518,11 +560,13 @@ export default function Home() {
       `reserve-${lesson.id}`,
       () => bookingApiClient.createReservation(lesson.id, locale),
       t("toast.reserved", { lesson: displayLessonName(lesson, locale) }),
+      { preserveConfirmedResultOnRefreshFailure: true, lockOnTransportFailure: true },
     );
     if (result) setModal(null);
   }
 
   async function handleCancel(reservation: Reservation) {
+    if (mutationIsBlocked()) return;
     if (!capabilities.reservationsEnabled) {
       setToast({ message: t("toast.bookingReadOnly"), tone: "warning" });
       return;
@@ -530,6 +574,8 @@ export default function Home() {
     const result = await withBusy(
       `cancel-${reservation.id}`,
       () => bookingApiClient.cancelReservation(reservation.id, locale),
+      undefined,
+      { preserveConfirmedResultOnRefreshFailure: true, lockOnTransportFailure: true },
     );
     if (!result) return;
     const fee = result.reservation.cancellationFeeKc;
@@ -544,6 +590,7 @@ export default function Home() {
   }
 
   async function handleWaitlist(lesson: Lesson) {
+    if (mutationIsBlocked()) return;
     if (!capabilities.waitlistEnabled) {
       setToast({ message: t("toast.waitlistUnavailable"), tone: "warning" });
       return;
@@ -558,16 +605,19 @@ export default function Home() {
         `waitlist-${lesson.id}`,
         () => bookingApiClient.leaveWaitlist(existing.id, locale),
         t("toast.waitlistLeft"),
+        { preserveConfirmedResultOnRefreshFailure: true },
       )
       : await withBusy(
         `waitlist-${lesson.id}`,
         () => bookingApiClient.joinWaitlist(lesson.id, locale),
         t("toast.waitlistJoined"),
+        { preserveConfirmedResultOnRefreshFailure: true },
       );
     if (result) setModal(null);
   }
 
   async function handleTopup(amount: number) {
+    if (mutationIsBlocked()) return;
     if (!snapshot?.user) {
       setModal("login");
       return;
@@ -577,7 +627,7 @@ export default function Home() {
         `topup-${amount}`,
         () => bookingApiClient.createStripeCheckout(amount, locale),
         undefined,
-        false,
+        { refreshAfter: false },
       );
       if (checkout) window.location.assign(checkout.url);
       return;
@@ -586,6 +636,7 @@ export default function Home() {
       `topup-${amount}`,
       () => bookingApiClient.createTopup(amount, locale),
       t("toast.topup", { amount: money(amount, locale) }),
+      { preserveConfirmedResultOnRefreshFailure: true },
     );
   }
 
@@ -987,16 +1038,20 @@ export default function Home() {
                           </div>
                           <button
                             className="btn-cancel"
-                            disabled={!cancellationOpen || busy === `cancel-${reservation.id}`}
+                            disabled={Boolean(mutationBlockReason) || !cancellationOpen || busy === `cancel-${reservation.id}`}
                             onClick={() => handleCancel(reservation)}
                           >
                             {!capabilities.reservationsEnabled
                               ? t("reservations.temporarilyUnavailable")
-                              : !cancellationOpen
-                                ? t("reservations.cancelClosed")
-                                : busy === `cancel-${reservation.id}`
-                                  ? t("reservations.cancelling")
-                                  : t("reservations.cancel")}
+                              : mutationBlockReason === "reconciliation"
+                                ? t("lesson.reconciliationRequired")
+                                : mutationBlockReason === "stale"
+                                  ? t("lesson.refreshRequired")
+                                  : !cancellationOpen
+                                    ? t("reservations.cancelClosed")
+                                    : busy === `cancel-${reservation.id}`
+                                      ? t("reservations.cancelling")
+                                      : t("reservations.cancel")}
                           </button>
                         </div>
                       );
@@ -1013,7 +1068,7 @@ export default function Home() {
                               {t("reservations.waitlistPosition", { position: entry.position, date: formatDateTime(lesson.startsAt, locale) })}
                             </p>
                           </div>
-                          <button className="btn btn-outline" disabled={!capabilities.waitlistEnabled || busy === `waitlist-${lesson.id}`} onClick={() => handleWaitlist(lesson)}>
+                          <button className="btn btn-outline" disabled={Boolean(mutationBlockReason) || !capabilities.waitlistEnabled || busy === `waitlist-${lesson.id}`} onClick={() => handleWaitlist(lesson)}>
                             {t("reservations.remove")}
                           </button>
                         </div>
@@ -1049,7 +1104,7 @@ export default function Home() {
                 {capabilities.topupsEnabled ? (
                   <div className="topup-grid">
                     {rules.topupAmounts.map((amount) => (
-                      <button key={amount} className="btn btn-outline" onClick={() => handleTopup(amount)} disabled={busy === `topup-${amount}`}>
+                      <button key={amount} className="btn btn-outline" onClick={() => handleTopup(amount)} disabled={Boolean(mutationBlockReason) || busy === `topup-${amount}`}>
                         {busy === `topup-${amount}` ? <Loader2 className="spin" size={16} /> : <CreditCard size={16} />}
                         {money(amount, locale)}
                       </button>
@@ -1147,6 +1202,7 @@ export default function Home() {
           reservationsEnabled={capabilities.reservationsEnabled}
           waitlistEnabled={capabilities.waitlistEnabled}
           businessRulesStatus={capabilities.businessRulesStatus}
+          mutationBlockReason={mutationBlockReason}
           reservation={reservationFor(selectedLesson, reservations)}
           waitlistEntry={waitlistFor(selectedLesson, waitlist)}
           isFavorite={favoriteServiceIds.includes(favoriteKey(selectedLesson))}
@@ -1313,6 +1369,7 @@ function LessonModal({
   reservationsEnabled,
   waitlistEnabled,
   businessRulesStatus,
+  mutationBlockReason,
   reservation,
   waitlistEntry,
   isFavorite,
@@ -1330,6 +1387,7 @@ function LessonModal({
   reservationsEnabled: boolean;
   waitlistEnabled: boolean;
   businessRulesStatus: BookingCapabilities["businessRulesStatus"];
+  mutationBlockReason: "stale" | "reconciliation" | null;
   reservation?: Reservation;
   waitlistEntry?: WaitlistEntry;
   isFavorite: boolean;
@@ -1469,6 +1527,12 @@ function LessonModal({
             ) : !reservationsEnabled ? (
               <button className="btn btn-outline" disabled>
                 {t("lesson.bookingUnavailable")}
+              </button>
+            ) : mutationBlockReason ? (
+              <button className="btn btn-outline" disabled>
+                {mutationBlockReason === "reconciliation"
+                  ? t("lesson.reconciliationRequired")
+                  : t("lesson.refreshRequired")}
               </button>
             ) : reservation ? (
               <button className="btn btn-outline" disabled>

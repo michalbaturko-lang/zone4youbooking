@@ -249,6 +249,93 @@ test("kredit pod 200 Kč zablokuje rezervaci bez zápisu", async ({ page }) => {
   expect(reservationWrites).toBe(0);
 });
 
+test("zastaralý snapshot zablokuje booking, dokud se nepodaří obnovit autoritativní data", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-small-320x568", "Stavový bezpečnostní tok stačí ověřit jednou.");
+  let failSnapshot = false;
+  let reservationWrites = 0;
+  let cancellationWrites = 0;
+  page.on("request", (request) => {
+    const pathname = new URL(request.url()).pathname;
+    if (request.method() === "POST" && pathname === "/api/reservations") {
+      reservationWrites += 1;
+    }
+    if (request.method() === "DELETE" && pathname.startsWith("/api/reservations/")) {
+      cancellationWrites += 1;
+    }
+  });
+  await page.route("**/api/booking/snapshot**", async (route) => {
+    if (!failSnapshot) {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error: "Požadavek se nepodařilo dokončit.",
+        code: "REQUEST_FAILED",
+        requestId: "stale-snapshot-browser",
+      }),
+    });
+  });
+  await openCleanDemo(page);
+
+  await page.getByRole("button", { name: "Přihlásit se" }).first().click();
+  const loginDialog = page.getByRole("dialog", { name: "Přihlášení" });
+  await loginDialog.getByLabel("Příjmení, e-mail nebo login").fill("Nováková");
+  await loginDialog.getByLabel("Heslo", { exact: true }).fill("2048");
+  await loginDialog.getByRole("button", { name: "Přihlásit se" }).click();
+  await expect(page.getByRole("button", { name: "Odhlásit" })).toBeVisible();
+
+  failSnapshot = true;
+  await page.getByRole("button", { name: "EN", exact: true }).first().click();
+  const staleBanner = page.locator(".runtime-error-banner");
+  await expect(staleBanner).toContainText("Data freshness cannot be confirmed");
+  await expect(staleBanner).toContainText("Support reference: stale-snapshot-browser");
+
+  await page.getByRole("navigation", { name: "Navigation" }).getByRole("button", { name: "Bookings" }).click();
+  await expect(
+    page.locator(".reservation-card").getByRole("button", { name: "Refresh current data first", exact: true }).first(),
+  ).toBeDisabled();
+  expect(cancellationWrites).toBe(0);
+
+  await page.getByRole("navigation", { name: "Navigation" }).getByRole("button", { name: "Schedule" }).click();
+  await page.locator(".lesson-row").first().click();
+  await expect(
+    page.getByRole("dialog").getByRole("button", { name: "Refresh current data first", exact: true }),
+  ).toBeDisabled();
+  await expect(staleBanner).toContainText("Restore the connection before booking");
+  expect(reservationWrites).toBe(0);
+  expect(cancellationWrites).toBe(0);
+});
+
+test("ztracená odpověď rezervace zamkne další booking proti slepému opakování", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-small-320x568", "Stavový bezpečnostní tok stačí ověřit jednou.");
+  let reservationWrites = 0;
+  await openCleanDemo(page);
+  await page.getByRole("button", { name: "Přihlásit se" }).first().click();
+  const loginDialog = page.getByRole("dialog", { name: "Přihlášení" });
+  await loginDialog.getByLabel("Příjmení, e-mail nebo login").fill("Nováková");
+  await loginDialog.getByLabel("Heslo", { exact: true }).fill("2048");
+  await loginDialog.getByRole("button", { name: "Přihlásit se" }).click();
+  await expect(page.getByRole("button", { name: "Odhlásit" })).toBeVisible();
+
+  await page.route("**/api/reservations", async (route) => {
+    reservationWrites += 1;
+    await route.abort("timedout");
+  });
+  await page.locator(".lesson-row").first().click();
+  const lessonDialog = page.getByRole("dialog");
+  const reserveButton = lessonDialog.getByRole("button", { name: "Rezervovat" });
+  await reserveButton.click();
+  await expect.poll(() => reservationWrites).toBe(1);
+  await expect(
+    lessonDialog.getByRole("button", { name: "Před další akcí kontaktujte recepci", exact: true }),
+  ).toBeDisabled();
+  await page.waitForTimeout(250);
+  expect(reservationWrites).toBe(1);
+});
+
 test("personalizovaná způsobilost lekci neschová a bezpečně zablokuje zápis", async ({ page }) => {
   let eligibility: false | undefined = false;
   let reservationWrites = 0;

@@ -1,6 +1,6 @@
 # Zone4You IT — příjem a vyhodnocení odpovědi
 
-Aktualizace: 2026-09-12
+Aktualizace: 2026-09-13
 
 Tento checklist slouží pouze k vyhodnocení technické odpovědi. Není souhlasem s deployem, DNS změnou ani živou Luxart mutací. Hesla, tokeny, privátní klíče a klientské přihlašovací údaje se do tohoto souboru ani do repozitáře nevkládají.
 
@@ -71,7 +71,7 @@ Read-only test se nespouští, pokud chybí síťová cesta, gateway režim, pot
 6. Teprve po samostatné autoritě připravit staging, alert, rollback a jedno řízené UAT.
 7. Produkční deploy, DNS a cutover zůstávají samostatně schvalované akce.
 
-### Síťové pozorování 11.–12. 9. 2026
+### Síťové pozorování 11.–13. 9. 2026
 
 - Neautentizovaný probe veřejné referenční dokumentace Luxartu na portu `9295` prošel: HTTP 200 a rozpoznaná stránka `API dokumentace`.
 - Obvyklé veřejné Zone4You hostname varianty na portu `9191` při HTTP i HTTPS z tohoto vývojového připojení timeoutovaly.
@@ -82,6 +82,7 @@ Read-only test se nespouští, pokud chybí síťová cesta, gateway režim, pot
 - Starší přiložená zpráva Luxartu z 1. 4. 2026 výslovně uvádí, že API připojené k testovací databázi bylo spuštěno na serveru Zone4You na portu `9759`. Nejpravděpodobnější pracovní interpretace je proto veřejné přesměrování `9191` na interní `9759`; zůstává to ale hypotéza, dokud IT nepotvrdí host a vazbu portů.
 - Následná IPv4 kontrola běžných Zone4You hostname variant timeoutovala na portech `9191` i `9759` pro HTTP i HTTPS. Všechny zjištěné názvy míří na stejný veřejný okraj, ale tento výsledek nerozliší neaplikované pravidlo, jiný cílový host, VPN ani zdrojový allowlist.
 - HTTP kořen `api.memberzone.online:9191` veřejně vypisuje názvy aplikačních adresářů a konfiguračních souborů jiné služby. Bez credentials byl načten pouze veřejný `Service1.svc` a jeho WSDL; jde o starší SOAP/WCF kontrakt s rezervačními operacemi, ne o REST API s `api/Lesson`. Konfigurační soubory otevřeny nebyly. Pokud server spravuje Luxart, je vhodné vypnout directory browsing; tato služba se nesmí zaměnit za Zone4You API.
+- Opakovaná kontrola 13. 9. potvrdila stejný stav: `:9191/` a `Service1.svc?wsdl` odpovídají 200, zatímco `:9191/Help` i `:9191/api/Lesson` vracejí HTML 404. Ve stejném okamžiku `:9295/Help` vrací REST dokumentaci 200 a `:9295/api/Lesson` JSON chybu kontroleru kvůli chybějícím parametrům. Hostname tedy může být zamýšlený správně, ale veřejný port 9191 je dnes navázán na jinou aplikaci/kontrakt.
 - Nebyl odeslán login, heslo, cookie ani autorizační hlavička a nebyla provedena žádná API mutace.
 
 ## 4. Výsledek vyhodnocení

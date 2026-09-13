@@ -8,6 +8,13 @@ export interface BookingSnapshotResponse extends BookingSnapshot {
 }
 
 const demoStateStorageKey = "zone4youbooking.demoState";
+const readRequestTimeoutMs = 20_000;
+const bookingMutationRequestTimeoutMs = 45_000;
+
+export interface BookingApiRequestOptions {
+  timeoutMs?: number;
+  outcome?: "read" | "booking_mutation";
+}
 
 interface StatefulResponse {
   demoState?: MockLuxartState;
@@ -75,6 +82,8 @@ const englishApiErrors: Record<string, string> = {
   CANCELLATION_POLICY_UNAVAILABLE: "The cancellation policy for this booking could not be verified safely.",
   BOOKING_RECONCILIATION_REQUIRED: "The result could not be confirmed safely. Do not repeat the action; contact reception.",
   WATCHDOG_DISABLED: "Seat alerts are temporarily unavailable.",
+  REQUEST_TIMEOUT: "The request took too long. Check your connection and try again.",
+  REQUEST_FAILED: "The service could not be reached. Check your connection and try again.",
 };
 
 export function localizedApiErrorMessage(locale: Locale, code?: string, serverMessage?: string) {
@@ -82,15 +91,68 @@ export function localizedApiErrorMessage(locale: Locale, code?: string, serverMe
   return (code && englishApiErrors[code]) || "The request could not be completed. Please try again.";
 }
 
-async function apiRequest<T>(path: string, init?: RequestInit, locale: Locale = "cs"): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      "X-Zone4You-Locale": locale,
-      ...init?.headers,
-    },
-  });
+function clientTransportMessage(locale: Locale, code: string) {
+  if (code === "BOOKING_RECONCILIATION_REQUIRED") {
+    return locale === "cs"
+      ? "Výsledek booking akce nelze bezpečně potvrdit. Akci neopakujte a kontaktujte recepci."
+      : englishApiErrors.BOOKING_RECONCILIATION_REQUIRED;
+  }
+  if (code === "REQUEST_TIMEOUT") {
+    return locale === "cs"
+      ? "Požadavek trval příliš dlouho. Zkontrolujte připojení a zkuste to znovu."
+      : englishApiErrors.REQUEST_TIMEOUT;
+  }
+  return locale === "cs"
+    ? "Službu se nepodařilo kontaktovat. Zkontrolujte připojení a zkuste to znovu."
+    : englishApiErrors.REQUEST_FAILED;
+}
+
+function boundedTimeout(value: number | undefined, fallback: number) {
+  return Number.isInteger(value) && Number(value) >= 1 && Number(value) <= 120_000
+    ? Number(value)
+    : fallback;
+}
+
+export async function apiRequest<T>(
+  path: string,
+  init?: RequestInit,
+  locale: Locale = "cs",
+  options: BookingApiRequestOptions = {},
+): Promise<T> {
+  const outcome = options.outcome ?? "read";
+  const timeoutMs = boundedTimeout(
+    options.timeoutMs,
+    outcome === "booking_mutation" ? bookingMutationRequestTimeoutMs : readRequestTimeoutMs,
+  );
+  const controller = new AbortController();
+  const upstreamSignal = init?.signal;
+  const abortFromUpstream = () => controller.abort();
+  if (upstreamSignal?.aborted) controller.abort();
+  else upstreamSignal?.addEventListener("abort", abortFromUpstream, { once: true });
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Zone4You-Locale": locale,
+        ...init?.headers,
+      },
+      signal: controller.signal,
+    });
+  } catch {
+    const code = outcome === "booking_mutation"
+      ? "BOOKING_RECONCILIATION_REQUIRED"
+      : controller.signal.aborted
+        ? "REQUEST_TIMEOUT"
+        : "REQUEST_FAILED";
+    throw new BookingApiClientError(clientTransportMessage(locale, code), 0, code);
+  } finally {
+    clearTimeout(timeout);
+    upstreamSignal?.removeEventListener("abort", abortFromUpstream);
+  }
   const json = (await response.json().catch(() => ({}))) as unknown;
 
   if (!response.ok) {
@@ -135,7 +197,7 @@ export const bookingApiClient = {
       method: "POST",
       headers: { "Idempotency-Key": bookingMutationKey("reserve") },
       body: bodyWithDemoState({ lessonId }),
-    }, locale);
+    }, locale, { outcome: "booking_mutation" });
   },
 
   cancelReservation(reservationId: string, locale: Locale = "cs") {
@@ -143,7 +205,7 @@ export const bookingApiClient = {
       method: "DELETE",
       headers: { "Idempotency-Key": bookingMutationKey("cancel") },
       body: bodyWithDemoState(),
-    }, locale);
+    }, locale, { outcome: "booking_mutation" });
   },
 
   joinWaitlist(lessonId: string, locale: Locale = "cs") {

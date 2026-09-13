@@ -68,6 +68,8 @@ Síťové rozhodnutí a důkaz, proč se čeká na veřejný Zone4You hostname m
 
 `verify:booking-mutations` smí běžet jen nad výslovně potvrzenou testovací databází. Ještě před prvním zápisem vyžaduje přesnou shodu staging commitu a launch fáze z `/api/readiness`, region `fra1`, live Luxart a vypnutý waitlist; u pilotu bez plateb také vypnuté top-upy. Dále vyžaduje, aby vybranou lekci personalizovaný feed označil jako povolenou, měla autoritativní volné místo, platné číslo sálu s release mapováním, byla uvnitř potvrzeného rezervačního okna a šla bezpečně online stornovat s očekávaným poplatkem. Odpověď na storno sama nestačí: až následný Luxart snapshot smí potvrdit, že UAT rezervace zmizela. Současně se porovná přesná množina identit všech dříve aktivních rezervací klienta a do evidence se zahrnou korelační ID všech snapshotů. Jakýkoli nesoulad končí bez rezervačního POSTu nebo neúspěšným UAT důkazem.
 
+Browserová vrstva nenechá požadavky viset bez omezení: čtení končí po 20 sekundách bezpečným retry stavem, rezervace/storno po 45 sekundách stavem vyžadujícím reconciliation. Zastaralý snapshot i ztracená odpověď booking mutace fyzicky vypnou zapisující ovládací prvky; uživatel není vybízen k opakování a u nejisté mutace dostane trvalou instrukci kontaktovat recepci. Potvrzený zápis současně nezměníme na falešné selhání jen proto, že selhalo následné obnovení dat.
+
 `inspect:business-rules` ukáže verzovaný profil pravidel a jeho SHA-256. Dokud je profil `provisional`, živé rezervace ani platby nelze odemknout; samotné `BOOKING_RULES_CONFIRMED=true` nestačí.
 
 `inspect:payment-product` ukáže potvrzený profil pěti CZK top-up částek a jeho SHA-256. Live Stripe vyžaduje přesnou shodu profilu s implementací i explicitní `PAYMENT_PRODUCT_CONFIRMED=true`.

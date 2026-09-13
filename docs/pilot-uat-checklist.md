@@ -15,6 +15,7 @@ Každý bod označte `PASS`, `FAIL` nebo `N/A — funkce bezpečně vypnutá`. K
 - [ ] Čas bez explicitního `Z` / UTC offsetu a neexistující kalendářní datum v lekci, rezervaci, kreditu nebo watchdogu vyvolají bezpečný stav nedostupnosti; desktop, mobil ani hostingová časová zóna je nesmí interpretovat rozdílně.
 - [ ] Všechny sály a Reformer jsou viditelné a filtrovatelné.
 - [ ] Luxart read-only důkaz, staging runtime a post-cutover produkce mají stejný SHA-256 vazeb každého výskytu lekce na `cislo_salu`; změna sálu při zachovaném ID lekce je NO-GO.
+- [ ] Luxart read-only důkaz, staging a produkce mají pro CS i EN stejný SHA-256 statického obsahu všech výskytů: čas, název, popis, instruktor, kategorie, kapacita, cena a rezervační metadata; změna jediné hodnoty je NO-GO.
 - [ ] `resourceMapSha256` ve staging readiness, release dossieru, pre-cutover receipt a produkční readiness je shodný s úplnou mapou `cislo_salu → id_resource` použitou při UAT; samotná interní resource ID nejsou ve veřejné evidenci.
 - [ ] Zobrazený počet volných míst i stav plno odpovídají přímo Luxart poli `volno`; test s rozdílem mezi `volno` a prostým `kapacita - obsazeno` nesmí použít dopočítanou hodnotu.
 - [ ] Neznámý sál nebo typ lekce nezpůsobí zmizení lekce ani pád stránky.
@@ -46,6 +47,9 @@ Každý bod označte `PASS`, `FAIL` nebo `N/A — funkce bezpečně vypnutá`. K
 - [ ] Storno/Reformer poplatek odpovídá písemně potvrzenému pravidlu.
 - [ ] Při chybě Luxartu UI neukáže falešný úspěch.
 - [ ] Timeout po odeslání Luxart mutace skončí jako `uncertain`, další pokus se zablokuje a projde ruční reconciliation drill.
+- [ ] Selhání obnovy snapshotu ponechá viditelná poslední data jako zastaralá, ale fyzicky vypne rezervaci, storno, waitlist i dobití; do úspěšné obnovy neodejde žádný mutační požadavek.
+- [ ] Browserové čtení skončí nejpozději po 20 s bezpečnou možností retry. Ztracená odpověď rezervace nebo storna skončí nejpozději po 45 s stavem `BOOKING_RECONCILIATION_REQUIRED`, zobrazí trvalou instrukci „neopakovat / kontaktovat recepci“ a fyzicky vypne další booking akce.
+- [ ] Potvrzená rezervace nebo storno zůstane v UI potvrzené, i když selže až následná obnova snapshotu; aplikace nesmí potvrzený zápis přepsat falešným hlášením o selhání akce.
 - [ ] Guarded `verify:booking-mutations` proběhl pouze na schválené test DB, odmítl produkční origin a před loginem svázal `/api/readiness` s přesným commitem, launch fází, regionem `fra1`, capability profilem a `resourceMapSha256` úplné operátorské mapy; před prvním POSTem ověřil personalizované povolení, autoritativní `volno`, mapovaný sál, rezervační okno, možnost online storna a očekávaný poplatek; uložil privacy-safe JSON důkaz.
 - [ ] Read-only režim zobrazí rozvrh, ale bezpečně zablokuje rezervaci, storno a watchdog hlídání místa.
 
