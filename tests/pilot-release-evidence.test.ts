@@ -31,6 +31,56 @@ function writeJson(path: string, value: unknown) {
   return createHash("sha256").update(body, "utf8").digest("hex");
 }
 
+function bookingUatScenario(
+  lessonKind: "standard" | "reformer",
+  checkedAt: string,
+  lessonRoomNumber: number,
+  lessonIdSha256: string,
+  reservationIdSha256: string,
+  requestPrefix: string,
+) {
+  return {
+    schemaVersion: 1,
+    ok: true,
+    checkedAt,
+    target: stagingTarget,
+    deploymentProvenanceVerified: true,
+    commit,
+    phase: "booking_without_payments",
+    region: "fra1",
+    lessonKind,
+    userVerified: true,
+    personalizedEligibilityVerified: true,
+    authoritativeAvailabilityVerified: true,
+    reservationWindowVerified: true,
+    onlineCancellationVerified: true,
+    resourceMapSha256,
+    lessonRoomNumber,
+    lessonIdSha256,
+    reservationIdSha256,
+    expectedCancellationFeeKc: 0,
+    sameKeyCreateReplays: 3,
+    parallelCreateRequests: 2,
+    sameKeyCancellationReplays: 3,
+    crossKeyCancellationReplay: true,
+    oneActiveReservationObserved: true,
+    cancellationStateVerified: true,
+    snapshotRequestIdsRecorded: true,
+    preExistingActiveReservationsPreserved: true,
+    finalStateRestored: true,
+    cancellationFeeMatched: true,
+    requestIds: Array.from({ length: 16 }, (_, index) => `${requestPrefix}-${index}`),
+  };
+}
+
+function mutableBookingUatScenario(
+  artifact: Record<string, unknown>,
+  lessonKind: "standard" | "reformer" = "standard",
+) {
+  const scenarios = artifact.scenarios as Record<string, Record<string, unknown>>;
+  return scenarios[lessonKind];
+}
+
 function validFixture() {
   const directory = mkdtempSync(join(tmpdir(), "zone4you-release-evidence-"));
   const checkedAt = "2026-09-05T07:30:00.000Z";
@@ -194,7 +244,7 @@ function validFixture() {
       },
     },
     bookingMutationUat: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       ok: true,
       checkedAt,
       target: stagingTarget,
@@ -202,27 +252,11 @@ function validFixture() {
       commit,
       phase: "booking_without_payments",
       region: "fra1",
-      userVerified: true,
-      personalizedEligibilityVerified: true,
-      authoritativeAvailabilityVerified: true,
-      reservationWindowVerified: true,
-      onlineCancellationVerified: true,
-      resourceMapSha256,
-      lessonRoomNumber: 1,
-      lessonIdSha256: "c".repeat(16),
-      reservationIdSha256: "d".repeat(16),
-      expectedCancellationFeeKc: 0,
-      sameKeyCreateReplays: 3,
-      parallelCreateRequests: 2,
-      sameKeyCancellationReplays: 3,
-      crossKeyCancellationReplay: true,
-      oneActiveReservationObserved: true,
-      cancellationStateVerified: true,
-      snapshotRequestIdsRecorded: true,
-      preExistingActiveReservationsPreserved: true,
-      finalStateRestored: true,
-      cancellationFeeMatched: true,
-      requestIds: Array.from({ length: 16 }, (_, index) => `request-${index}`),
+      scenarioCount: 2,
+      scenarios: {
+        standard: bookingUatScenario("standard", checkedAt, 1, "c".repeat(16), "d".repeat(16), "standard-request"),
+        reformer: bookingUatScenario("reformer", checkedAt, 3, "e".repeat(16), "f".repeat(16), "reformer-request"),
+      },
     },
     rollbackTimer,
     rollback: {
@@ -494,23 +528,44 @@ test("pilot release dossier rejects evidence that cannot come from the real guar
     [
       "bookingMutationUat",
       (artifact: Record<string, unknown>) => {
-        artifact.schemaVersion = 2;
+        artifact.schemaVersion = 1;
       },
-      /Booking UAT evidence schemaVersion must be 1/i,
+      /Booking UAT evidence schemaVersion must be 2/i,
     ],
     [
       "bookingMutationUat",
       (artifact: Record<string, unknown>) => {
-        artifact.expectedCancellationFeeKc = maximumOperationalAmountKc + 1;
+        artifact.ok = false;
       },
-      /booking UAT expectedCancellationFeeKc must not exceed/i,
+      /bookingMutationUat\.ok must be true/i,
     ],
     [
       "bookingMutationUat",
       (artifact: Record<string, unknown>) => {
-        artifact.authoritativeAvailabilityVerified = false;
+        delete (artifact.scenarios as Record<string, unknown>).reformer;
       },
-      /booking UAT authoritativeAvailabilityVerified must be true/i,
+      /scenarios must contain exactly standard and reformer evidence/i,
+    ],
+    [
+      "bookingMutationUat",
+      (artifact: Record<string, unknown>) => {
+        mutableBookingUatScenario(artifact, "reformer").lessonKind = "standard";
+      },
+      /booking UAT reformer lessonKind must exactly equal reformer/i,
+    ],
+    [
+      "bookingMutationUat",
+      (artifact: Record<string, unknown>) => {
+        mutableBookingUatScenario(artifact).expectedCancellationFeeKc = maximumOperationalAmountKc + 1;
+      },
+      /booking UAT standard expectedCancellationFeeKc must not exceed/i,
+    ],
+    [
+      "bookingMutationUat",
+      (artifact: Record<string, unknown>) => {
+        mutableBookingUatScenario(artifact).authoritativeAvailabilityVerified = false;
+      },
+      /booking UAT standard authoritativeAvailabilityVerified must be true/i,
     ],
     [
       "bookingMutationUat",
@@ -522,30 +577,44 @@ test("pilot release dossier rejects evidence that cannot come from the real guar
     [
       "bookingMutationUat",
       (artifact: Record<string, unknown>) => {
-        artifact.resourceMapSha256 = "f".repeat(64);
+        mutableBookingUatScenario(artifact).resourceMapSha256 = "f".repeat(64);
       },
-      /booking UAT resourceMapSha256 must exactly equal/i,
+      /booking UAT standard resourceMapSha256 must exactly equal/i,
     ],
     [
       "bookingMutationUat",
       (artifact: Record<string, unknown>) => {
-        artifact.requestIds = Array.from({ length: 16 }, () => "reused-request-id");
+        mutableBookingUatScenario(artifact).requestIds = Array.from({ length: 16 }, () => "reused-request-id");
       },
-      /booking UAT evidence request IDs must be unique/i,
+      /booking UAT standard evidence request IDs must be unique/i,
     ],
     [
       "bookingMutationUat",
       (artifact: Record<string, unknown>) => {
-        artifact.preExistingActiveReservationsPreserved = false;
+        mutableBookingUatScenario(artifact, "reformer").requestIds = mutableBookingUatScenario(artifact).requestIds;
       },
-      /booking UAT preExistingActiveReservationsPreserved must be true/i,
+      /request IDs must be unique across both scenarios/i,
     ],
     [
       "bookingMutationUat",
       (artifact: Record<string, unknown>) => {
-        artifact.lessonIdSha256 = "not-a-digest";
+        mutableBookingUatScenario(artifact).preExistingActiveReservationsPreserved = false;
       },
-      /booking UAT lessonIdSha256 must be a 16-character lowercase SHA-256 prefix/i,
+      /booking UAT standard preExistingActiveReservationsPreserved must be true/i,
+    ],
+    [
+      "bookingMutationUat",
+      (artifact: Record<string, unknown>) => {
+        mutableBookingUatScenario(artifact).lessonIdSha256 = "not-a-digest";
+      },
+      /booking UAT standard lessonIdSha256 must be a 16-character lowercase SHA-256 prefix/i,
+    ],
+    [
+      "bookingMutationUat",
+      (artifact: Record<string, unknown>) => {
+        mutableBookingUatScenario(artifact, "reformer").lessonIdSha256 = mutableBookingUatScenario(artifact).lessonIdSha256;
+      },
+      /must use different lesson occurrences/i,
     ],
     [
       "rollbackTimer",
@@ -997,6 +1066,8 @@ test("Stripe launch mode cannot pass without its own end-to-end UAT artifact", (
   const runtimeSha = writeJson(join(fixture.directory, "runtimeProbe.json"), runtime);
   const bookingMutationUat = structuredClone(fixture.files.bookingMutationUat) as Record<string, unknown>;
   bookingMutationUat.phase = "booking_with_stripe";
+  mutableBookingUatScenario(bookingMutationUat).phase = "booking_with_stripe";
+  mutableBookingUatScenario(bookingMutationUat, "reformer").phase = "booking_with_stripe";
   const bookingMutationUatSha = writeJson(
     join(fixture.directory, "bookingMutationUat.json"),
     bookingMutationUat,

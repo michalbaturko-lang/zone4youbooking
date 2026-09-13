@@ -4,11 +4,14 @@ import type { BookingCapabilities, BookingRules, Lesson, Reservation, User } fro
 import {
   assertUatReservation,
   bookingMutationUatEvidenceSchemaVersion,
+  bookingMutationUatScenarioEvidenceSchemaVersion,
   loadBookingMutationUatConfig,
+  loadBookingMutationUatSuiteConfig,
   redactUatSecrets,
   runBookingMutationUat,
+  runBookingMutationUatSuite,
 } from "../scripts/verify-booking-mutations";
-import { validateBookingUatEvidence } from "../scripts/verify-pilot-release";
+import { validateBookingUatScenarioEvidence } from "../scripts/verify-pilot-release";
 import { luxartResourceMappingSha256 } from "../src/lib/luxartResourceMappingFingerprint";
 import { maximumOperationalAmountKc } from "../src/lib/moneyBounds";
 
@@ -25,6 +28,7 @@ const baseEnvironment = {
   ZONE4YOU_UAT_LOGIN: "approved-test-user",
   ZONE4YOU_UAT_PASSWORD: "test-secret",
   ZONE4YOU_UAT_EXPECTED_USER_ID: "42",
+  ZONE4YOU_UAT_EXPECTED_LESSON_KIND: "standard",
   ZONE4YOU_UAT_LESSON_ID: "luxart:1:12:321:2026-09-01T14:30:00.000Z",
   ZONE4YOU_UAT_EXPECTED_CANCELLATION_FEE_KC: "0",
   ZONE4YOU_UAT_MIN_HOURS_BEFORE_START: "4",
@@ -62,7 +66,30 @@ test("mutation UAT configuration refuses production and stale confirmations", ()
     }),
     /between 0 and/i,
   );
+  assert.throws(
+    () => loadBookingMutationUatConfig({ ...baseEnvironment, ZONE4YOU_UAT_EXPECTED_LESSON_KIND: "all" }),
+    /standard or reformer/i,
+  );
   assert.equal(loadBookingMutationUatConfig(baseEnvironment).target.origin, "https://staging.booking.zone4you.cz");
+
+  const suiteEnvironment = {
+    ...baseEnvironment,
+    ZONE4YOU_UAT_STANDARD_LESSON_ID: "luxart:1:12:321:2026-09-01T14:30:00.000Z",
+    ZONE4YOU_UAT_STANDARD_EXPECTED_CANCELLATION_FEE_KC: "0",
+    ZONE4YOU_UAT_REFORMER_LESSON_ID: "luxart:1:22:654:2026-09-02T14:30:00.000Z",
+    ZONE4YOU_UAT_REFORMER_EXPECTED_CANCELLATION_FEE_KC: "0",
+  };
+  const suite = loadBookingMutationUatSuiteConfig(suiteEnvironment);
+  assert.equal(suite.standard.expectedLessonKind, "standard");
+  assert.equal(suite.reformer.expectedLessonKind, "reformer");
+  assert.throws(
+    () => loadBookingMutationUatSuiteConfig({
+      ...suiteEnvironment,
+      ZONE4YOU_UAT_REFORMER_LESSON_ID: suiteEnvironment.ZONE4YOU_UAT_STANDARD_LESSON_ID,
+      ZONE4YOU_UAT_REFORMER_EXPECTED_CANCELLATION_FEE_KC: "0",
+    }),
+    /different lesson occurrences/i,
+  );
 });
 
 test("mutation UAT rejects malformed financial reservation evidence", () => {
@@ -98,6 +125,70 @@ test("mutation UAT rejects malformed financial reservation evidence", () => {
     cancelledAt: "2026-09-01T13:00:00.000Z",
     cancellationFeeKc: 0,
   }, config, "cancelled"));
+});
+
+test("mutation UAT suite requires and records separate standard and Reformer scenarios", async () => {
+  const suite = loadBookingMutationUatSuiteConfig({
+    ...baseEnvironment,
+    ZONE4YOU_UAT_STANDARD_LESSON_ID: "luxart:1:12:321:2026-09-01T14:30:00.000Z",
+    ZONE4YOU_UAT_STANDARD_EXPECTED_CANCELLATION_FEE_KC: "0",
+    ZONE4YOU_UAT_REFORMER_LESSON_ID: "luxart:1:22:654:2026-09-02T14:30:00.000Z",
+    ZONE4YOU_UAT_REFORMER_EXPECTED_CANCELLATION_FEE_KC: "0",
+  });
+  const calls: string[] = [];
+  const evidence = await runBookingMutationUatSuite(suite, fetch, async (scenario) => {
+    calls.push(scenario.expectedLessonKind);
+    return {
+      schemaVersion: bookingMutationUatScenarioEvidenceSchemaVersion,
+      ok: true,
+      checkedAt: new Date().toISOString(),
+      target: scenario.target.origin,
+      deploymentProvenanceVerified: true,
+      commit: scenario.expectedCommit,
+      phase: scenario.expectedPhase,
+      region: "fra1",
+      lessonKind: scenario.expectedLessonKind,
+      userVerified: true,
+      personalizedEligibilityVerified: true,
+      authoritativeAvailabilityVerified: true,
+      reservationWindowVerified: true,
+      onlineCancellationVerified: true,
+      resourceMapSha256: scenario.expectedResourceMapSha256,
+      lessonRoomNumber: scenario.expectedLessonKind === "standard" ? 1 : 2,
+      lessonIdSha256: scenario.expectedLessonKind === "standard" ? "a".repeat(16) : "b".repeat(16),
+      reservationIdSha256: scenario.expectedLessonKind === "standard" ? "c".repeat(16) : "d".repeat(16),
+      expectedCancellationFeeKc: scenario.expectedCancellationFeeKc,
+      sameKeyCreateReplays: 3,
+      parallelCreateRequests: 2,
+      sameKeyCancellationReplays: 3,
+      crossKeyCancellationReplay: true,
+      oneActiveReservationObserved: true,
+      cancellationStateVerified: true,
+      snapshotRequestIdsRecorded: true,
+      preExistingActiveReservationsPreserved: true,
+      finalStateRestored: true,
+      cancellationFeeMatched: true,
+      requestIds: Array.from({ length: 16 }, (_, index) => `${scenario.expectedLessonKind}-${index}`),
+    };
+  });
+  assert.deepEqual(calls, ["standard", "reformer"]);
+  assert.equal(evidence.schemaVersion, bookingMutationUatEvidenceSchemaVersion);
+  assert.equal(evidence.scenarioCount, 2);
+  assert.equal(evidence.scenarios.standard.lessonKind, "standard");
+  assert.equal(evidence.scenarios.reformer.lessonKind, "reformer");
+
+  let invalidCalls = 0;
+  await assert.rejects(
+    runBookingMutationUatSuite({
+      ...suite,
+      reformer: { ...suite.reformer, expectedCommit: "f".repeat(40) },
+    }, fetch, async (scenario) => {
+      invalidCalls += 1;
+      return evidence.scenarios[scenario.expectedLessonKind];
+    }),
+    /one approved staging user and deployment/i,
+  );
+  assert.equal(invalidCalls, 0);
 });
 
 test("mutation UAT error evidence redacts test credentials", () => {
@@ -282,6 +373,12 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
     return response({ code: "NOT_FOUND", error: "not found" }, 404);
   };
 
+  await assert.rejects(
+    runBookingMutationUat({ ...config, expectedLessonKind: "reformer" }, fakeFetch),
+    /not the required reformer scenario.*no mutation was attempted/i,
+  );
+  assert.equal(createWrites, 0);
+
   snapshotCreditBalanceKc = maximumOperationalAmountKc + 1;
   await assert.rejects(
     runBookingMutationUat(config, fakeFetch),
@@ -297,16 +394,18 @@ test("guarded UAT proves replay, concurrency and restored state without exposing
   assert.equal(createWrites, 0);
 
   const evidence = await runBookingMutationUat(config, fakeFetch);
-  validateBookingUatEvidence(
+  validateBookingUatScenarioEvidence(
     evidence,
     config.target.origin,
     new Map([["1", 101]]),
     resourceMapSha256,
     config.expectedCommit,
     config.expectedPhase,
+    "standard",
   );
   assert.equal(evidence.ok, true);
-  assert.equal(evidence.schemaVersion, bookingMutationUatEvidenceSchemaVersion);
+  assert.equal(evidence.schemaVersion, bookingMutationUatScenarioEvidenceSchemaVersion);
+  assert.equal(evidence.lessonKind, "standard");
   assert.equal(evidence.deploymentProvenanceVerified, true);
   assert.equal(evidence.commit, commit);
   assert.equal(evidence.phase, "booking_without_payments");

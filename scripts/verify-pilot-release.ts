@@ -16,7 +16,11 @@ import {
 } from "./verify-luxart-public-contract";
 import { memberzoneFallbackUrl } from "./verify-memberzone-fallback";
 import { maximumOperationalAmountKc } from "../src/lib/moneyBounds";
-import { bookingMutationUatEvidenceSchemaVersion } from "./verify-booking-mutations";
+import {
+  bookingMutationUatEvidenceSchemaVersion,
+  bookingMutationUatScenarioEvidenceSchemaVersion,
+  type BookingMutationUatLessonKind,
+} from "./verify-booking-mutations";
 import {
   validateReadonlyRollbackTimerEvidence,
   type ReadonlyRollbackTimerEvidence,
@@ -522,6 +526,87 @@ function validateRuntimeEvidence(
   }
 }
 
+export function validateBookingUatScenarioEvidence(
+  evidence: JsonObject,
+  stagingOrigin: string,
+  resourceMap: Map<string, number>,
+  resourceMapSha256: string,
+  expectedCommit: string,
+  launchMode: string,
+  expectedLessonKind: BookingMutationUatLessonKind,
+) {
+  const label = `booking UAT ${expectedLessonKind}`;
+  if (evidence.schemaVersion !== bookingMutationUatScenarioEvidenceSchemaVersion) {
+    throw new Error(
+      `${label} scenario schemaVersion must be ${bookingMutationUatScenarioEvidenceSchemaVersion}.`,
+    );
+  }
+  trueValue(evidence.ok, `${label}.ok`);
+  exactString(cleanHttpsOrigin(evidence.target, `${label}.target`), stagingOrigin, `${label} target`);
+  trueValue(evidence.deploymentProvenanceVerified, `${label} deploymentProvenanceVerified`);
+  exactString(
+    stringValue(evidence.commit, `${label} commit`).toLowerCase(),
+    expectedCommit,
+    `${label} commit`,
+  );
+  exactString(evidence.phase, launchMode, `${label} phase`);
+  exactString(evidence.region, "fra1", `${label} region`);
+  exactString(evidence.lessonKind, expectedLessonKind, `${label} lessonKind`);
+  trueValue(evidence.userVerified, `${label} userVerified`);
+  trueValue(evidence.personalizedEligibilityVerified, `${label} personalizedEligibilityVerified`);
+  trueValue(evidence.authoritativeAvailabilityVerified, `${label} authoritativeAvailabilityVerified`);
+  trueValue(evidence.reservationWindowVerified, `${label} reservationWindowVerified`);
+  trueValue(evidence.onlineCancellationVerified, `${label} onlineCancellationVerified`);
+  exactString(
+    evidence.resourceMapSha256,
+    resourceMapSha256,
+    `${label} resourceMapSha256`,
+  );
+  const lessonRoomNumber = integerValue(evidence.lessonRoomNumber, `${label} lessonRoomNumber`, 1);
+  if (!resourceMap.has(String(lessonRoomNumber))) {
+    throw new Error(`The ${label} lesson room is missing from LUXART_RESOURCE_MAP_JSON.`);
+  }
+  for (const key of ["lessonIdSha256", "reservationIdSha256"] as const) {
+    const digest = stringValue(evidence[key], `${label} ${key}`);
+    if (!/^[a-f0-9]{16}$/.test(digest)) {
+      throw new Error(`${label} ${key} must be a 16-character lowercase SHA-256 prefix.`);
+    }
+  }
+  const expectedCancellationFeeKc = integerValue(
+    evidence.expectedCancellationFeeKc,
+    `${label} expectedCancellationFeeKc`,
+  );
+  if (expectedCancellationFeeKc > maximumOperationalAmountKc) {
+    throw new Error(
+      `${label} expectedCancellationFeeKc must not exceed ${maximumOperationalAmountKc}.`,
+    );
+  }
+  integerValue(evidence.sameKeyCreateReplays, `${label} sameKeyCreateReplays`, 3);
+  integerValue(evidence.parallelCreateRequests, `${label} parallelCreateRequests`, 2);
+  integerValue(evidence.sameKeyCancellationReplays, `${label} sameKeyCancellationReplays`, 3);
+  trueValue(evidence.crossKeyCancellationReplay, `${label} crossKeyCancellationReplay`);
+  trueValue(evidence.oneActiveReservationObserved, `${label} oneActiveReservationObserved`);
+  trueValue(evidence.cancellationStateVerified, `${label} cancellationStateVerified`);
+  trueValue(evidence.snapshotRequestIdsRecorded, `${label} snapshotRequestIdsRecorded`);
+  trueValue(evidence.preExistingActiveReservationsPreserved, `${label} preExistingActiveReservationsPreserved`);
+  trueValue(evidence.finalStateRestored, `${label} finalStateRestored`);
+  trueValue(evidence.cancellationFeeMatched, `${label} cancellationFeeMatched`);
+  const requestIds = stringArray(evidence.requestIds, `${label} requestIds`);
+  if (requestIds.length < 16) {
+    throw new Error(`${label} evidence contains too few correlated request IDs.`);
+  }
+  if (new Set(requestIds).size !== requestIds.length) {
+    throw new Error(`${label} evidence request IDs must be unique.`);
+  }
+  const scenarioCheckedAt = new Date(stringValue(evidence.checkedAt, `${label}.checkedAt`));
+  if (!Number.isFinite(scenarioCheckedAt.getTime())) throw new Error(`${label}.checkedAt must be a valid timestamp.`);
+  return {
+    checkedAt: scenarioCheckedAt,
+    lessonIdSha256: stringValue(evidence.lessonIdSha256, `${label} lessonIdSha256`),
+    requestIds,
+  };
+}
+
 export function validateBookingUatEvidence(
   evidence: JsonObject,
   stagingOrigin: string,
@@ -535,60 +620,51 @@ export function validateBookingUatEvidence(
       `Booking UAT evidence schemaVersion must be ${bookingMutationUatEvidenceSchemaVersion}.`,
     );
   }
+  trueValue(evidence.ok, "booking UAT.ok");
   exactString(cleanHttpsOrigin(evidence.target, "artifacts.bookingMutationUat.target"), stagingOrigin, "Booking UAT target");
   trueValue(evidence.deploymentProvenanceVerified, "booking UAT deploymentProvenanceVerified");
-  exactString(
-    stringValue(evidence.commit, "booking UAT commit").toLowerCase(),
-    expectedCommit,
-    "booking UAT commit",
-  );
+  exactString(stringValue(evidence.commit, "booking UAT commit").toLowerCase(), expectedCommit, "booking UAT commit");
   exactString(evidence.phase, launchMode, "booking UAT phase");
   exactString(evidence.region, "fra1", "booking UAT region");
-  trueValue(evidence.userVerified, "booking UAT userVerified");
-  trueValue(evidence.personalizedEligibilityVerified, "booking UAT personalizedEligibilityVerified");
-  trueValue(evidence.authoritativeAvailabilityVerified, "booking UAT authoritativeAvailabilityVerified");
-  trueValue(evidence.reservationWindowVerified, "booking UAT reservationWindowVerified");
-  trueValue(evidence.onlineCancellationVerified, "booking UAT onlineCancellationVerified");
-  exactString(
-    evidence.resourceMapSha256,
+  if (integerValue(evidence.scenarioCount, "booking UAT scenarioCount", 2) !== 2) {
+    throw new Error("booking UAT scenarioCount must exactly equal 2.");
+  }
+  const scenarios = objectValue(evidence.scenarios, "booking UAT scenarios");
+  if (JSON.stringify(Object.keys(scenarios).sort()) !== JSON.stringify(["reformer", "standard"])) {
+    throw new Error("booking UAT scenarios must contain exactly standard and reformer evidence.");
+  }
+  const standard = validateBookingUatScenarioEvidence(
+    objectValue(scenarios.standard, "booking UAT scenarios.standard"),
+    stagingOrigin,
+    resourceMap,
     resourceMapSha256,
-    "booking UAT resourceMapSha256",
+    expectedCommit,
+    launchMode,
+    "standard",
   );
-  const lessonRoomNumber = integerValue(evidence.lessonRoomNumber, "booking UAT lessonRoomNumber", 1);
-  if (!resourceMap.has(String(lessonRoomNumber))) {
-    throw new Error("The booking UAT lesson room is missing from LUXART_RESOURCE_MAP_JSON.");
+  const reformer = validateBookingUatScenarioEvidence(
+    objectValue(scenarios.reformer, "booking UAT scenarios.reformer"),
+    stagingOrigin,
+    resourceMap,
+    resourceMapSha256,
+    expectedCommit,
+    launchMode,
+    "reformer",
+  );
+  if (standard.lessonIdSha256 === reformer.lessonIdSha256) {
+    throw new Error("Standard and Reformer booking UAT must use different lesson occurrences.");
   }
-  for (const key of ["lessonIdSha256", "reservationIdSha256"] as const) {
-    const digest = stringValue(evidence[key], `booking UAT ${key}`);
-    if (!/^[a-f0-9]{16}$/.test(digest)) {
-      throw new Error(`booking UAT ${key} must be a 16-character lowercase SHA-256 prefix.`);
+  const allRequestIds = [...standard.requestIds, ...reformer.requestIds];
+  if (new Set(allRequestIds).size !== allRequestIds.length) {
+    throw new Error("Standard and Reformer booking UAT request IDs must be unique across both scenarios.");
+  }
+  const suiteCheckedAt = new Date(stringValue(evidence.checkedAt, "booking UAT.checkedAt"));
+  if (!Number.isFinite(suiteCheckedAt.getTime())) throw new Error("booking UAT.checkedAt must be a valid timestamp.");
+  for (const [kind, scenario] of [["standard", standard], ["reformer", reformer]] as const) {
+    const ageMs = suiteCheckedAt.getTime() - scenario.checkedAt.getTime();
+    if (ageMs < 0 || ageMs > 2 * 3_600_000) {
+      throw new Error(`booking UAT ${kind}.checkedAt must be no more than two hours before the suite evidence.`);
     }
-  }
-  const expectedCancellationFeeKc = integerValue(
-    evidence.expectedCancellationFeeKc,
-    "booking UAT expectedCancellationFeeKc",
-  );
-  if (expectedCancellationFeeKc > maximumOperationalAmountKc) {
-    throw new Error(
-      `booking UAT expectedCancellationFeeKc must not exceed ${maximumOperationalAmountKc}.`,
-    );
-  }
-  integerValue(evidence.sameKeyCreateReplays, "booking UAT sameKeyCreateReplays", 3);
-  integerValue(evidence.parallelCreateRequests, "booking UAT parallelCreateRequests", 2);
-  integerValue(evidence.sameKeyCancellationReplays, "booking UAT sameKeyCancellationReplays", 3);
-  trueValue(evidence.crossKeyCancellationReplay, "booking UAT crossKeyCancellationReplay");
-  trueValue(evidence.oneActiveReservationObserved, "booking UAT oneActiveReservationObserved");
-  trueValue(evidence.cancellationStateVerified, "booking UAT cancellationStateVerified");
-  trueValue(evidence.snapshotRequestIdsRecorded, "booking UAT snapshotRequestIdsRecorded");
-  trueValue(evidence.preExistingActiveReservationsPreserved, "booking UAT preExistingActiveReservationsPreserved");
-  trueValue(evidence.finalStateRestored, "booking UAT finalStateRestored");
-  trueValue(evidence.cancellationFeeMatched, "booking UAT cancellationFeeMatched");
-  const requestIds = stringArray(evidence.requestIds, "booking UAT requestIds");
-  if (requestIds.length < 16) {
-    throw new Error("Booking UAT evidence contains too few correlated request IDs.");
-  }
-  if (new Set(requestIds).size !== requestIds.length) {
-    throw new Error("Booking UAT evidence request IDs must be unique.");
   }
 }
 

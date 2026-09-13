@@ -191,6 +191,10 @@ test("Stripe staging preflight accepts only the fully signed and durable payment
 test("preflight report never echoes configured secrets, database URLs or Luxart endpoint", () => {
   const requiredOperatorOnlyVariables = [
     "LUXART_REQUIRE_AUTHENTICATED_PROBE",
+    "ZONE4YOU_UAT_STANDARD_LESSON_ID",
+    "ZONE4YOU_UAT_STANDARD_EXPECTED_CANCELLATION_FEE_KC",
+    "ZONE4YOU_UAT_REFORMER_LESSON_ID",
+    "ZONE4YOU_UAT_REFORMER_EXPECTED_CANCELLATION_FEE_KC",
     "ZONE4YOU_ALERT_EVIDENCE_PATH",
     "ZONE4YOU_BOOKING_UAT_EVIDENCE_PATH",
     "ZONE4YOU_LUXART_EVIDENCE_PATH",

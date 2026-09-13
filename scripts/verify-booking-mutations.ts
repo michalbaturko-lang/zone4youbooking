@@ -6,6 +6,7 @@ import {
   canCancelLessonAt,
   cancellationPolicyForLesson,
   freeCancellationDeadlineForLesson,
+  isReformerLesson,
 } from "../src/lib/bookingRules";
 import { parseExplicitLuxartDateTime } from "../src/lib/luxartContract";
 import { luxartResourceMappingSha256 } from "../src/lib/luxartResourceMappingFingerprint";
@@ -14,8 +15,10 @@ import { isBoundedKcAmount, maximumOperationalAmountKc } from "../src/lib/moneyB
 type FetchLike = typeof fetch;
 type Environment = Record<string, string | undefined>;
 type BookingMutationUatPhase = "booking_without_payments" | "booking_with_stripe";
+export type BookingMutationUatLessonKind = "standard" | "reformer";
 
-export const bookingMutationUatEvidenceSchemaVersion = 1;
+export const bookingMutationUatScenarioEvidenceSchemaVersion = 1;
+export const bookingMutationUatEvidenceSchemaVersion = 2;
 
 interface Snapshot {
   user: User;
@@ -35,9 +38,15 @@ export interface BookingMutationUatConfig {
   memberCardNumber?: string;
   expectedUserId: string;
   lessonId: string;
+  expectedLessonKind: BookingMutationUatLessonKind;
   expectedCancellationFeeKc: number;
   minimumHoursBeforeStart: number;
   timeoutMs: number;
+}
+
+export interface BookingMutationUatSuiteConfig {
+  standard: BookingMutationUatConfig;
+  reformer: BookingMutationUatConfig;
 }
 
 interface ApiResult<T> {
@@ -105,6 +114,10 @@ export function loadBookingMutationUatConfig(environment: Environment = process.
   if (!(["booking_without_payments", "booking_with_stripe"] as string[]).includes(expectedPhase)) {
     throw new Error("ZONE4YOU_UAT_EXPECTED_PHASE must be booking_without_payments or booking_with_stripe.");
   }
+  const expectedLessonKind = required(environment, "ZONE4YOU_UAT_EXPECTED_LESSON_KIND");
+  if (!(expectedLessonKind === "standard" || expectedLessonKind === "reformer")) {
+    throw new Error("ZONE4YOU_UAT_EXPECTED_LESSON_KIND must be standard or reformer.");
+  }
 
   const minimumHoursBeforeStart = Number(environment.ZONE4YOU_UAT_MIN_HOURS_BEFORE_START ?? "6");
   const timeoutMs = Number(environment.ZONE4YOU_UAT_TIMEOUT_MS ?? "12000");
@@ -127,10 +140,40 @@ export function loadBookingMutationUatConfig(environment: Environment = process.
     memberCardNumber: environment.ZONE4YOU_UAT_MEMBER_CARD_NUMBER?.trim() || undefined,
     expectedUserId: required(environment, "ZONE4YOU_UAT_EXPECTED_USER_ID"),
     lessonId: required(environment, "ZONE4YOU_UAT_LESSON_ID"),
+    expectedLessonKind,
     expectedCancellationFeeKc: exactInteger(environment, "ZONE4YOU_UAT_EXPECTED_CANCELLATION_FEE_KC"),
     minimumHoursBeforeStart,
     timeoutMs,
   };
+}
+
+export function loadBookingMutationUatSuiteConfig(
+  environment: Environment = process.env,
+): BookingMutationUatSuiteConfig {
+  const scenario = (
+    kind: BookingMutationUatLessonKind,
+    lessonIdName: string,
+    cancellationFeeName: string,
+  ) => loadBookingMutationUatConfig({
+    ...environment,
+    ZONE4YOU_UAT_EXPECTED_LESSON_KIND: kind,
+    ZONE4YOU_UAT_LESSON_ID: required(environment, lessonIdName),
+    ZONE4YOU_UAT_EXPECTED_CANCELLATION_FEE_KC: required(environment, cancellationFeeName),
+  });
+  const standard = scenario(
+    "standard",
+    "ZONE4YOU_UAT_STANDARD_LESSON_ID",
+    "ZONE4YOU_UAT_STANDARD_EXPECTED_CANCELLATION_FEE_KC",
+  );
+  const reformer = scenario(
+    "reformer",
+    "ZONE4YOU_UAT_REFORMER_LESSON_ID",
+    "ZONE4YOU_UAT_REFORMER_EXPECTED_CANCELLATION_FEE_KC",
+  );
+  if (standard.lessonId === reformer.lessonId) {
+    throw new Error("Standard and Reformer mutation UAT must use different lesson occurrences.");
+  }
+  return { standard, reformer };
 }
 
 function cookieFromSetCookie(setCookie: string | undefined) {
@@ -341,6 +384,12 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
   const beforeActiveReservations = activeReservationIdentitySet(before);
   const lesson = before.lessons.find((candidate) => candidate.id === config.lessonId);
   if (!lesson) throw new Error("ZONE4YOU_UAT_LESSON_ID is not present in the current staging schedule.");
+  const actualLessonKind: BookingMutationUatLessonKind = isReformerLesson(lesson) ? "reformer" : "standard";
+  if (actualLessonKind !== config.expectedLessonKind) {
+    throw new Error(
+      `The approved UAT lesson is ${actualLessonKind}, not the required ${config.expectedLessonKind} scenario; no mutation was attempted.`,
+    );
+  }
   if (
     !isBoundedKcAmount(before.user.creditBalanceKc) ||
     !isBoundedKcAmount(lesson.priceKc, 0) ||
@@ -486,7 +535,7 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
     }
 
     return {
-      schemaVersion: bookingMutationUatEvidenceSchemaVersion,
+      schemaVersion: bookingMutationUatScenarioEvidenceSchemaVersion,
       ok: true,
       checkedAt: new Date().toISOString(),
       target: config.target.origin,
@@ -494,6 +543,7 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
       commit: config.expectedCommit,
       phase: config.expectedPhase,
       region: "fra1",
+      lessonKind: config.expectedLessonKind,
       userVerified: true,
       personalizedEligibilityVerified: true,
       authoritativeAvailabilityVerified: true,
@@ -539,9 +589,52 @@ export async function runBookingMutationUat(config: BookingMutationUatConfig, fe
   }
 }
 
+export async function runBookingMutationUatSuite(
+  config: BookingMutationUatSuiteConfig,
+  fetchImpl: FetchLike = fetch,
+  runScenario: typeof runBookingMutationUat = runBookingMutationUat,
+) {
+  const sharedFields = [
+    "target",
+    "expectedCommit",
+    "expectedPhase",
+    "expectedResourceMapSha256",
+    "login",
+    "password",
+    "memberCardNumber",
+    "expectedUserId",
+  ] as const;
+  if (
+    config.standard.expectedLessonKind !== "standard" ||
+    config.reformer.expectedLessonKind !== "reformer" ||
+    config.standard.lessonId === config.reformer.lessonId ||
+    sharedFields.some((field) => {
+      const standardValue = field === "target" ? config.standard.target.origin : config.standard[field];
+      const reformerValue = field === "target" ? config.reformer.target.origin : config.reformer[field];
+      return standardValue !== reformerValue;
+    })
+  ) {
+    throw new Error("Booking mutation UAT suite must bind distinct standard and Reformer lessons to one approved staging user and deployment.");
+  }
+  const standard = await runScenario(config.standard, fetchImpl);
+  const reformer = await runScenario(config.reformer, fetchImpl);
+  return {
+    schemaVersion: bookingMutationUatEvidenceSchemaVersion,
+    ok: true,
+    checkedAt: new Date().toISOString(),
+    target: config.standard.target.origin,
+    deploymentProvenanceVerified: true,
+    commit: config.standard.expectedCommit,
+    phase: config.standard.expectedPhase,
+    region: "fra1",
+    scenarioCount: 2,
+    scenarios: { standard, reformer },
+  };
+}
+
 async function main() {
-  const config = loadBookingMutationUatConfig();
-  console.log(JSON.stringify(await runBookingMutationUat(config), null, 2));
+  const config = loadBookingMutationUatSuiteConfig();
+  console.log(JSON.stringify(await runBookingMutationUatSuite(config), null, 2));
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
