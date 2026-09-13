@@ -18,6 +18,7 @@ import {
   resolveProductionDnsRecords,
   type ProductionDnsRollbackRecord,
 } from "./capture-production-domain-baseline";
+import { probeMemberzoneFallback } from "./verify-memberzone-fallback";
 import { readStableReleaseJson } from "./release-evidence-file";
 
 type Environment = Record<string, string | undefined>;
@@ -666,6 +667,11 @@ export async function runProductionCutoverVerification(
       "Production lesson feed does not exactly match the approved live Luxart and staging lesson evidence.",
     );
   }
+  const memberzoneFallback = await probeMemberzoneFallback({
+    fetchImpl,
+    now: checkedAt,
+    requestTimeoutMs: config.timeoutMs,
+  });
   const durationMs = Date.now() - startedAt;
   if (durationMs > config.maxDurationMs) {
     throw new Error(
@@ -674,7 +680,7 @@ export async function runProductionCutoverVerification(
   }
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     ok: true,
     checkedAt: checkedAt.toISOString(),
     target: config.target.origin,
@@ -692,6 +698,19 @@ export async function runProductionCutoverVerification(
       fingerprintSha256: dnsFingerprintSha256,
     },
     browserSecurity: true,
+    memberzoneFallback: {
+      checkedAt: memberzoneFallback.checkedAt,
+      targetFingerprintSha256: memberzoneFallback.targetFingerprintSha256,
+      transport: memberzoneFallback.transport,
+      httpStatus: memberzoneFallback.httpStatus,
+      contentType: memberzoneFallback.contentType,
+      bodyBytes: memberzoneFallback.bodyBytes,
+      bodySha256: memberzoneFallback.bodySha256,
+      schedulerDetected: memberzoneFallback.schedulerDetected,
+      signInPathDetected: memberzoneFallback.signInPathDetected,
+      nonEmptyScheduleDetected: memberzoneFallback.nonEmptyScheduleDetected,
+      reformerDetected: memberzoneFallback.reformerDetected,
+    },
     requestIds: {
       health: health.requestId,
       readiness: readiness.requestId,

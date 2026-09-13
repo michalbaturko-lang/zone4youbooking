@@ -12,6 +12,7 @@ import {
 import { lessonContentSetSha256 } from "../scripts/lesson-content-evidence.mjs";
 import type { Lesson } from "../src/lib/domain";
 import { zone4YouScheduleRange } from "../src/lib/zone4YouTime";
+import { memberzoneFallbackUrl } from "../scripts/verify-memberzone-fallback";
 
 const commit = "1234567890abcdef1234567890abcdef12345678";
 const target = "https://booking.zone4you.cz/";
@@ -123,9 +124,22 @@ function response(body: unknown, requestId: string, status = 200, html = false) 
   });
 }
 
+const memberzoneHtml = `<!doctype html><html><body>
+  <script src="/ZONE4YOU/scheduler.js">ASPxClientScheduler</script>
+  <a href="Account/SignIn.aspx">Přihlášení</a>
+  <script>const data = {'apts':[{'name':'Private instructor'}]};</script>
+  <span>REFORMER</span>
+</body></html>`;
+
 function liveFetch(lessons = [lesson("lesson-1")]): typeof fetch {
   return async (input, init) => {
     const url = new URL(typeof input === "string" ? input : input instanceof URL ? input : input.url);
+    if (url.href === memberzoneFallbackUrl.href) {
+      return new Response(memberzoneHtml, {
+        status: 200,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
     if (url.pathname === "/") return response("<!doctype html>", "unused", 200, true);
     if (url.pathname === "/api/health") return response({ status: "ok" }, "health-1");
     if (url.pathname === "/api/readiness") {
@@ -305,6 +319,10 @@ test("production cutover verifier proves DNS, security, runtime provenance and m
   assert.equal(evidence.readiness.schedule, "ready");
   assert.equal(evidence.readiness.bookingNotifications, "ready");
   assert.equal(evidence.readiness.resourceMapSha256, approvedResourceMapSha256);
+  assert.equal(evidence.memberzoneFallback.httpStatus, 200);
+  assert.equal(evidence.memberzoneFallback.schedulerDetected, true);
+  assert.equal(evidence.memberzoneFallback.reformerDetected, true);
+  assert.equal(JSON.stringify(evidence).includes("Private instructor"), false);
   assert.deepEqual(evidence.dns.recordTypes, ["A"]);
   assert.equal(evidence.requestIds.lessonsCs, "lessons-cs");
   assert.equal(evidence.requestIds.lessonsEn, "lessons-en");
@@ -323,13 +341,13 @@ test("production cutover writes one immutable owner-only release receipt outside
     now: checkedAt,
   });
 
-  assert.equal(receipt.schemaVersion, 1);
+  assert.equal(receipt.schemaVersion, 2);
   assert.equal(receipt.ok, true);
   assert.equal(receipt.evidenceStoredOwnerOnly, true);
   assert.match(receipt.evidenceSha256, /^[a-f0-9]{64}$/);
   assert.equal(statSync(outputPath).mode & 0o777, 0o600);
   const stored = JSON.parse(readFileSync(outputPath, "utf8")) as Record<string, unknown>;
-  assert.equal(stored.schemaVersion, 1);
+  assert.equal(stored.schemaVersion, 2);
   assert.equal(stored.preCutoverEvidenceSha256, approvedPreCutover.sha256);
   assert.equal(stored.expectedCommit, commit);
   assert.equal("evidenceSha256" in stored, false);
@@ -550,5 +568,27 @@ test("production cutover verifier fails closed on DNS, runtime or schedule diver
       now: () => checkedAt,
     }),
     /outside the seven-day Prague range/i,
+  );
+});
+
+test("production cutover fails closed when the exact Memberzone rollback scheduler is unavailable", async () => {
+  const normalFetch = liveFetch();
+  const missingFallbackFetch: typeof fetch = async (input, init) => {
+    const url = new URL(typeof input === "string" ? input : input instanceof URL ? input : input.url);
+    if (url.href === memberzoneFallbackUrl.href) {
+      return new Response("Unavailable", {
+        status: 503,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+    return normalFetch(input, init);
+  };
+  await assert.rejects(
+    runProductionCutoverVerification(loadProductionCutoverConfig(baseEnvironment, checkedAt), {
+      fetchImpl: missingFallbackFetch,
+      resolveAnyImpl: async () => [{ type: "A", address: "203.0.113.10", ttl: 60 }],
+      now: () => checkedAt,
+    }),
+    /Memberzone fallback returned unexpected HTTP status 503/i,
   );
 });

@@ -14,6 +14,12 @@ interface MemberzoneFallbackOptions {
   repositoryRoot?: string;
 }
 
+export interface MemberzoneFallbackProbeOptions {
+  fetchImpl?: FetchLike;
+  now?: Date;
+  requestTimeoutMs?: number;
+}
+
 const repositoryRootDefault = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const maximumBodyBytes = 512 * 1024;
 export const memberzoneFallbackUrl = new URL("https://memberzone.cz/zone4you/scheduler.aspx");
@@ -26,6 +32,10 @@ function required(environment: Environment, name: string) {
 
 function timeoutMs(environment: Environment) {
   const parsed = Number(environment.ZONE4YOU_MEMBERZONE_TIMEOUT_MS ?? 10_000);
+  return validTimeoutMs(parsed);
+}
+
+function validTimeoutMs(parsed: number) {
   if (!Number.isInteger(parsed) || parsed < 1_000 || parsed > 30_000) {
     throw new Error("ZONE4YOU_MEMBERZONE_TIMEOUT_MS must be an integer from 1000 to 30000.");
   }
@@ -83,22 +93,20 @@ async function readLimitedBody(response: Response) {
   }
 }
 
-export async function verifyMemberzoneFallback({
-  environment = process.env,
+export async function probeMemberzoneFallback({
   fetchImpl = fetch,
   now = new Date(),
-  repositoryRoot = repositoryRootDefault,
-}: MemberzoneFallbackOptions = {}) {
-  const outputPath = outputTarget(
-    required(environment, "ZONE4YOU_MEMBERZONE_EVIDENCE_OUTPUT_PATH"),
-    repositoryRoot,
-  );
+  requestTimeoutMs = 10_000,
+}: MemberzoneFallbackProbeOptions = {}) {
+  if (!Number.isFinite(now.getTime())) {
+    throw new Error("Memberzone fallback verification time is invalid.");
+  }
   const response = await fetchImpl(memberzoneFallbackUrl, {
     method: "GET",
     redirect: "manual",
     cache: "no-store",
     headers: { Accept: "text/html,application/xhtml+xml" },
-    signal: AbortSignal.timeout(timeoutMs(environment)),
+    signal: AbortSignal.timeout(validTimeoutMs(requestTimeoutMs)),
   });
   if (response.status !== 200) {
     throw new Error(`Memberzone fallback returned unexpected HTTP status ${response.status}.`);
@@ -117,7 +125,7 @@ export async function verifyMemberzoneFallback({
     throw new Error("Memberzone fallback does not expose the expected non-empty Zone4You schedule.");
   }
 
-  const evidence = {
+  return {
     schemaVersion: 1,
     ok: true,
     checkedAt: now.toISOString(),
@@ -133,6 +141,23 @@ export async function verifyMemberzoneFallback({
     nonEmptyScheduleDetected,
     reformerDetected,
   } as const;
+}
+
+export async function verifyMemberzoneFallback({
+  environment = process.env,
+  fetchImpl = fetch,
+  now = new Date(),
+  repositoryRoot = repositoryRootDefault,
+}: MemberzoneFallbackOptions = {}) {
+  const outputPath = outputTarget(
+    required(environment, "ZONE4YOU_MEMBERZONE_EVIDENCE_OUTPUT_PATH"),
+    repositoryRoot,
+  );
+  const evidence = await probeMemberzoneFallback({
+    fetchImpl,
+    now,
+    requestTimeoutMs: timeoutMs(environment),
+  });
   const serialized = `${JSON.stringify(evidence, null, 2)}\n`;
   writeFileSync(outputPath, serialized, { encoding: "utf8", flag: "wx", mode: 0o600 });
   const stored = readStableReleaseJson(outputPath, "Memberzone fallback evidence", {
