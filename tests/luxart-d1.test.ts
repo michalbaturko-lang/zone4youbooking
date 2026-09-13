@@ -30,6 +30,8 @@ function environment(outputPath: string) {
     LUXART_API_AUTH_MODE: "none",
     LUXART_API_AUTH_CONFIRMED: "true",
     LUXART_LOGIN_QUERY_LOGGING_CONFIRMED: "true",
+    LUXART_LOGIN_QUERY_LOGGING_CONFIRMED_BY: "Zone4You IT administrator",
+    LUXART_LOGIN_QUERY_LOGGING_CONFIRMED_AT: "2026-09-11T13:30:00.000Z",
     LUXART_TEST_LOGIN: "test-client",
     LUXART_TEST_PASSWORD: "not-printed",
     ZONE4YOU_LUXART_EVIDENCE_OUTPUT_PATH: outputPath,
@@ -95,11 +97,13 @@ test("D1 configuration is locked to the exact approved HTTPS REST origin and a p
   const directory = mkdtempSync(join(tmpdir(), "zone4you-d1-"));
   try {
     const outputPath = join(directory, "luxart.json");
-    assert.deepEqual(loadLuxartD1Configuration(environment(outputPath), "/repository"), {
+    assert.deepEqual(loadLuxartD1Configuration(environment(outputPath), "/repository", now), {
       apiOrigin: approvedOrigin,
       apiContract: "memberzone_rest_v1",
       port: "9443",
       targetFingerprintSha256: approvedOriginFingerprint,
+      loginQueryLoggingConfirmedBy: "Zone4You IT administrator",
+      loginQueryLoggingConfirmedAt: "2026-09-11T13:30:00.000Z",
       outputPath,
     });
 
@@ -112,11 +116,14 @@ test("D1 configuration is locked to the exact approved HTTPS REST origin and a p
       { LUXART_ALLOW_INSECURE_TEST_HTTP: "true" },
       { LUXART_REQUIRE_AUTHENTICATED_PROBE: "false" },
       { LUXART_LOGIN_QUERY_LOGGING_CONFIRMED: "false" },
+      { LUXART_LOGIN_QUERY_LOGGING_CONFIRMED_BY: "TBD" },
+      { LUXART_LOGIN_QUERY_LOGGING_CONFIRMED_AT: "2026-10-11T13:30:00.000Z" },
+      { LUXART_LOGIN_QUERY_LOGGING_CONFIRMED_AT: "2026-07-11T13:30:00.000Z" },
     ];
     for (const drift of unsafe) {
       assert.throws(
-        () => loadLuxartD1Configuration({ ...environment(outputPath), ...drift }, "/repository"),
-        /HTTPS|REST|same approved origin|SHA-256|does not match|must exactly equal|refuses|authenticated|access logs/i,
+        () => loadLuxartD1Configuration({ ...environment(outputPath), ...drift }, "/repository", now),
+        /HTTPS|REST|same approved origin|SHA-256|does not match|must exactly equal|refuses|authenticated|access logs|actual approver|future|days old/i,
       );
     }
 
@@ -126,11 +133,13 @@ test("D1 configuration is locked to the exact approved HTTPS REST origin and a p
       LUXART_API_BASE_URL: alternateRestOrigin,
       LUXART_HELP_URL: `${alternateRestOrigin}/Help`,
       LUXART_APPROVED_ORIGIN_SHA256: createHash("sha256").update(alternateRestOrigin).digest("hex"),
-    }, "/repository"), {
+    }, "/repository", now), {
       apiOrigin: alternateRestOrigin,
       apiContract: "memberzone_rest_v1",
       port: "9759",
       targetFingerprintSha256: createHash("sha256").update(alternateRestOrigin).digest("hex"),
+      loginQueryLoggingConfirmedBy: "Zone4You IT administrator",
+      loginQueryLoggingConfirmedAt: "2026-09-11T13:30:00.000Z",
       outputPath,
     });
   } finally {
@@ -206,7 +215,7 @@ test("D1 binds transport, gateway, semantic contract and authenticated read-only
     delete parsed.d1;
     assert.deepEqual(parsed, readonlyEvidence());
     assert.deepEqual(d1, {
-      schemaVersion: 4,
+      schemaVersion: 5,
       checkedAt: now.toISOString(),
       targetFingerprintSha256: approvedOriginFingerprint,
       helpClassification: "ready",
@@ -224,6 +233,8 @@ test("D1 binds transport, gateway, semantic contract and authenticated read-only
       authenticatedReadOnlyVerified: true,
       personalizedLessonSetVerified: true,
       loginQueryLoggingConfirmed: true,
+      loginQueryLoggingConfirmedBy: "Zone4You IT administrator",
+      loginQueryLoggingConfirmedAt: "2026-09-11T13:30:00.000Z",
     });
   } finally {
     rmSync(directory, { recursive: true, force: true });

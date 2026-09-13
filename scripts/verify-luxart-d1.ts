@@ -38,11 +38,58 @@ interface LuxartD1Options extends LuxartD1Dependencies {
 }
 
 const repositoryRootDefault = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const queryLoggingConfirmationMaximumAgeDays = 30;
+const placeholderConfirmationIdentities = new Set([
+  "-",
+  "n a",
+  "na",
+  "none",
+  "pending",
+  "pending approval",
+  "pending human approval",
+  "tbd",
+  "todo",
+  "unassigned",
+  "unknown",
+]);
 
 function required(environment: Environment, name: string) {
   const value = environment[name]?.trim();
   if (!value) throw new Error(`${name} is required for the Luxart D1 verification.`);
   return value;
+}
+
+function confirmationIdentity(environment: Environment) {
+  const identity = required(environment, "LUXART_LOGIN_QUERY_LOGGING_CONFIRMED_BY");
+  if (identity.length > 120 || /\p{Cc}/u.test(identity)) {
+    throw new Error("LUXART_LOGIN_QUERY_LOGGING_CONFIRMED_BY must be a bounded safe identity or operational role.");
+  }
+  const normalized = identity
+    .normalize("NFKC")
+    .toLocaleLowerCase("en-US")
+    .replace(/[_./-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (placeholderConfirmationIdentities.has(normalized) || normalized.startsWith("replace with ")) {
+    throw new Error("LUXART_LOGIN_QUERY_LOGGING_CONFIRMED_BY must identify the actual approver or operational role.");
+  }
+  return identity;
+}
+
+function queryLoggingConfirmedAt(environment: Environment, now: Date) {
+  const raw = required(environment, "LUXART_LOGIN_QUERY_LOGGING_CONFIRMED_AT");
+  const confirmedAt = new Date(raw);
+  const time = confirmedAt.getTime();
+  if (!Number.isFinite(time)) {
+    throw new Error("LUXART_LOGIN_QUERY_LOGGING_CONFIRMED_AT must be a valid timestamp.");
+  }
+  if (time - now.getTime() > 5 * 60_000) {
+    throw new Error("Luxart login query logging confirmation cannot be dated in the future.");
+  }
+  if (now.getTime() - time > queryLoggingConfirmationMaximumAgeDays * 24 * 60 * 60_000) {
+    throw new Error(`Luxart login query logging confirmation must be at most ${queryLoggingConfirmationMaximumAgeDays} days old.`);
+  }
+  return confirmedAt.toISOString();
 }
 
 function effectivePort(url: URL) {
@@ -103,6 +150,7 @@ function outputTarget(raw: string, repositoryRoot: string) {
 export function loadLuxartD1Configuration(
   environment: Environment = process.env,
   repositoryRoot = repositoryRootDefault,
+  now = new Date(),
 ) {
   if (environment.LUXART_MOCK !== "false") {
     throw new Error("Luxart D1 verification requires LUXART_MOCK=false.");
@@ -119,6 +167,8 @@ export function loadLuxartD1Configuration(
       "Luxart D1 verification requires IT/Luxart confirmation that /api/Login query strings are omitted or redacted from access logs.",
     );
   }
+  const loginQueryLoggingConfirmedBy = confirmationIdentity(environment);
+  const loginQueryLoggingConfirmedAt = queryLoggingConfirmedAt(environment, now);
   if (environment.LUXART_RESORT_ID !== "1") {
     throw new Error("Luxart D1 verification is locked to Zone4You resort 1.");
   }
@@ -135,6 +185,8 @@ export function loadLuxartD1Configuration(
     apiContract,
     port: effectivePort(apiUrl),
     targetFingerprintSha256,
+    loginQueryLoggingConfirmedBy,
+    loginQueryLoggingConfirmedAt,
     outputPath: outputTarget(
       required(environment, "ZONE4YOU_LUXART_EVIDENCE_OUTPUT_PATH"),
       repositoryRoot,
@@ -173,7 +225,7 @@ export async function runLuxartD1Verification({
   contractVerifier = verifyD1ContractDocumentation,
   readonlyVerifier = runLuxartReadonlyVerification,
 }: LuxartD1Options = {}) {
-  const configuration = loadLuxartD1Configuration(environment, repositoryRoot);
+  const configuration = loadLuxartD1Configuration(environment, repositoryRoot, now);
   const gateway = gatewayVerifier(environment);
   const help = await helpProbe({
     environment: { ...environment, LUXART_EXPECTED_PORT: configuration.port },
@@ -242,7 +294,7 @@ export async function runLuxartD1Verification({
   const d1Evidence = {
     ...evidence,
     d1: {
-      schemaVersion: 4,
+      schemaVersion: 5,
       checkedAt: help.checkedAt,
       targetFingerprintSha256: configuration.targetFingerprintSha256,
       helpClassification: help.classification,
@@ -260,6 +312,8 @@ export async function runLuxartD1Verification({
       authenticatedReadOnlyVerified: true,
       personalizedLessonSetVerified: true,
       loginQueryLoggingConfirmed: true,
+      loginQueryLoggingConfirmedBy: configuration.loginQueryLoggingConfirmedBy,
+      loginQueryLoggingConfirmedAt: configuration.loginQueryLoggingConfirmedAt,
     },
   };
   const body = `${JSON.stringify(d1Evidence, null, 2)}\n`;

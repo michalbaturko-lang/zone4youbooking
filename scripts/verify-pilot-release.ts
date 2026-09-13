@@ -278,8 +278,8 @@ export function validateLuxartEvidence(
   const expectedPort = expectedOrigin.port || (expectedOrigin.protocol === "https:" ? "443" : "80");
   const expectedFingerprint = createHash("sha256").update(expectedOrigin.origin).digest("hex");
   const d1 = objectValue(evidence.d1, "artifacts.luxartReadOnly.d1");
-  if (d1.schemaVersion !== 4) {
-    throw new Error("artifacts.luxartReadOnly.d1.schemaVersion must be 4.");
+  if (d1.schemaVersion !== 5) {
+    throw new Error("artifacts.luxartReadOnly.d1.schemaVersion must be 5.");
   }
   exactString(d1.apiContract, supportedLuxartApiContract, "Luxart D1 apiContract");
   exactString(evidence.apiContract, supportedLuxartApiContract, "Luxart evidence apiContract");
@@ -314,6 +314,16 @@ export function validateLuxartEvidence(
   trueValue(d1.authenticatedReadOnlyVerified, "Luxart D1 authenticatedReadOnlyVerified");
   trueValue(d1.personalizedLessonSetVerified, "Luxart D1 personalizedLessonSetVerified");
   trueValue(d1.loginQueryLoggingConfirmed, "Luxart D1 loginQueryLoggingConfirmed");
+  approvalIdentity(d1.loginQueryLoggingConfirmedBy, "Luxart D1 loginQueryLoggingConfirmedBy");
+  const loginQueryLoggingConfirmedAt = approvedAt(
+    d1.loginQueryLoggingConfirmedAt,
+    "Luxart D1 loginQueryLogging",
+    new Date(stringValue(d1.checkedAt, "Luxart D1 checkedAt")),
+    30 * 24,
+  );
+  if (Date.parse(loginQueryLoggingConfirmedAt) > Date.parse(stringValue(d1.checkedAt, "Luxart D1 checkedAt"))) {
+    throw new Error("Luxart D1 login query logging confirmation must not postdate the D1 verification.");
+  }
   const helpClassification = stringValue(d1.helpClassification, "Luxart D1 helpClassification");
   const helpStatus = integerValue(d1.helpHttpStatus, "Luxart D1 helpHttpStatus", 1);
   if (helpClassification === "ready") {

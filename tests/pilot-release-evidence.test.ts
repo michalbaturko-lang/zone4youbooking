@@ -105,7 +105,7 @@ function validFixture() {
       apiContract: "memberzone_rest_v1",
       gatewayAuthMode: "none",
       d1: {
-        schemaVersion: 4,
+        schemaVersion: 5,
         checkedAt,
         targetFingerprintSha256: luxartTargetFingerprint,
         helpClassification: "ready",
@@ -123,6 +123,8 @@ function validFixture() {
         authenticatedReadOnlyVerified: true,
         personalizedLessonSetVerified: true,
         loginQueryLoggingConfirmed: true,
+        loginQueryLoggingConfirmedBy: "Zone4You IT administrator",
+        loginQueryLoggingConfirmedAt: "2026-09-05T07:20:00.000Z",
       },
       range: {
         from: "2026-09-05T00:00:00.000Z",
@@ -523,6 +525,27 @@ test("pilot release dossier rejects evidence that cannot come from the real guar
         delete (artifact.d1 as Record<string, unknown>).loginQueryLoggingConfirmed;
       },
       /D1 loginQueryLoggingConfirmed must be true/i,
+    ],
+    [
+      "luxartReadOnly",
+      (artifact: Record<string, unknown>) => {
+        (artifact.d1 as Record<string, unknown>).loginQueryLoggingConfirmedBy = "TBD";
+      },
+      /must identify the actual approving person or operational role/i,
+    ],
+    [
+      "luxartReadOnly",
+      (artifact: Record<string, unknown>) => {
+        (artifact.d1 as Record<string, unknown>).loginQueryLoggingConfirmedAt = "2026-09-05T07:31:00.000Z";
+      },
+      /must not postdate the D1 verification/i,
+    ],
+    [
+      "luxartReadOnly",
+      (artifact: Record<string, unknown>) => {
+        (artifact.d1 as Record<string, unknown>).loginQueryLoggingConfirmedAt = "2026-07-01T07:20:00.000Z";
+      },
+      /approval is older than 720 hours/i,
     ],
     [
       "luxartReadOnly",

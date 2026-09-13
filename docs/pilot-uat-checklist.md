@@ -30,7 +30,7 @@ Každý bod označte `PASS`, `FAIL` nebo `N/A — funkce bezpečně vypnutá`. K
 - [ ] Luxart potvrdí, zda je pro Zone4You vyžadované také číslo členské karty a jaký má vztah k heslu.
 - [ ] Neplatné údaje neprozradí interní detail a nevytvoří session.
 - [ ] Po neplatném loginu zůstane dialog otevřený, heslo se nikam neuloží a bezpečný kód požadavku lze předat podpoře.
-- [ ] IT/Luxart písemně potvrdili, že reverse proxy, webserver i monitoring neukládají celý query string `/api/Login` nebo redigují `login`, `password` a `member_card_number`; D1 obsahuje `loginQueryLoggingConfirmed=true`.
+- [ ] IT/Luxart písemně potvrdili, že reverse proxy, webserver i monitoring neukládají celý query string `/api/Login` nebo redigují `login`, `password` a `member_card_number`; D1 obsahuje `loginQueryLoggingConfirmed=true`, skutečného schvalujícího člověka/roli a čas potvrzení nejvýše 30 dní před testem.
 - [ ] Logout zneplatní session i při nedostupném Luxartu nebo sdíleném limiteru; refresh platnou session zachová. Cizí Origin nesmí session smazat.
 - [ ] Vypršená session odstraní z UI starého klienta, rezervace i kreditní historii a otevře prázdný přihlašovací formulář.
 - [ ] Kredit v UI odpovídá Luxart autoritě.

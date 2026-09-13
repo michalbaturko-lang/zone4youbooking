@@ -46,7 +46,7 @@ Mapy `LUXART_ROOM_MAP_JSON`, `LUXART_ROOM_MAP_EN_JSON`, `LUXART_LESSON_TYPE_MAP_
 
 ## Co do runtime prostředí nepatří
 
-Do hostingu se nevkládají testovací klientská hesla, `LUXART_HELP_URL`, `LUXART_APPROVED_ORIGIN_SHA256`, žádné cesty k Luxart/runtime/UAT/rollback/rollback-timer/alert/release důkazům, startovní ani ověřovací rollback fráze, UAT a cutover potvrzovací fráze, DNS baseline, release ID ani release okno, lokální integrační databáze, `PROBE_*`, externí Playwright Preview ani Vercel protection-bypass hodnoty. Ty patří jen do jednorázového operátorského procesu. Preflight jejich neprázdnou přítomnost v runtime prostředí odmítne.
+Do hostingu se nevkládají testovací klientská hesla, `LUXART_HELP_URL`, `LUXART_APPROVED_ORIGIN_SHA256`, jednorázové `LUXART_LOGIN_QUERY_LOGGING_CONFIRMED_BY` ani `LUXART_LOGIN_QUERY_LOGGING_CONFIRMED_AT`, žádné cesty k Luxart/runtime/UAT/rollback/rollback-timer/alert/release důkazům, startovní ani ověřovací rollback fráze, UAT a cutover potvrzovací fráze, DNS baseline, release ID ani release okno, lokální integrační databáze, `PROBE_*`, externí Playwright Preview ani Vercel protection-bypass hodnoty. Ty patří jen do jednorázového operátorského procesu. Preflight jejich neprázdnou přítomnost v runtime prostředí odmítne.
 
 ## Hodnocení výsledku
 

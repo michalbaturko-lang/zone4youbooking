@@ -63,12 +63,16 @@ function verifiedD1RoomNumbers(data: unknown) {
 
   const d1 = record(evidence.d1, "Luxart D1 attestation");
   if (
-    d1.schemaVersion !== 4 ||
+    d1.schemaVersion !== 5 ||
     d1.contractBaselineVerified !== true ||
     d1.approvedOriginFingerprintVerified !== true ||
     d1.authenticatedReadOnlyVerified !== true ||
     d1.personalizedLessonSetVerified !== true ||
-    d1.loginQueryLoggingConfirmed !== true
+    d1.loginQueryLoggingConfirmed !== true ||
+    typeof d1.loginQueryLoggingConfirmedBy !== "string" ||
+    !d1.loginQueryLoggingConfirmedBy.trim() ||
+    typeof d1.loginQueryLoggingConfirmedAt !== "string" ||
+    !d1.loginQueryLoggingConfirmedAt.trim()
   ) {
     throw new Error("Luxart D1 attestation does not prove the release-grade read-only contract.");
   }
