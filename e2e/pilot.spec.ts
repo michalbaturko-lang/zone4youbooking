@@ -103,6 +103,70 @@ test("zobrazí všech 24 lekcí, všechny sály a Reformer bez browser chyby", {
   expect(browserErrors).toEqual([]);
 });
 
+test("mobile zachová libovolně velký Luxart feed a dynamicky přidá každý nový sál", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-standard-390x844", "Dynamickou úplnost feedu stačí ověřit v referenčním mobile-first viewportu.");
+  const browserErrors = captureUnexpectedBrowserErrors(page);
+  const addedRooms = ["Sál 17", "Pohybový ateliér Sever", "Reformer"];
+  const expectedRoomCounts = new Map<string, number>();
+  let expectedLessonCount = 0;
+
+  await page.route("**/api/booking/snapshot**", async (route) => {
+    const response = await route.fetch();
+    const body = await response.json() as { lessons?: Array<Record<string, unknown>> };
+    const originalLessons = body.lessons ?? [];
+    const additions = Array.from({ length: 13 }, (_, index) => {
+      const source = originalLessons[index % originalLessons.length];
+      const roomName = addedRooms[index % addedRooms.length];
+      const offsetMs = (index + 1) * 60_000;
+      expectedRoomCounts.set(roomName, (expectedRoomCounts.get(roomName) ?? 0) + 1);
+      return {
+        ...source,
+        id: `${String(source.id)}-dynamic-${index + 1}`,
+        luxartLessonId: `${String(source.luxartLessonId)}-dynamic-${index + 1}`,
+        startsAt: new Date(Date.parse(String(source.startsAt)) + offsetMs).toISOString(),
+        endsAt: new Date(Date.parse(String(source.endsAt)) + offsetMs).toISOString(),
+        roomName,
+        luxartRoomNumber: 17 + index,
+      };
+    });
+    expectedLessonCount = originalLessons.length + additions.length;
+    body.lessons = [...originalLessons, ...additions];
+    await route.fulfill({ response, json: body });
+  });
+
+  await openCleanDemo(page);
+  await page.getByRole("button", { name: "Týden", exact: true }).click();
+  await expect(visibleWeekLessons(page, testInfo.project.name)).toHaveCount(expectedLessonCount);
+
+  const roomFilter = page.getByLabel("Filtr místnosti");
+  for (const roomName of addedRooms) {
+    const button = roomFilter.getByRole("button", { name: roomName, exact: true });
+    await expect(button).toBeVisible();
+    await button.click();
+    const originalRoomCount = roomName === "Reformer" ? 3 : 0;
+    await expect(visibleWeekLessons(page, testInfo.project.name)).toHaveCount(
+      originalRoomCount + (expectedRoomCounts.get(roomName) ?? 0),
+    );
+  }
+
+  await roomFilter.getByRole("button", { name: "Všechny", exact: true }).click();
+  await expect(visibleWeekLessons(page, testInfo.project.name)).toHaveCount(expectedLessonCount);
+
+  const mobileLayout = await page.evaluate(() => ({
+    viewportWidth: window.innerWidth,
+    documentWidth: document.documentElement.scrollWidth,
+    undersizedRoomFilters: [...document.querySelectorAll<HTMLElement>(".legend button")]
+      .map((button) => {
+        const bounds = button.getBoundingClientRect();
+        return { label: button.innerText.trim(), width: bounds.width, height: bounds.height };
+      })
+      .filter(({ width, height }) => width < 44 || height < 44),
+  }));
+  expect(mobileLayout.documentWidth).toBeLessThanOrEqual(mobileLayout.viewportWidth);
+  expect(mobileLayout.undersizedRoomFilters).toEqual([]);
+  expect(browserErrors).toEqual([]);
+});
+
 test("mobile-first matice drží 44px ovládání, obsah nad navigací a bezpečný dialog", { tag: "@preview" }, async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.startsWith("desktop"), "Mobilní ergonomie se ověřuje na dotykových projektech.");
   await openCleanDemo(page);
