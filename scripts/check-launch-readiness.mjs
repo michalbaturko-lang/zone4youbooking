@@ -23,6 +23,7 @@ const bookingWriteGatePath = join(repositoryRoot, "src/lib/bookingWriteGate.ts")
 const liveAccessGatePath = join(repositoryRoot, "src/lib/liveAccessGate.ts");
 const adapterProviderPath = join(repositoryRoot, "src/lib/adapterProvider.ts");
 const loginRoutePath = join(repositoryRoot, "src/app/api/auth/login/route.ts");
+const loginServicePath = join(repositoryRoot, "src/lib/loginService.ts");
 const requestSecurityPath = join(repositoryRoot, "src/lib/requestSecurity.ts");
 const bookingServicePath = join(repositoryRoot, "src/lib/bookingService.ts");
 const pilotCapabilitiesPath = join(repositoryRoot, "src/lib/pilotCapabilities.ts");
@@ -47,6 +48,7 @@ const bookingWriteGate = existsSync(bookingWriteGatePath) ? readFileSync(booking
 const liveAccessGate = existsSync(liveAccessGatePath) ? readFileSync(liveAccessGatePath, "utf8") : "";
 const adapterProvider = existsSync(adapterProviderPath) ? readFileSync(adapterProviderPath, "utf8") : "";
 const loginRoute = existsSync(loginRoutePath) ? readFileSync(loginRoutePath, "utf8") : "";
+const loginService = existsSync(loginServicePath) ? readFileSync(loginServicePath, "utf8") : "";
 const requestSecurity = existsSync(requestSecurityPath) ? readFileSync(requestSecurityPath, "utf8") : "";
 const bookingService = existsSync(bookingServicePath) ? readFileSync(bookingServicePath, "utf8") : "";
 const pilotCapabilities = existsSync(pilotCapabilitiesPath) ? readFileSync(pilotCapabilitiesPath, "utf8") : "";
@@ -181,6 +183,31 @@ function validTlsPostgresUrl(value) {
   } catch {
     return false;
   }
+}
+
+function containsInOrder(source, tokens) {
+  let cursor = 0;
+  for (const token of tokens) {
+    const index = source.indexOf(token, cursor);
+    if (index < 0) return false;
+    cursor = index + token.length;
+  }
+  return true;
+}
+
+function liveLoginPipelineReady() {
+  return containsInOrder(loginRoute, [
+    "assertTrustedMutation(request)",
+    "runLoginAttempt(request, live)",
+    "if (live) setBookingSession",
+  ]) && containsInOrder(loginService, [
+    "dependencies.assertLiveReady()",
+    "dependencies.limit(request, rateLimitRules.loginAddress)",
+    "dependencies.readInput(request)",
+    "dependencies.parseInput",
+    "live ? rateLimitRules.loginAccount : rateLimitRules.loginDemo",
+    "dependencies.login(input)",
+  ]);
 }
 
 const requiredOperationsChain = [
@@ -503,7 +530,7 @@ check(
     liveAccessGate.includes("approvedRuntimeRegion") &&
     liveAccessGate.includes("PERSONALIZED_HTTPS_REQUIRED") &&
     adapterProvider.includes("assertLivePersonalizedAccessReady") &&
-    loginRoute.includes("assertLivePersonalizedAccessReady") &&
+    liveLoginPipelineReady() &&
     requestSecurity.includes("assertBookingWriteDeploymentReady") &&
     pilotCapabilities.includes("bookingWriteDeploymentReady") &&
     bookingService.includes("assertLiveBookingCreationReady") &&
