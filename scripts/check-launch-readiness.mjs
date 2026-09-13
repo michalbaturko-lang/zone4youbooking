@@ -211,6 +211,7 @@ function liveLoginPipelineReady() {
 }
 
 const requiredOperationsChain = [
+  ["verify:luxart-anonymous-candidate", "tsx scripts/verify-luxart-anonymous-candidate.ts", "scripts/verify-luxart-anonymous-candidate.ts"],
   ["probe:runtime", "node scripts/probe-runtime.mjs", "scripts/probe-runtime.mjs"],
   ["verify:luxart-d1", "tsx scripts/verify-luxart-d1.ts", "scripts/verify-luxart-d1.ts"],
   ["verify:booking-mutations", "tsx scripts/verify-booking-mutations.ts", "scripts/verify-booking-mutations.ts"],
