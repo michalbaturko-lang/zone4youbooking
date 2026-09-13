@@ -18,10 +18,23 @@ function captureUnexpectedBrowserErrors(page: Page) {
 
 let isolatedTestClient = 0;
 
-async function openCleanDemo(page: Page) {
+function nextIsolatedTestAddress() {
   isolatedTestClient += 1;
+  const addressCount = 2 * 256 * 254;
+  const offset = (process.pid * 997 + isolatedTestClient) % addressCount;
+  const secondOctet = 18 + Math.floor(offset / (256 * 254));
+  const remainder = offset % (256 * 254);
+  const thirdOctet = Math.floor(remainder / 254);
+  const fourthOctet = (remainder % 254) + 1;
+  return `198.${secondOctet}.${thirdOctet}.${fourthOctet}`;
+}
+
+async function openCleanDemo(page: Page) {
   await page.setExtraHTTPHeaders({
-    "x-forwarded-for": `198.51.100.${isolatedTestClient}`,
+    // 198.18.0.0/15 is reserved for benchmark/testing traffic. Including the
+    // worker process keeps login buckets isolated even after a Playwright retry
+    // restarts the worker while the application server stays alive.
+    "x-forwarded-for": nextIsolatedTestAddress(),
     ...externalDemoRequestHeaders(),
   });
   await page.addInitScript(() => {
@@ -410,8 +423,11 @@ test("ztracená odpověď rezervace zamkne další booking proti slepému opakov
     reservationWrites += 1;
     await route.abort("timedout");
   });
-  await page.locator(".lesson-row").first().click();
-  const lessonDialog = page.getByRole("dialog");
+  // Always use tomorrow's bookable lesson. The first item on today's demo
+  // schedule crosses its real Prague closing time during an afternoon CI run.
+  await page.getByLabel("Výběr dne").getByRole("button").nth(1).click();
+  await page.locator(".lesson-row").filter({ hasText: "PUMPING" }).first().click();
+  const lessonDialog = page.getByRole("dialog", { name: "PUMPING" });
   const reserveButton = lessonDialog.getByRole("button", { name: "Rezervovat" });
   await reserveButton.click();
   await expect.poll(() => reservationWrites).toBe(1);
@@ -660,10 +676,12 @@ test("angličtina a oblíbené lekce přežijí reload", { tag: "@preview" }, as
   });
   await page.reload();
   await expect(page.getByRole("button", { name: "Přihlásit se" }).first()).toBeVisible();
-  const recoveredFavorites = await page.evaluate(() => JSON.parse(
-    window.localStorage.getItem("zone4youbooking.favoriteServices:anonymous") ?? "[]",
-  ) as unknown[]);
-  expect(recoveredFavorites.length).toBeLessThanOrEqual(512);
+  await expect.poll(() => page.evaluate(() => {
+    const recovered = JSON.parse(
+      window.localStorage.getItem("zone4youbooking.favoriteServices:anonymous") ?? "[]",
+    ) as unknown[];
+    return recovered.length;
+  })).toBeLessThanOrEqual(512);
 
   await page.addInitScript(() => {
     const originalGetItem = Storage.prototype.getItem;
