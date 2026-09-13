@@ -157,8 +157,11 @@ test("D1 binds transport, gateway, semantic contract and authenticated read-only
       environment: env,
       now,
       repositoryRoot: "/repository",
-      gatewayVerifier: () => {
+      gatewayVerifier: (gatewayEnvironment) => {
         calls.push("gateway");
+        assert.equal(gatewayEnvironment.LUXART_API_AUTH_MODE, "none");
+        assert.equal(gatewayEnvironment.LUXART_TEST_LOGIN, undefined);
+        assert.equal(gatewayEnvironment.LUXART_TEST_PASSWORD, undefined);
         return {
           ok: true,
           checkedAt: now.toISOString(),
@@ -170,6 +173,10 @@ test("D1 binds transport, gateway, semantic contract and authenticated read-only
       helpProbe: async ({ environment: probeEnvironment }) => {
         calls.push("help");
         assert.equal(probeEnvironment.LUXART_EXPECTED_PORT, "9443");
+        assert.equal(probeEnvironment.LUXART_HELP_URL, `${approvedOrigin}/Help`);
+        assert.equal(probeEnvironment.LUXART_TEST_LOGIN, undefined);
+        assert.equal(probeEnvironment.LUXART_TEST_PASSWORD, undefined);
+        assert.equal(probeEnvironment.LUXART_API_BASIC_PASSWORD, undefined);
         return {
           ok: true,
           checkedAt: now.toISOString(),
@@ -184,9 +191,12 @@ test("D1 binds transport, gateway, semantic contract and authenticated read-only
           directoryBrowsingDetected: false,
         };
       },
-      contractVerifier: async ({ origin }) => {
+      contractVerifier: async ({ environment: contractEnvironment, origin }) => {
         calls.push("contract");
         assert.equal(origin, approvedOrigin);
+        assert.equal(contractEnvironment.LUXART_API_AUTH_MODE, "none");
+        assert.equal(contractEnvironment.LUXART_TEST_LOGIN, undefined);
+        assert.equal(contractEnvironment.LUXART_TEST_PASSWORD, undefined);
         return contractEvidence();
       },
       readonlyVerifier: async () => {
@@ -195,7 +205,7 @@ test("D1 binds transport, gateway, semantic contract and authenticated read-only
       },
     });
 
-    assert.deepEqual(calls, ["gateway", "help", "contract", "readonly"]);
+    assert.deepEqual(calls, ["help", "gateway", "contract", "readonly"]);
     assert.equal(receipt.ok, true);
     assert.equal(receipt.apiContract, "memberzone_rest_v1");
     assert.equal(receipt.port, "9443");
@@ -329,6 +339,63 @@ test("D1 rejects internally inconsistent Help success before the authenticated r
   }
 });
 
+test("D1 rejects an exposed public root before loading gateway configuration or client credentials", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "zone4you-d1-"));
+  try {
+    const outputPath = join(directory, "luxart.json");
+    let gatewayCalls = 0;
+    let contractCalls = 0;
+    let readonlyCalls = 0;
+    await assert.rejects(
+      runLuxartD1Verification({
+        environment: environment(outputPath),
+        now,
+        repositoryRoot: "/repository",
+        gatewayVerifier: () => {
+          gatewayCalls += 1;
+          return {
+            ok: true,
+            checkedAt: now.toISOString(),
+            gatewayAuthMode: "none",
+            authorizationHeaderConfigured: false,
+            gatewayDecisionConfirmed: true,
+          };
+        },
+        helpProbe: async () => ({
+          ok: false,
+          checkedAt: now.toISOString(),
+          targetFingerprintSha256: approvedOriginFingerprint,
+          transport: "https",
+          port: "9443",
+          reached: true,
+          httpStatus: 200,
+          classification: "directory_listing_detected",
+          candidateContract: "unknown",
+          directoryBrowsingChecked: true,
+          directoryBrowsingDetected: true,
+          launchAuthority: false,
+          credentialsAuthorized: false,
+        }),
+        contractVerifier: async () => {
+          contractCalls += 1;
+          return contractEvidence();
+        },
+        readonlyVerifier: async () => {
+          readonlyCalls += 1;
+          return readonlyEvidence();
+        },
+      }),
+      /did not pass safely \(directory_listing_detected\)/i,
+    );
+    assert.equal(gatewayCalls, 0);
+    assert.equal(contractCalls, 0);
+    assert.equal(readonlyCalls, 0);
+    assert.equal(existsSync(outputPath), false);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("D1 rejects an unavailable Help path before the authenticated read-only request", async () => {
   const directory = mkdtempSync(join(tmpdir(), "zone4you-d1-"));
   try {
@@ -429,13 +496,20 @@ test("D1 accepts an authentication challenge only when a non-empty gateway mode 
       environment: env,
       now,
       repositoryRoot: "/repository",
-      gatewayVerifier: () => ({
-        ok: true,
-        checkedAt: now.toISOString(),
-        gatewayAuthMode: "basic",
-        authorizationHeaderConfigured: true,
-        gatewayDecisionConfirmed: true,
-      }),
+      gatewayVerifier: (gatewayEnvironment) => {
+        assert.equal(gatewayEnvironment.LUXART_API_AUTH_MODE, "basic");
+        assert.equal(gatewayEnvironment.LUXART_API_BASIC_USERNAME, "gateway-user");
+        assert.equal(gatewayEnvironment.LUXART_API_BASIC_PASSWORD, "gateway-password");
+        assert.equal(gatewayEnvironment.LUXART_TEST_LOGIN, undefined);
+        assert.equal(gatewayEnvironment.LUXART_TEST_PASSWORD, undefined);
+        return {
+          ok: true,
+          checkedAt: now.toISOString(),
+          gatewayAuthMode: "basic",
+          authorizationHeaderConfigured: true,
+          gatewayDecisionConfirmed: true,
+        };
+      },
       helpProbe: async () => ({
         ok: false,
         checkedAt: now.toISOString(),
@@ -448,7 +522,12 @@ test("D1 accepts an authentication challenge only when a non-empty gateway mode 
         directoryBrowsingChecked: true,
         directoryBrowsingDetected: false,
       }),
-      contractVerifier: async () => contractEvidence(),
+      contractVerifier: async ({ environment: contractEnvironment }) => {
+        assert.equal(contractEnvironment.LUXART_API_BASIC_PASSWORD, "gateway-password");
+        assert.equal(contractEnvironment.LUXART_TEST_LOGIN, undefined);
+        assert.equal(contractEnvironment.LUXART_TEST_PASSWORD, undefined);
+        return contractEvidence();
+      },
       readonlyVerifier: async () => readonlyEvidence("basic"),
     });
     assert.equal(receipt.helpClassification, "authentication_required");

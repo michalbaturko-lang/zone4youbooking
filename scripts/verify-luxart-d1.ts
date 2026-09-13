@@ -39,6 +39,15 @@ interface LuxartD1Options extends LuxartD1Dependencies {
 
 const repositoryRootDefault = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const queryLoggingConfirmationMaximumAgeDays = 30;
+const gatewayEnvironmentNames = [
+  "LUXART_API_AUTH_MODE",
+  "LUXART_API_AUTH_CONFIRMED",
+  "LUXART_API_BASIC_USERNAME",
+  "LUXART_API_BASIC_PASSWORD",
+  "LUXART_API_BEARER_TOKEN",
+  "LUXART_API_AUTH_HEADER_NAME",
+  "LUXART_API_AUTH_HEADER_VALUE",
+] as const;
 const placeholderConfirmationIdentities = new Set([
   "-",
   "n a",
@@ -57,6 +66,19 @@ function required(environment: Environment, name: string) {
   const value = environment[name]?.trim();
   if (!value) throw new Error(`${name} is required for the Luxart D1 verification.`);
   return value;
+}
+
+function gatewayEnvironment(environment: Environment) {
+  return Object.fromEntries(gatewayEnvironmentNames.map((name) => [name, environment[name]]));
+}
+
+function anonymousHelpEnvironment(environment: Environment, expectedPort: string) {
+  return {
+    LUXART_HELP_URL: environment.LUXART_HELP_URL,
+    LUXART_EXPECTED_PORT: expectedPort,
+    LUXART_HELP_PROBE_TIMEOUT_MS: environment.LUXART_HELP_PROBE_TIMEOUT_MS,
+    LUXART_ALLOW_INSECURE_TEST_HTTP: "false",
+  } satisfies Environment;
 }
 
 function confirmationIdentity(environment: Environment) {
@@ -208,7 +230,7 @@ async function verifyD1ContractDocumentation({
   origin: string;
   now: Date;
 }) {
-  const gateway = loadLuxartGatewayAuthConfig(environment);
+  const gateway = loadLuxartGatewayAuthConfig(gatewayEnvironment(environment));
   return verifyLuxartContractDocumentation({
     origin,
     now,
@@ -226,9 +248,8 @@ export async function runLuxartD1Verification({
   readonlyVerifier = runLuxartReadonlyVerification,
 }: LuxartD1Options = {}) {
   const configuration = loadLuxartD1Configuration(environment, repositoryRoot, now);
-  const gateway = gatewayVerifier(environment);
   const help = await helpProbe({
-    environment: { ...environment, LUXART_EXPECTED_PORT: configuration.port },
+    environment: anonymousHelpEnvironment(environment, configuration.port),
     now,
   });
   if (
@@ -252,15 +273,20 @@ export async function runLuxartD1Verification({
   ) {
     throw new Error("Luxart Help authentication challenge evidence is internally inconsistent.");
   }
-  if (!helpAccepted(help, gateway)) {
+  if (!["ready", "authentication_required"].includes(help.classification)) {
     throw new Error(`Luxart Help transport check did not pass safely (${help.classification}).`);
   }
   if (help.directoryBrowsingChecked !== true || help.directoryBrowsingDetected !== false) {
     throw new Error("Luxart Help evidence does not prove that public directory browsing is disabled.");
   }
+  const isolatedGatewayEnvironment = gatewayEnvironment(environment);
+  const gateway = gatewayVerifier(isolatedGatewayEnvironment);
+  if (!helpAccepted(help, gateway)) {
+    throw new Error(`Luxart Help transport check did not pass safely (${help.classification}).`);
+  }
 
   const contract = await contractVerifier({
-    environment,
+    environment: isolatedGatewayEnvironment,
     origin: configuration.apiOrigin,
     now,
   });
