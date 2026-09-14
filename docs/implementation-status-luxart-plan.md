@@ -1,6 +1,6 @@
 # Zone4You Booking - stav a Luxart integrační plán
 
-> Aktualizace 11. 9. 2026: e-mailová historie potvrzuje objednaný REST kontrakt, klientskou instanci na serveru Zone4You na interním portu `9759` a testovací databázi. Port `9295` hostuje referenční REST dokumentaci. IT potvrdilo zveřejnění portu `9191`, ale nedodalo veřejný hostname/IP ani potvrzení překladu `9191 → 9759`. SOAP/WCF `Service1.svc` na `api.memberzone.online:9191` je jiný kontrakt a není důkazem Zone4You instance. Pro integraci chybí přesný HTTPS origin a gateway auth režim.
+> Aktualizace 14. 9. 2026: Luxart potvrdil stejný REST kontrakt na interním portu `9759`, připojení k testovací databázi, HTTPS, IP allowlist a Basic Auth. Pro integraci stále chybí přesný veřejný HTTPS origin s certifikátem a reverse proxy od IT. Pětidenní ukládání klientského password hashe potvrzené Luxartem je bezpečnostní blocker: D1 login zůstává zavřený do redakce `login`, `password` a `member_card_number` ve všech vrstvách logování.
 
 Datum auditu: 2026-06-18
 

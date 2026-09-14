@@ -33,7 +33,7 @@ Přepnutí fáze je release změna. Samotné nastavení boolean přepínače nes
 | Aplikační origin | čistý HTTPS kořen v `APP_BASE_URL`; produkce je přesně `https://booking.zone4you.cz/` |
 | Staging origin | explicitní čistý HTTPS kořen v `ZONE4YOU_STAGING_APP_ORIGIN`, shodný s `APP_BASE_URL` a odlišný od produkce |
 | Veřejné prostředí | `NEXT_PUBLIC_APP_ENV` musí přesně odpovídat cíli; žádný jiný `NEXT_PUBLIC_*` secret |
-| Luxart | live režim, resort `1`, timeout 1–30 s, potvrzený gateway auth, `LUXART_LOGIN_QUERY_LOGGING_CONFIRMED=true` po písemném potvrzení redakce přístupových logů a HTTPS; testovací HTTP je možné pouze na stagingu s explicitní výjimkou, bez gateway credentials a pouze pro anonymní read-only rozvrh |
+| Luxart | live režim, resort `1`, timeout 1–30 s, potvrzený Basic Auth, `LUXART_LOGIN_QUERY_LOGGING_CONFIRMED=true` až po písemném potvrzení redakce `login`, znovupoužitelného password hashe a `member_card_number` ve všech logovacích vrstvách; pětidenní retence hashe podmínku nesplňuje. Testovací HTTP je možné pouze na stagingu s explicitní výjimkou, bez gateway credentials a pouze pro anonymní read-only rozvrh |
 | Luxart mapy | volitelné mapy názvů sálů a typů pro CS/EN musí používat kanonická nezáporná číselná ID a krátké neprázdné texty; booking fáze navíc vyžaduje úplnou mapu kladných `cislo_salu` → `id_resource` |
 | Session | samostatný serverový secret nejméně 32 znaků, nerecyklovaný jako gateway nebo Stripe secret |
 | Rate limit | PostgreSQL s TLS, nebo pouze u doložené single-instance topologie paměťový režim s výslovným potvrzením; na Vercelu se identita klienta bere pouze z validní platformní `x-vercel-forwarded-for` |

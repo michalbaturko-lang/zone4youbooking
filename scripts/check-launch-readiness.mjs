@@ -389,12 +389,12 @@ check(
 check(
   "Luxart gateway authentication",
   verifiedLuxartGatewayConfiguration(),
-  "IT must explicitly confirm none/basic/bearer/custom-header gateway auth; configure it only in the secret store and run npm run verify:luxart-gateway-config.",
+  "Luxart confirmed Basic Auth; configure dedicated credentials only in the secret store and run npm run verify:luxart-gateway-config after the approved HTTPS origin is available.",
 );
 check(
   "Luxart login query-string log redaction",
   process.env.LUXART_LOGIN_QUERY_LOGGING_CONFIRMED === "true",
-  "IT/Luxart must confirm that access logs omit or redact query strings for /api/Login before any real client credentials are sent.",
+  "IT/Luxart must confirm that every logging layer omits or redacts login, the reusable password hash and member_card_number for /api/Login; retaining the hash for any period is not acceptable before real client credentials are sent.",
 );
 check(
   "Luxart reservation resources",

@@ -186,7 +186,7 @@ export function loadLuxartD1Configuration(
   }
   if (environment.LUXART_LOGIN_QUERY_LOGGING_CONFIRMED !== "true") {
     throw new Error(
-      "Luxart D1 verification requires IT/Luxart confirmation that /api/Login query strings are omitted or redacted from access logs.",
+      "Luxart D1 verification requires IT/Luxart confirmation that access logs in every layer omit or redact login, the reusable password hash and member_card_number from /api/Login.",
     );
   }
   const loginQueryLoggingConfirmedBy = confirmationIdentity(environment);

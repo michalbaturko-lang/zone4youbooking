@@ -14,6 +14,8 @@
 6. HTTPS na `api.memberzone.online` na portech `443`, `9191` ani `9295` nebylo 11. 9. 2026 použitelné. Testovací klientské údaje se proto na tyto adresy neposílaly.
 7. Opakované anonymní ověření 13. 9. 2026 potvrzuje, že `api.memberzone.online:9295/Help` nadále obsahuje zdokumentované REST cesty `api/Lesson`, které bez autorizace odpovídají `401`. Na stejném hostiteli vrací port `9191` pro `/Help` i plně parametrizovaný `api/Lesson` stav `404`, zatímco `Service1.svc` odpovídá `200`. Port je tedy veřejně otevřený, ale je na něm publikovaná jiná IIS aplikace. Kořen navíc zobrazuje veřejný adresářový výpis, který musí IT vypnout.
 8. Přímé srovnání 13. 9. 2026 v 21:23 CEST bez credentials znovu ověřilo `9295/Help` jako REST dokumentaci HTTP 200 bez directory listingu a všech 11/11 očekávaných dokumentačních částí se shodným sémantickým SHA-256. Ve stejném okamžiku `9191/Help` zůstalo na HTTP 404 s klasifikací SOAP/WCF a veřejným directory listingem. Nejde tedy pouze o změnu čísla portu stejné aplikace.
+9. Luxart 14. 9. 2026 písemně potvrdil, že interní `9759` je stejné REST API připojené k testovací databázi, veřejný hostname a certifikát má dodat IT a přístup má používat HTTPS, IP allowlist a Basic Auth.
+10. Luxart současně potvrdil pětidenní ukládání hashe klientského hesla z login požadavku. Protože tento hash API přijímá jako přihlašovací údaj, požadavek na redakci zatím splněný není a reálný login zůstává fail-closed. Rozhodnutí a rozdělení odpovědností je v `docs/luxart-access-confirmation-2026-09-14.md`.
 
 ## Očekávaná topologie k potvrzení IT
 
@@ -30,13 +32,14 @@ booking backend
 
 ## Co nyní musí dodat IT Zone4You
 
-1. přesný veřejný hostname nebo IP a celé URL včetně schématu a portu;
-2. potvrzení, že tato veřejná cesta vede na interní REST API na portu `9759`;
-3. potvrzení dostupnosti `/Help` a `api/Lesson` na stejném originu;
-4. platné HTTPS nebo bezpečný tunel/reverse proxy;
-5. síťová omezení a gateway autentizaci;
-6. potvrzení, že cílem je testovací databáze Zone4You;
+1. přesný veřejný hostname a celé HTTPS URL včetně případného portu;
+2. platný TLS certifikát a reverse proxy/NAT na interní REST API `9759`;
+3. dostupnost `/Help` a `api/Lesson` na stejném originu;
+4. IP allowlist pro odsouhlasené statické odchozí adresy booking backendu;
+5. vypnutí directory browsingu na veřejném IIS webu;
+6. potvrzení, že proxy a webserver nelogují nebo redigují `login`, `password` a `member_card_number` z `/api/Login`;
 7. povolení nejprve read-only testu a později samostatně schváleného rezervačního UAT.
-8. vypnutí directory browsing na veřejném IIS webu.
+
+REST kontrakt, testovací databáze a Basic Auth jsou potvrzené. Luxart musí samostatně odstranit stejné citlivé parametry ze svých aplikačních a navazujících logů. Nabídnuté sdílené testovací gateway údaje se neukládají ani nepoužijí před ověřením HTTPS a allowlistu.
 
 SOAP audit zůstává pouze negativním srovnávacím důkazem. Nesmí otevřít D1, změnit `LUXART_API_CONTRACT` ani autorizovat release.
