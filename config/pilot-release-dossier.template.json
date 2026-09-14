@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 6,
+  "draft": true,
+  "releaseId": "zone4you-pilot-2026-09-05",
+  "target": "https://booking.zone4you.cz/",
+  "stagingTarget": "https://staging.booking.zone4you.cz/",
+  "luxartOrigin": "https://replace-with-approved-luxart-rest-origin.example/",
+  "luxartApiContract": "memberzone_rest_v1",
+  "commit": "0000000000000000000000000000000000000000",
+  "launchMode": "booking_without_payments",
+  "maximumEvidenceAgeHours": 72,
+  "launchWindow": {
+    "startsAt": "2026-09-05T00:00:00+02:00",
+    "endsAt": "2026-09-05T23:59:59+02:00"
+  },
+  "artifacts": {
+    "luxartReadOnly": {
+      "path": "/secure/release-evidence/luxart-d1.json",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "runtimeProbe": {
+      "path": "/secure/release-evidence/runtime-probe.json",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "bookingMutationUat": {
+      "path": "/secure/release-evidence/booking-mutation-uat.json",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "rollbackTimer": {
+      "path": "/secure/release-evidence/readonly-rollback-timer.json",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "rollback": {
+      "path": "/secure/release-evidence/readonly-rollback.json",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "dnsRollbackBaseline": {
+      "path": "/secure/release-evidence/production-dns-baseline.json",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "alertDelivery": {
+      "path": "/secure/release-evidence/alert-delivery.json",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "memberzoneFallback": {
+      "path": "/secure/release-evidence/memberzone-fallback.json",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  },
+  "approvals": {
+    "uat": {
+      "decision": "NO-GO",
+      "openP0": 0,
+      "openP1": 0,
+      "approvedBy": "replace-with-authorized-role",
+      "approvedAt": "2026-09-05T00:00:00+02:00"
+    },
+    "alertReceipt": {
+      "confirmed": false,
+      "eventId": "replace-with-alert-event-id",
+      "approvedBy": "replace-with-support-owner",
+      "approvedAt": "2026-09-05T00:00:00+02:00"
+    },
+    "memberzoneFallback": {
+      "available": false,
+      "approvedBy": "replace-with-support-owner",
+      "approvedAt": "2026-09-05T00:00:00+02:00"
+    },
+    "luxartNotifications": {
+      "confirmed": false,
+      "approvedBy": "replace-with-luxart-or-zone4you-owner",
+      "approvedAt": "2026-09-05T00:00:00+02:00"
+    },
+    "cutover": {
+      "approved": false,
+      "approvedBy": "replace-with-authorized-release-owner",
+      "approvedAt": "2026-09-05T00:00:00+02:00"
+    }
+  }
+}

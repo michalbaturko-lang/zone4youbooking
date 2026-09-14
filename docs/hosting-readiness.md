@@ -1,0 +1,71 @@
+# Zone4You Booking — připravenost hostingu
+
+Aktualizace: 2026-09-12
+
+Tento dokument odděluje bezpečnou přípravu hostingu od deploye, změny DNS a produkčního cutoveru. Samotná existence Vercel projektu ani zelený build není souhlas s publikací.
+
+## Ověřený stav
+
+Read-only kontrola propojeného Vercel projektu potvrdila:
+
+- projekt `zone4youbooking` existuje v aktuálním Vercel týmu;
+- projekt používá Node.js 24.x; repozitář deklaruje framework `nextjs` ve `vercel.json`;
+- CI i balíček jsou uzamčené na stejnou Node.js 24.x větev a CI před E2E výslovně instaluje Chromium i WebKit se systémovými závislostmi;
+- v projektu není nastavená žádná runtime environment variable;
+- `booking.zone4you.cz` není k projektu připojená ani dostupná jako jeho alias;
+- veřejné DNS pro `booking.zone4you.cz` i `staging.booking.zone4you.cz` už vrací A/AAAA na existující server mimo Vercel; HTTPS certifikát neplatí pro požadovaný hostname a HTTP vrací nginx 404;
+- kontrola 11. 9. znovu potvrdila, že `booking.zone4you.cz` nemá CNAME, má současně A i AAAA, HTTP vrací nginx 404 a prezentovaný certifikát je pro `*.nameserver.sk`; samotná existence záznamů proto není důkaz připraveného hostingu;
+- historický produkční alias je 84 dní starý a není důkazem současného buildu;
+- 11. 9. vznikl nový izolovaný Vercel Preview pro klientskou prezentaci. Vrací HTTPS bezpečnostní hlavičky, `noindex`, zdravý `/api/health` a `/api/readiness`, který výslovně potvrzuje pouze `mode=demo`, `luxart=mock`, `schedule=mock`, paměťový rate limit, přesný Git commit a systémový region `fra1`;
+- předchozí Preview prošel nízkoobjemovou Chromium regresí ve všech pěti viewports: 20/20 provedených scénářů včetně jediného přihlášení, rezervace a následného storna, 5 záměrných skipů kvůli login limiteru a desktopové duplicitě mobilní ergonomie; aktuální CI matice navíc přidává read-only mobilní WebKit 390 × 844 bez loginu a mutací;
+- read-only kontrola 12. 9. znovu potvrdila A/AAAA mimo Vercel, nginx HTTP 404, neplatný HTTPS hostname a nepřipojenou doménu v aktuálním Vercel týmu; nový `npm run probe:production-domain` tento stav opakovaně kontroluje bez vypsání DNS adres a vždy vrací `authorizesCutover=false`; společný resolver nyní dotazuje A, AAAA a CNAME samostatně, protože DNS `ANY` na této doméně vracelo jen IPv4 a mohlo by vynechat rollback pro IPv6;
+- Preview nemá Luxart ani jiné live runtime secrets a není live stagingem, UAT důkazem ani kandidátem pro release dossier. Externí browser regrese vyžaduje samostatně zadaný očekávaný commit a odmítne chybějící či rozdílný commit, jiný region i obecné `unverified` údaje ještě před přihlášením.
+
+Z toho plyne, že nový Preview lze bezpečně ukázat klientovi jako interaktivní demo, ale nelze jej použít jako stagingový ani produkční důkaz pro pilot. Současná cílová doména zůstává bez schváleného cutoveru nepoužitelná a žádný demo důkaz nesmí vstoupit do release dossieru.
+
+## Umístění a přístup k Luxart API
+
+Vercel Functions jinak standardně běží v `iad1` ve Washingtonu. Projekt proto deklaruje `fra1` (Frankfurt), tedy evropský region blízko předpokládaného českého Luxart serveru. Live `/api/readiness`, runtime probe, release dossier i produkční post-cutover kontrola nyní fail-closed odmítnou jiný nebo neznámý systémový `VERCEL_REGION`. Finální latenci a síťovou cestu je nutné potvrdit až proti skutečnému Zone4You endpointu.
+
+Standardní odchozí IP Vercel Functions jsou dynamické. Pokud IT Zone4You vyžaduje IP allowlist, jsou bezpečné varianty:
+
+1. Vercel Static IPs pro projekt v regionu `fra1` a povolení přidělených egress IP na Zone4You firewallu;
+2. Vercel Secure Compute s privátním napojením/VPN, pokud je k dispozici odpovídající plán a infrastruktura;
+3. veřejný HTTPS reverse proxy endpoint spravovaný Zone4You, chráněný síťově a samostatnou Basic/Bearer/vlastní gateway autentizací.
+
+Samotná IP allowlist není autentizace. I při statické IP se preferuje samostatná gateway credential nebo jiná druhá vrstva, pokud ji IT umí dodat. Testovací klientské přihlašovací údaje se pro gateway nikdy nepoužijí.
+
+Oficiální podklady:
+
+- [Vercel: statické odchozí IP a Secure Compute](https://vercel.com/kb/guide/can-i-get-a-fixed-ip-address)
+- [Vercel: konfigurace regionů funkcí](https://vercel.com/docs/functions/configuring-functions/region)
+- [Vercel: seznam regionů](https://vercel.com/docs/regions)
+
+## Povinné pořadí stagingu
+
+| Brána | Akce | Důkaz | Stav |
+|---|---|---|---|
+| H0 Autorita | IT dodá host/HTTPS, gateway režim, síťovou cestu a povolení read-only testu | písemná odpověď | čeká se |
+| H1 Síť | vybere se veřejné HTTPS, Static IPs nebo Secure Compute/VPN | spojení z `fra1`, žádné tajemství v URL/logu | čeká se |
+| H2 Databáze | provisionovat pooled TLS PostgreSQL a aplikovat migrace `003` a pro booking fázi `002` | transakční testy + readiness | čeká se |
+| H3 Konfigurace | vložit pouze runtime proměnné do Vercel secret store; žádné UAT účty ani operátorské fráze | `verify:deployment-preflight` | čeká se |
+| H4 Read-only staging | nasadit přesný schválený commit s vypnutými booking/payment/watchdog mutacemi | readiness + runtime probe v `fra1` | čeká se |
+| H5 Live integrace | porovnat přímý Luxart a stagingový CS/EN feed pro stejných sedm pražských dnů | hashované důkazy | čeká se |
+| H6 Transakční staging | až po pravidlech, resource mapě a povolení test DB spustit jedno řízené UAT | obnovený stav + request ID | čeká se |
+| H7 Doména/cutover | po identifikaci vlastníka zachytit původní A/AAAA do owner-only rollback důkazu, těsně před změnou v jednom běhu potvrdit zelený dossier, výslovný souhlas a nezměněný fingerprint, potom připojit doménu k Vercelu a vydat platný certifikát; pilotní skupinu otevřít až po read-only kontrole skutečné produkční domény | `capture:production-domain-baseline` + `verify:production-precutover` před změnou + `verify:production-cutover` po změně | čeká se |
+
+## Konfigurační hranice
+
+- Veřejný prezentační Preview smí obsahovat jen mock data, žádné runtime secrets, musí hlásit přesný demo/mock profil a mít `noindex`. Live staging musí zůstat chráněný; operátorský runtime probe může použít jednorázový protection bypass mimo runtime prostředí aplikace.
+- Vercel/serverless se považuje za multi-instance topologii, proto používá `RATE_LIMIT_MODE=postgres`; paměťový limiter není pro tento hosting produkční varianta.
+- `BOOKING_MUTATIONS_ENABLED=false`, `PAYMENT_MUTATIONS_ENABLED=false` a `LUXART_WAITLIST_ENABLED=false` jsou výchozí i rollback hodnoty.
+- Produkční doména, DNS, secrets ani deployment se nemění bez samostatného schválení.
+- Existující A/AAAA se před cutoverem uloží mimo repozitář do nepřepisovatelného souboru s právy `0600`; release dossier vyžaduje jeho čerstvý SHA-256 a příznak připraveného rollbacku. TTL se do fingerprintu nezahrnuje, protože rekurzivní DNS resolver vrací odpočítávanou hodnotu, nikoli autoritativní konfiguraci. Bezprostředně před zásahem musí stejné záznamy i celý schválený dossier v jediném běhu potvrdit `verify:production-precutover`; současné záznamy se nyní nemění.
+- Zelený release dossier autorizuje změnu, ale nedokládá výsledek DNS. `verify:production-precutover` proto uloží nepřepisovatelný owner-only autorizační důkaz; po přepnutí musí před otevřením pilotu projít `verify:production-cutover` nad jeho přesným hashem, stejným dossierem, commitem a fází, nejpozději do 30 minut. Při chybě se bez dalšího experimentování vrátí zaznamenané původní DNS hodnoty.
+- Přesná matice proměnných a zákaz CLI-only hodnot v runtime prostředí je v `docs/deployment-preflight.md`.
+
+## Bezprostřední rozhodnutí po odpovědi IT
+
+Pokud IT odpoví „povolíme konkrétní IP“, je nutné před stagingem rozhodnout, zda Zone4You schválí placené Vercel Static IPs, nebo poskytne bezpečný veřejný HTTPS endpoint s gateway autentizací. Dynamickou Vercel IP nelze předat jako stabilní allowlist údaj.
+
+Pokud IT poskytne VPN-only přístup, standardní Vercel projekt se nepřipojí bez odpovídající privátní síťové vrstvy. Do vyřešení zůstává možný pouze lokální integrační test přes schválenou VPN a read-only veřejný pilot se nespouští.

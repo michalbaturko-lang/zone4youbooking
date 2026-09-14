@@ -1,0 +1,17 @@
+{
+  "profileId": "zone4you-booking-rules-2026-08-29-provisional",
+  "status": "provisional",
+  "minimumCreditForReservationKc": 200,
+  "reservationHoldKc": null,
+  "reservationWindow": null,
+  "groupCancellation": {
+    "freeCancellationCutoff": {
+      "mode": "lesson_day_midnight",
+      "timeZone": "Europe/Prague"
+    },
+    "lateFeeKc": null,
+    "noShowFeeKc": null,
+    "lateCancellationAllowed": null
+  },
+  "reformerCancellation": null
+}

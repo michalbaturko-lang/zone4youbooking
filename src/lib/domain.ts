@@ -28,6 +28,9 @@ export interface Lesson {
   id: ID;
   luxartLessonId?: string;
   serviceId?: string;
+  luxartCategoryId?: number;
+  luxartRoomNumber?: number;
+  luxartGender?: string;
   name: string;
   description: string;
   startsAt: ISODateTime;
@@ -37,10 +40,12 @@ export interface Lesson {
   substituteInstructorName?: string;
   instructorPhoto?: string;
   instructorSpecialization: string;
-  roomName: "Sál 1" | "Sál 2" | "Sál 3" | "Reformer";
-  category: "Síla" | "Cardio" | "Body & Mind" | "Reformer" | "Zdraví";
+  roomName: string;
+  category: string;
   capacity: number;
   occupiedCount: number;
+  availableCount?: number;
+  canCurrentUserReserve?: boolean;
   priceKc: number;
   reservationOpensAt?: ISODateTime;
   reservationClosesAt?: ISODateTime;
@@ -56,8 +61,11 @@ export interface Reservation {
   reservedAt: ISODateTime;
   cancelledAt?: ISODateTime;
   priceKc: number;
+  holdAmountKc?: number;
   cancellationFeeKc?: number;
   creditTransactionId?: ID;
+  luxartUuid?: string;
+  luxartCategoryId?: number;
 }
 
 export interface WaitlistEntry {
@@ -66,7 +74,7 @@ export interface WaitlistEntry {
   lessonId: ID;
   position: number;
   status: WaitlistStatus;
-  joinedAt: ISODateTime;
+  joinedAt?: ISODateTime;
   promotedAt?: ISODateTime;
 }
 
@@ -104,7 +112,6 @@ export interface LoginInput {
 
 export interface LoginResult {
   user: User;
-  sessionToken: string;
 }
 
 export interface LessonQuery {
@@ -147,11 +154,48 @@ export interface BookingSnapshot {
   transactions: CreditTransaction[];
 }
 
-export interface BookingRules {
-  resortId: number;
-  freeCancellationHours: number;
+export interface BookingCapabilities {
+  reservationsEnabled: boolean;
+  waitlistEnabled: boolean;
+  topupsEnabled: boolean;
+  topupMode: "demo" | "stripe" | "disabled";
+  businessRulesStatus: "demo" | "confirmed" | "unconfirmed";
+  favoritesSync: "device";
+  forgotPasswordEnabled: false;
+  englishEnabled: true;
+}
+
+export type FreeCancellationCutoff = {
+  mode: "lesson_day_midnight";
+  timeZone: "Europe/Prague";
+} | {
+  mode: "hours_before_start";
+  hours: number;
+};
+
+export interface CancellationPolicy {
+  freeCancellationCutoff: FreeCancellationCutoff;
   lateCancelFeeKc: number;
   noShowFeeKc: number;
+  lateCancellationAllowed: boolean;
+}
+
+export type ReformerCancellationPolicy = {
+  mode: "same_as_group";
+} | ({
+  mode: "custom";
+} & CancellationPolicy);
+
+export interface BookingRules {
+  resortId: number;
+  scheduleDays: number;
+  freeCancellationCutoff: FreeCancellationCutoff;
+  lateCancelFeeKc: number;
+  noShowFeeKc: number;
+  lateCancellationAllowed: boolean;
+  reformerCancellation: ReformerCancellationPolicy;
+  minimumCreditForReservationKc: number;
+  reservationHoldKc: number;
   reservationWindowHours: number;
   topupAmounts: number[];
 }

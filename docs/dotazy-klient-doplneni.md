@@ -6,9 +6,9 @@ díky za odpovědi, většinu věcí máme jasných a můžeme se pustit do prá
 
 ---
 
-### 1. No-show — 100 Kč nebo 100 %?
+### 1. Pozdní storno, Reformer a no-show
 
-Máme jasné, že zrušení je možné nejpozději 4 hodiny předem a poplatek za pozdní zrušení je 100 Kč. Ale jak je to s **no-show (nedostavení se na lekci)?** Je to taky:
+Máme jasné, že běžná lekce je bez storno pokuty do `00:00 Europe/Prague` na začátku dne lekce. Potřebujeme doplnit, zda lze poté online stornovat až do začátku lekce, kolik stojí pozdní storno a jak je to s **no-show (nedostavení se na lekci)** a Reformerem:
 
 - a) **100 Kč** — stejně jako pozdní zrušení?
 - b) **100 % ceny lekce** — propadne celý kredit za danou lekci?

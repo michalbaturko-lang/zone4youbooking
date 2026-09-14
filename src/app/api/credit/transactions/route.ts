@@ -1,12 +1,14 @@
 import { fail, ok } from "@/lib/apiResponse";
-import { getLuxartAdapter } from "@/lib/adapterProvider";
+import { getRequestLuxartAdapter } from "@/lib/adapterProvider";
 import { withDemoState } from "@/lib/demoStateTransport";
+import { assertRateLimit, rateLimitRules } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const transactions = await getLuxartAdapter().getCreditTransactions();
+    await assertRateLimit(request, rateLimitRules.accountRead);
+    const transactions = await getRequestLuxartAdapter(request).getCreditTransactions();
     return ok(withDemoState({ transactions }));
   } catch (error) {
     return fail(error);

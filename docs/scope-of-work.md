@@ -1,5 +1,7 @@
 # Scope of Work — Zone4You Online Booking System
 
+> Historický rozsah před pilotním zpřesněním. Aktuální scope, vlastníci rozhodnutí a release brány jsou v `docs/launch-plan.md`; při konfliktu má novější launch plán přednost. Částky Stripe top-upu v modulu 5 zůstávají potvrzené.
+
 **Projekt:** Nový rezervační systém pro Zone4You
 **Klient:** Zone4You s.r.o.
 **Dodavatel:** Michal Baturko
@@ -60,12 +62,10 @@ Projekt je rozdělen do dvou fází. **Fáze 1** pokrývá kompletní funkční 
 
 **Co je možné vytvořit:**
 - Rezervaci lekce jedním klikem z rozvrhu
-- Stržení kreditu v momentě rezervace
-- Kontrolu dostatečného zůstatku kreditu před rezervací (minimální zůstatek — upřesníme)
-- Zrušení rezervace klientem s automatickým vrácením kreditu (při zrušení min. 4 hodiny předem)
-- Poplatek za pozdní zrušení (méně než 4 hodiny předem) — **100 Kč**
-- Penalizaci za no-show (nedostavení se) — **100 Kč**
-- Omezení rezervací na 48 hodin dopředu
+- Serverovou kontrolu minimálního zůstatku **200 Kč** před rezervací
+- Zrušení bez storno pokuty do `00:00 Europe/Prague` na začátku dne lekce
+- Zobrazení skutečného storno poplatku vráceného Luxartem
+- Pozdní storno, no-show, Reformer, rezervační okno a kreditní mechaniku po písemném potvrzení
 - Zobrazení seznamu aktivních rezervací klienta ("Moje rezervace")
 
 **Termín:** Týden 3–5
@@ -236,7 +236,7 @@ Projekt je rozdělen do dvou fází. **Fáze 1** pokrývá kompletní funkční 
 
 Pro úspěšnou realizaci projektu je potřeba součinnost klienta v těchto oblastech:
 
-1. **Luxart API** — čekáme na přístup k API na portu 9759 a aktuální `/Help` dokumentaci
+1. **Luxart API** — objednaný kontrakt je REST `memberzone_rest_v1` na interním Zone4You portu 9759; IT potvrdilo zveřejnění portu 9191, ale chybí veřejný hostname/IP, potvrzení překladu, HTTPS, test DB a auth režim
 2. **Stripe účet** — API klíče (testovací i produkční) — **čekáme na klienta**
 3. **Doména** — potvrzení a nastavení DNS pro booking.zone4you.cz
 4. **HTTPS certifikát** — na serveru, kde poběží aplikace

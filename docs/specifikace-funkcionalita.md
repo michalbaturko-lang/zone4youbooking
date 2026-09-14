@@ -1,5 +1,7 @@
 # Zone4You — Specifikace funkcionality (na základě odpovědí klienta)
 
+> Historický rozhodovací podklad. Pro pilot 5. 9. je autoritou `docs/launch-plan.md` a novější explicitní rozhodnutí klienta. Ta ruší zejména reset zapomenutého hesla, přesouvají standardní emaily na Luxart a nedovolují slibovat automatickou rezervaci ani pořadí watchdogu. Potvrzené částky dobití v oddílu 2 zůstávají platné.
+
 Datum: 2026-02-27
 Verze: 1.1 (aktualizováno na základě upřesnění)
 
@@ -45,19 +47,19 @@ Verze: 1.1 (aktualizováno na základě upřesnění)
 
 | Požadavek | Rozhodnutí |
 |-----------|-----------|
-| Strhávání kreditu | **Při rezervaci** — vrací se pouze při včasném zrušení |
+| Strhávání kreditu | **Čeká na potvrzení** — známe pouze minimum 200 Kč před rezervací |
 | Ceny lekcí — zobrazovat u každé lekce | **ANO** — zobrazovat předem u každé lekce |
 | Maximální počet rezervací najednou | **Není pevný limit** — omezeno dostatečným zůstatkem kreditu |
-| Časový horizont rezervací | **48 hodin dopředu max** |
-| Zrušení bez sankce | **Minimálně 4 hodiny před lekcí** |
-| Storno poplatek za pozdní zrušení | **100 Kč** |
-| Vrácení kreditu při včasném zrušení | **ANO** — plné vrácení |
-| No-show (nedostavení se) | **100 Kč** |
+| Časový horizont rezervací | **Čeká na potvrzení** |
+| Zrušení bez sankce | **Do 00:00 Europe/Prague na začátku dne lekce** |
+| Storno poplatek za pozdní zrušení | **Čeká na potvrzení** |
+| Vrácení kreditu při včasném zrušení | **Musí potvrdit Luxart test** |
+| No-show (nedostavení se) | **Čeká na potvrzení** |
 
 ### Poznámky k implementaci
-- Flow: Rezervace → stržení kreditu → pokud klient zruší min. 4 h předem → kredit zpět
-- Pokud klient zruší méně než 4 h předem → poplatek 100 Kč
-- No-show → poplatek 100 Kč
+- Flow kreditu při rezervaci a vrácení musí potvrdit Zone4You a Luxart test.
+- Bezplatný cutoff není klouzavý počet hodin; je to začátek dne lekce v Praze.
+- Pozdní storno, no-show a Reformer čekají na přesné částky a pravidla.
 - Není limit na počet rezervací, ale klient musí mít dostatečný zůstatek kreditu
 
 ---
@@ -164,7 +166,7 @@ Verze: 1.1 (aktualizováno na základě upřesnění)
 
 ### Kritické (blokují vývoj)
 1. **Stripe přístupy** — čekáme na API klíče od klienta
-2. **Luxart API přístup a dokumentace** — čekáme na aktuální `/Help` pro port 9759
+2. **Luxart API přístup** — objednaný kontrakt je REST na interním Zone4You portu 9759; IT potvrdilo zveřejnění portu 9191, ale chybí veřejný hostname/IP, potvrzení přesměrování, HTTPS a auth režim
 
 ### Důležité (potřebné brzy)
 3. **Minimální zůstatek kreditu** pro rezervaci — jaká je minimální částka?

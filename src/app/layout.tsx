@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AppProviders } from "./providers";
 
 export const metadata: Metadata = {
-  title: "Zone4You Booking",
-  description: "Prezentacni booking engine pro Zone4You s mock Luxart adapterem.",
+  title: "Zone4You rezervace",
+  description: "Online rezervační systém Zone4You.",
 };
 
 export default function RootLayout({
@@ -13,7 +14,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="cs">
-      <body>{children}</body>
+      <body><AppProviders>{children}</AppProviders></body>
     </html>
   );
 }

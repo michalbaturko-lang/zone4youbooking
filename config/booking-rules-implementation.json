@@ -1,0 +1,18 @@
+{
+  "resortId": 1,
+  "scheduleDays": 7,
+  "freeCancellationCutoff": {
+    "mode": "lesson_day_midnight",
+    "timeZone": "Europe/Prague"
+  },
+  "lateCancelFeeKc": 100,
+  "noShowFeeKc": 100,
+  "lateCancellationAllowed": true,
+  "reformerCancellation": {
+    "mode": "same_as_group"
+  },
+  "minimumCreditForReservationKc": 200,
+  "reservationHoldKc": 100,
+  "reservationWindowHours": 48,
+  "topupAmounts": [500, 1000, 2000, 5000, 10000]
+}

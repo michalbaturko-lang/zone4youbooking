@@ -1,15 +1,20 @@
-import type { LoginInput } from "@/lib/domain";
 import { fail, ok } from "@/lib/apiResponse";
-import { getLuxartAdapter } from "@/lib/adapterProvider";
-import { readJsonWithDemoState, withDemoState } from "@/lib/demoStateTransport";
+import { isRealLuxartMode } from "@/lib/adapterProvider";
+import { withDemoState } from "@/lib/demoStateTransport";
+import { runLoginAttempt } from "@/lib/loginService";
+import { setBookingSession } from "@/lib/session";
+import { assertTrustedMutation } from "@/lib/requestSecurity";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
-    const body = await readJsonWithDemoState<LoginInput>(request);
-    const result = await getLuxartAdapter().login(body);
-    return ok(withDemoState(result));
+    assertTrustedMutation(request);
+    const live = isRealLuxartMode();
+    const result = await runLoginAttempt(request, live);
+    const response = ok(withDemoState({ user: result.user }));
+    if (live) setBookingSession(response, result.user.id);
+    return response;
   } catch (error) {
     return fail(error);
   }

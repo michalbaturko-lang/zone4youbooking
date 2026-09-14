@@ -1,23 +1,23 @@
-name: Deploy to GitHub Pages
+name: Legacy static preview (manual only)
 
 on:
-  push:
-    branches: ["claude/review-booking-redesign-VpnPW", "main"]
+  workflow_dispatch:
 
 permissions:
   contents: write
   pages: write
-  id-token: write
 
 jobs:
   build-and-deploy:
+    # This publishes static design artefacts only. It is not a production
+    # deployment path for the authenticated Next.js booking application.
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Deploy to gh-pages branch
-        uses: peaceiris/actions-gh-pages@v4
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: .

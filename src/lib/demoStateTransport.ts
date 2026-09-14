@@ -4,6 +4,8 @@ import {
   setMockLuxartState,
   type MockLuxartState,
 } from "./mockLuxart";
+import { readBoundedJson } from "./requestBody";
+import { isSafeMockLuxartState, safeSerializedDemoState } from "./demoState";
 
 type BodyWithDemoState = {
   demoState?: MockLuxartState;
@@ -19,7 +21,11 @@ function hasDemoState(body: unknown): body is BodyWithDemoState {
 
 export function restoreDemoState(body: unknown) {
   if (!isMockMode()) return;
-  if (hasDemoState(body) && body.demoState) {
+  if (
+    hasDemoState(body) &&
+    isSafeMockLuxartState(body.demoState) &&
+    safeSerializedDemoState(body.demoState)
+  ) {
     setMockLuxartState(body.demoState);
     return;
   }
@@ -27,7 +33,7 @@ export function restoreDemoState(body: unknown) {
 }
 
 export async function readJsonWithDemoState<T>(request: Request): Promise<T> {
-  const body = (await request.json().catch(() => ({}))) as T;
+  const body = await readBoundedJson<T>(request);
   restoreDemoState(body);
   return body;
 }

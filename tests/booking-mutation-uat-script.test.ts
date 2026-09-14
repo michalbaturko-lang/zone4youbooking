@@ -1,0 +1,515 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import type { BookingCapabilities, BookingRules, Lesson, Reservation, User } from "../src/lib/domain";
+import {
+  assertUatReservation,
+  bookingMutationUatEvidenceSchemaVersion,
+  bookingMutationUatScenarioEvidenceSchemaVersion,
+  loadBookingMutationUatConfig,
+  loadBookingMutationUatSuiteConfig,
+  redactUatSecrets,
+  runBookingMutationUat,
+  runBookingMutationUatSuite,
+} from "../scripts/verify-booking-mutations";
+import { validateBookingUatScenarioEvidence } from "../scripts/verify-pilot-release";
+import { luxartResourceMappingSha256 } from "../src/lib/luxartResourceMappingFingerprint";
+import { maximumOperationalAmountKc } from "../src/lib/moneyBounds";
+
+const target = "https://staging.booking.zone4you.cz/";
+const commit = "1234567890abcdef1234567890abcdef12345678";
+const resourceMapJson = JSON.stringify({ 1: 101, 2: 102, 3: 203 });
+const resourceMapSha256 = luxartResourceMappingSha256(resourceMapJson);
+const baseEnvironment = {
+  ZONE4YOU_UAT_APP_URL: target,
+  ZONE4YOU_UAT_MUTATION_CONFIRMATION: "ZONE4YOU_TEST_DB_ONLY:https://staging.booking.zone4you.cz",
+  ZONE4YOU_UAT_EXPECTED_COMMIT: commit,
+  ZONE4YOU_UAT_EXPECTED_PHASE: "booking_without_payments",
+  LUXART_RESOURCE_MAP_JSON: resourceMapJson,
+  ZONE4YOU_UAT_LOGIN: "approved-test-user",
+  ZONE4YOU_UAT_PASSWORD: "test-secret",
+  ZONE4YOU_UAT_EXPECTED_USER_ID: "42",
+  ZONE4YOU_UAT_EXPECTED_ROOM_NUMBER: "1",
+  ZONE4YOU_UAT_EXPECTED_LESSON_KIND: "standard",
+  ZONE4YOU_UAT_LESSON_ID: "luxart:1:12:321:2026-09-01T14:30:00.000Z",
+  ZONE4YOU_UAT_EXPECTED_CANCELLATION_FEE_KC: "0",
+  ZONE4YOU_UAT_MIN_HOURS_BEFORE_START: "4",
+} satisfies Record<string, string | undefined>;
+
+test("mutation UAT configuration refuses production and stale confirmations", () => {
+  assert.throws(
+    () => loadBookingMutationUatConfig({ ...baseEnvironment, ZONE4YOU_UAT_APP_URL: "https://booking.zone4you.cz/" }),
+    /production/i,
+  );
+  assert.throws(
+    () => loadBookingMutationUatConfig({ ...baseEnvironment, ZONE4YOU_UAT_MUTATION_CONFIRMATION: "YES" }),
+    /exactly equal/i,
+  );
+  assert.throws(
+    () => loadBookingMutationUatConfig({
+      ...baseEnvironment,
+      ZONE4YOU_UAT_APP_URL: "https://example.com/",
+      ZONE4YOU_UAT_MUTATION_CONFIRMATION: "ZONE4YOU_TEST_DB_ONLY:https://example.com",
+    }),
+    /staging-named/i,
+  );
+  assert.throws(
+    () => loadBookingMutationUatConfig({ ...baseEnvironment, ZONE4YOU_UAT_EXPECTED_COMMIT: "latest" }),
+    /full 40-character Git SHA/i,
+  );
+  assert.throws(
+    () => loadBookingMutationUatConfig({ ...baseEnvironment, ZONE4YOU_UAT_EXPECTED_PHASE: "read_only" }),
+    /booking_without_payments or booking_with_stripe/i,
+  );
+  assert.throws(
+    () => loadBookingMutationUatConfig({
+      ...baseEnvironment,
+      ZONE4YOU_UAT_EXPECTED_CANCELLATION_FEE_KC: String(maximumOperationalAmountKc + 1),
+    }),
+    /between 0 and/i,
+  );
+  assert.throws(
+    () => loadBookingMutationUatConfig({ ...baseEnvironment, ZONE4YOU_UAT_EXPECTED_LESSON_KIND: "all" }),
+    /standard or reformer/i,
+  );
+  assert.equal(loadBookingMutationUatConfig(baseEnvironment).target.origin, "https://staging.booking.zone4you.cz");
+
+  const suiteEnvironment = {
+    ...baseEnvironment,
+    ZONE4YOU_UAT_ROOM_SCENARIOS_JSON: JSON.stringify([
+      { roomNumber: 1, lessonId: "luxart:1:12:321:2026-09-01T14:30:00.000Z", lessonKind: "standard", expectedCancellationFeeKc: 0 },
+      { roomNumber: 2, lessonId: "luxart:2:13:322:2026-09-01T15:30:00.000Z", lessonKind: "standard", expectedCancellationFeeKc: 0 },
+      { roomNumber: 3, lessonId: "luxart:3:22:654:2026-09-02T14:30:00.000Z", lessonKind: "reformer", expectedCancellationFeeKc: 0 },
+    ]),
+  };
+  const suite = loadBookingMutationUatSuiteConfig(suiteEnvironment);
+  assert.deepEqual(suite.expectedRoomNumbers, [1, 2, 3]);
+  assert.deepEqual(suite.scenarios.map((scenario) => scenario.expectedLessonKind), ["standard", "standard", "reformer"]);
+  assert.throws(
+    () => loadBookingMutationUatSuiteConfig({
+      ...suiteEnvironment,
+      ZONE4YOU_UAT_ROOM_SCENARIOS_JSON: JSON.stringify([
+        { roomNumber: 1, lessonId: "same", lessonKind: "standard", expectedCancellationFeeKc: 0 },
+        { roomNumber: 2, lessonId: "same", lessonKind: "standard", expectedCancellationFeeKc: 0 },
+        { roomNumber: 3, lessonId: "reformer", lessonKind: "reformer", expectedCancellationFeeKc: 0 },
+      ]),
+    }),
+    /one distinct lesson for every mapped room/i,
+  );
+  assert.throws(
+    () => loadBookingMutationUatSuiteConfig({
+      ...suiteEnvironment,
+      ZONE4YOU_UAT_ROOM_SCENARIOS_JSON: JSON.stringify([
+        { roomNumber: 1, lessonId: "one", lessonKind: "standard", expectedCancellationFeeKc: 0 },
+        { roomNumber: 3, lessonId: "three", lessonKind: "reformer", expectedCancellationFeeKc: 0 },
+      ]),
+    }),
+    /one distinct lesson for every mapped room/i,
+  );
+});
+
+test("mutation UAT rejects malformed financial reservation evidence", () => {
+  const config = loadBookingMutationUatConfig(baseEnvironment);
+  const active: Reservation = {
+    id: "987",
+    userId: config.expectedUserId,
+    lessonId: config.lessonId,
+    status: "active",
+    reservedAt: "2026-09-01T12:00:00.000Z",
+    priceKc: 180,
+  };
+  assert.doesNotThrow(() => assertUatReservation(active, config, "active"));
+  assert.throws(
+    () => assertUatReservation({ ...active, priceKc: maximumOperationalAmountKc + 1 }, config, "active"),
+    /financial bounds/i,
+  );
+  assert.throws(
+    () => assertUatReservation({ ...active, reservedAt: "2026-09-01T12:00:00" }, config, "active"),
+    /financial bounds/i,
+  );
+  assert.throws(
+    () => assertUatReservation({
+      ...active,
+      status: "cancelled",
+      cancelledAt: "2026-09-01T13:00:00.000Z",
+    }, config, "cancelled"),
+    /financial bounds/i,
+  );
+  assert.doesNotThrow(() => assertUatReservation({
+    ...active,
+    status: "cancelled",
+    cancelledAt: "2026-09-01T13:00:00.000Z",
+    cancellationFeeKc: 0,
+  }, config, "cancelled"));
+});
+
+test("mutation UAT suite requires and records one scenario for every mapped room", async () => {
+  const suite = loadBookingMutationUatSuiteConfig({
+    ...baseEnvironment,
+    ZONE4YOU_UAT_ROOM_SCENARIOS_JSON: JSON.stringify([
+      { roomNumber: 1, lessonId: "luxart:1:12:321:2026-09-01T14:30:00.000Z", lessonKind: "standard", expectedCancellationFeeKc: 0 },
+      { roomNumber: 2, lessonId: "luxart:2:13:322:2026-09-01T15:30:00.000Z", lessonKind: "standard", expectedCancellationFeeKc: 0 },
+      { roomNumber: 3, lessonId: "luxart:3:22:654:2026-09-02T14:30:00.000Z", lessonKind: "reformer", expectedCancellationFeeKc: 0 },
+    ]),
+  });
+  const calls: string[] = [];
+  let authenticationCalls = 0;
+  const evidence = await runBookingMutationUatSuite(suite, fetch, async (scenario, _fetchImpl, session) => {
+    calls.push(`${scenario.expectedRoomNumber}:${scenario.expectedLessonKind}`);
+    assert.deepEqual(session, { cookie: "z4y_booking_session=shared", userId: "42" });
+    return {
+      schemaVersion: bookingMutationUatScenarioEvidenceSchemaVersion,
+      ok: true,
+      checkedAt: new Date().toISOString(),
+      target: scenario.target.origin,
+      deploymentProvenanceVerified: true,
+      commit: scenario.expectedCommit,
+      phase: scenario.expectedPhase,
+      region: "fra1",
+      lessonKind: scenario.expectedLessonKind,
+      userVerified: true,
+      personalizedEligibilityVerified: true,
+      authoritativeAvailabilityVerified: true,
+      reservationWindowVerified: true,
+      onlineCancellationVerified: true,
+      resourceMapSha256: scenario.expectedResourceMapSha256,
+      lessonRoomNumber: scenario.expectedRoomNumber,
+      lessonIdSha256: String(scenario.expectedRoomNumber).repeat(16),
+      reservationIdSha256: String(scenario.expectedRoomNumber + 3).repeat(16),
+      expectedCancellationFeeKc: scenario.expectedCancellationFeeKc,
+      sameKeyCreateReplays: 3,
+      parallelCreateRequests: 2,
+      sameKeyCancellationReplays: 3,
+      crossKeyCancellationReplay: true,
+      oneActiveReservationObserved: true,
+      cancellationStateVerified: true,
+      snapshotRequestIdsRecorded: true,
+      preExistingActiveReservationsPreserved: true,
+      finalStateRestored: true,
+      cancellationFeeMatched: true,
+      requestIds: Array.from({ length: 16 }, (_, index) => `${scenario.expectedRoomNumber}-${index}`),
+    };
+  }, async () => {
+    authenticationCalls += 1;
+    return {
+      session: { cookie: "z4y_booking_session=shared", userId: "42" },
+      requestIds: ["authentication-readiness", "authentication-login"],
+    };
+  });
+  assert.deepEqual(calls, ["1:standard", "2:standard", "3:reformer"]);
+  assert.equal(authenticationCalls, 1);
+  assert.equal(evidence.schemaVersion, bookingMutationUatEvidenceSchemaVersion);
+  assert.equal(evidence.scenarioCount, 3);
+  assert.deepEqual(evidence.authenticationRequestIds, ["authentication-readiness", "authentication-login"]);
+  assert.deepEqual(evidence.scenarios.map((scenario) => scenario.lessonRoomNumber), [1, 2, 3]);
+
+  let invalidCalls = 0;
+  await assert.rejects(
+    runBookingMutationUatSuite({
+      ...suite,
+      scenarios: suite.scenarios.map((scenario, index) => index === 2 ? { ...scenario, expectedCommit: "f".repeat(40) } : scenario),
+    }, fetch, async (scenario) => {
+      invalidCalls += 1;
+      return evidence.scenarios.find((item) => item.lessonRoomNumber === scenario.expectedRoomNumber)!;
+    }),
+    /one approved staging user and deployment/i,
+  );
+  assert.equal(invalidCalls, 0);
+});
+
+test("mutation UAT error evidence redacts test credentials", () => {
+  assert.equal(
+    redactUatSecrets("approved-test-user failed with test-secret", baseEnvironment),
+    "[redacted] failed with [redacted]",
+  );
+});
+
+test("guarded UAT proves replay, concurrency and restored state without exposing credentials", async () => {
+  const config = loadBookingMutationUatConfig(baseEnvironment);
+  const user: User = {
+    id: "42",
+    login: "approved-test-user",
+    fullName: "Approved Test User",
+    email: "test@example.invalid",
+    creditBalanceKc: 1000,
+  };
+  const lesson: Lesson = {
+    id: config.lessonId,
+    luxartRoomNumber: 1,
+    name: "UAT lesson",
+    description: "",
+    startsAt: new Date(Date.now() + 30 * 3_600_000).toISOString(),
+    endsAt: new Date(Date.now() + 31 * 3_600_000).toISOString(),
+    durationMinutes: 60,
+    instructorName: "Test",
+    instructorSpecialization: "Test",
+    roomName: "Sál 1",
+    category: "Test",
+    capacity: 10,
+    occupiedCount: 2,
+    availableCount: 8,
+    canCurrentUserReserve: true,
+    priceKc: 180,
+    waitlistEnabled: false,
+  };
+  const rules: BookingRules = {
+    resortId: 1,
+    scheduleDays: 7,
+    freeCancellationCutoff: {
+      mode: "lesson_day_midnight",
+      timeZone: "Europe/Prague",
+    },
+    lateCancelFeeKc: 100,
+    noShowFeeKc: 100,
+    lateCancellationAllowed: true,
+    reformerCancellation: { mode: "same_as_group" },
+    minimumCreditForReservationKc: 200,
+    reservationHoldKc: 100,
+    reservationWindowHours: 48,
+    topupAmounts: [500],
+  };
+  const capabilities: BookingCapabilities = {
+    reservationsEnabled: true,
+    waitlistEnabled: false,
+    topupsEnabled: false,
+    topupMode: "disabled",
+    businessRulesStatus: "confirmed",
+    favoritesSync: "device",
+    forgotPasswordEnabled: false,
+    englishEnabled: true,
+  };
+  const preExistingReservation: Reservation = {
+    id: "existing-123",
+    userId: user.id,
+    lessonId: "luxart:1:12:111:2026-09-01T12:00:00.000Z",
+    status: "active",
+    reservedAt: new Date().toISOString(),
+    priceKc: 170,
+  };
+  let reservations: Reservation[] = [preExistingReservation];
+  let createWrites = 0;
+  let cancelWrites = 0;
+  let cancelledReservation: Reservation | undefined;
+  let personalizedEligibility = true;
+  let authoritativeAvailableCount = 8;
+  let readinessCommit = commit;
+  let readinessResourceMapSha256 = resourceMapSha256;
+  let snapshotCreditBalanceKc = user.creditBalanceKc;
+  let snapshotLessonPriceKc = lesson.priceKc;
+  let corruptPreExistingReservation = false;
+  let failSnapshotAfterCancellation = false;
+  let cleanupRequests = 0;
+  let sequence = 0;
+  const idempotentResponses = new Map<string, Reservation>();
+
+  const response = (body: unknown, status = 200, extraHeaders: HeadersInit = {}) => new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json", "X-Request-ID": `req-${sequence += 1}`, ...extraHeaders },
+  });
+  const fakeFetch: typeof fetch = async (input, init) => {
+    const url = new URL(typeof input === "string" ? input : input instanceof URL ? input : input.url);
+    const headers = new Headers(init?.headers);
+    if (url.pathname === "/api/readiness") {
+      return response({
+        status: "ready",
+        mode: "live",
+        phase: "booking_without_payments",
+        commit: readinessCommit,
+        region: "fra1",
+        luxart: "reachable",
+        schedule: "ready",
+        booking: "ready",
+        payments: "disabled",
+        resourceMapSha256: readinessResourceMapSha256,
+        capabilities,
+      });
+    }
+    if (url.pathname === "/api/auth/login") {
+      const rawBody = String(init?.body ?? "");
+      assert.ok(rawBody.includes("test-secret"));
+      return response({ user }, 200, { "Set-Cookie": "z4y_booking_session=test-cookie; HttpOnly; Path=/" });
+    }
+    assert.equal(headers.get("cookie"), "z4y_booking_session=test-cookie");
+    if (url.pathname === "/api/booking/snapshot") {
+      if (failSnapshotAfterCancellation && cancelledReservation) {
+        return response({ code: "LUXART_UNAVAILABLE", error: "snapshot unavailable" }, 503);
+      }
+      return response({
+        user: { ...user, creditBalanceKc: snapshotCreditBalanceKc },
+        lessons: [{
+          ...lesson,
+          canCurrentUserReserve: personalizedEligibility,
+          availableCount: authoritativeAvailableCount,
+          priceKc: snapshotLessonPriceKc,
+        }],
+        reservations,
+        rules,
+        capabilities,
+      });
+    }
+    if (url.pathname === "/api/reservations" && init?.method === "POST") {
+      const key = headers.get("idempotency-key")!;
+      const stored = idempotentResponses.get(key) ?? reservations.find(
+        (reservation) => reservation.status === "active" && reservation.lessonId === lesson.id,
+      );
+      if (stored) {
+        idempotentResponses.set(key, stored);
+        return response({ reservation: stored });
+      }
+      createWrites += 1;
+      const created: Reservation = {
+        id: "987",
+        userId: user.id,
+        lessonId: lesson.id,
+        status: "active",
+        reservedAt: new Date().toISOString(),
+        priceKc: lesson.priceKc,
+      };
+      reservations = [...reservations, created];
+      idempotentResponses.set(key, created);
+      return response({ reservation: created }, 201);
+    }
+    if (url.pathname === "/api/reservations/987" && init?.method === "DELETE") {
+      const key = headers.get("idempotency-key")!;
+      if (key.startsWith("uat:cleanup:")) cleanupRequests += 1;
+      const stored = idempotentResponses.get(key);
+      if (stored?.status === "cancelled") return response({ reservation: stored });
+      if (cancelledReservation) {
+        idempotentResponses.set(key, cancelledReservation);
+        return response({ reservation: cancelledReservation });
+      }
+      cancelWrites += 1;
+      const targetReservation = reservations.find((reservation) => reservation.id === "987");
+      const cancelled: Reservation = {
+        ...(targetReservation ?? { id: "987", userId: user.id, lessonId: lesson.id, reservedAt: new Date().toISOString(), priceKc: 180 }),
+        status: "cancelled",
+        cancelledAt: new Date().toISOString(),
+        cancellationFeeKc: 0,
+      };
+      reservations = reservations.filter((reservation) => reservation.id !== "987");
+      if (corruptPreExistingReservation) {
+        reservations = reservations.map((reservation) => reservation.id === preExistingReservation.id
+          ? { ...reservation, id: "unexpected-replacement" }
+          : reservation);
+      }
+      cancelledReservation = cancelled;
+      idempotentResponses.set(key, cancelled);
+      return response({ reservation: cancelled });
+    }
+    return response({ code: "NOT_FOUND", error: "not found" }, 404);
+  };
+
+  await assert.rejects(
+    runBookingMutationUat({ ...config, expectedLessonKind: "reformer" }, fakeFetch),
+    /not the required reformer scenario.*no mutation was attempted/i,
+  );
+  assert.equal(createWrites, 0);
+
+  await assert.rejects(
+    runBookingMutationUat({ ...config, expectedRoomNumber: 2 }, fakeFetch),
+    /different Luxart room than expected.*no mutation was attempted/i,
+  );
+  assert.equal(createWrites, 0);
+
+  snapshotCreditBalanceKc = maximumOperationalAmountKc + 1;
+  await assert.rejects(
+    runBookingMutationUat(config, fakeFetch),
+    /invalid financial values/i,
+  );
+  snapshotCreditBalanceKc = user.creditBalanceKc;
+  snapshotLessonPriceKc = maximumOperationalAmountKc + 1;
+  await assert.rejects(
+    runBookingMutationUat(config, fakeFetch),
+    /invalid financial values/i,
+  );
+  snapshotLessonPriceKc = lesson.priceKc;
+  assert.equal(createWrites, 0);
+
+  const evidence = await runBookingMutationUat(config, fakeFetch);
+  validateBookingUatScenarioEvidence(
+    evidence,
+    config.target.origin,
+    new Map([["1", 101]]),
+    resourceMapSha256,
+    config.expectedCommit,
+    config.expectedPhase,
+    "standard",
+  );
+  assert.equal(evidence.ok, true);
+  assert.equal(evidence.schemaVersion, bookingMutationUatScenarioEvidenceSchemaVersion);
+  assert.equal(evidence.lessonKind, "standard");
+  assert.equal(evidence.deploymentProvenanceVerified, true);
+  assert.equal(evidence.commit, commit);
+  assert.equal(evidence.phase, "booking_without_payments");
+  assert.equal(evidence.region, "fra1");
+  assert.equal(evidence.personalizedEligibilityVerified, true);
+  assert.equal(evidence.authoritativeAvailabilityVerified, true);
+  assert.equal(evidence.reservationWindowVerified, true);
+  assert.equal(evidence.onlineCancellationVerified, true);
+  assert.equal(evidence.resourceMapSha256, resourceMapSha256);
+  assert.equal(evidence.lessonRoomNumber, 1);
+  assert.equal(evidence.expectedCancellationFeeKc, 0);
+  assert.equal(evidence.cancellationStateVerified, true);
+  assert.equal(evidence.snapshotRequestIdsRecorded, true);
+  assert.equal(evidence.preExistingActiveReservationsPreserved, true);
+  assert.equal(evidence.finalStateRestored, true);
+  assert.ok(evidence.requestIds.length >= 16);
+  assert.equal(createWrites, 1);
+  assert.equal(cancelWrites, 1);
+  assert.equal(JSON.stringify(evidence).includes("test-secret"), false);
+  assert.equal(JSON.stringify(evidence).includes("approved-test-user"), false);
+
+  const writesAfterSuccessfulUat = createWrites;
+  personalizedEligibility = false;
+  await assert.rejects(
+    runBookingMutationUat(config, fakeFetch),
+    /not explicitly eligible.*no mutation was attempted/i,
+  );
+  assert.equal(createWrites, writesAfterSuccessfulUat);
+
+  personalizedEligibility = true;
+  authoritativeAvailableCount = 0;
+  await assert.rejects(
+    runBookingMutationUat(config, fakeFetch),
+    /no authoritative available place.*no mutation was attempted/i,
+  );
+  assert.equal(createWrites, writesAfterSuccessfulUat);
+
+  authoritativeAvailableCount = 8;
+  readinessCommit = "b".repeat(40);
+  await assert.rejects(
+    runBookingMutationUat(config, fakeFetch),
+    /exact approved ready live staging runtime/i,
+  );
+  assert.equal(createWrites, writesAfterSuccessfulUat);
+
+  readinessCommit = commit;
+  readinessResourceMapSha256 = "f".repeat(64);
+  await assert.rejects(
+    runBookingMutationUat(config, fakeFetch),
+    /exact approved ready live staging runtime/i,
+  );
+  assert.equal(createWrites, writesAfterSuccessfulUat);
+  readinessResourceMapSha256 = resourceMapSha256;
+
+  reservations = [preExistingReservation];
+  cancelledReservation = undefined;
+  idempotentResponses.clear();
+  readinessCommit = commit;
+  corruptPreExistingReservation = true;
+  await assert.rejects(
+    runBookingMutationUat(config, fakeFetch),
+    /active reservation identity set does not match/i,
+  );
+
+  reservations = [preExistingReservation];
+  cancelledReservation = undefined;
+  idempotentResponses.clear();
+  corruptPreExistingReservation = false;
+  failSnapshotAfterCancellation = true;
+  const cleanupRequestsBeforeFailure = cleanupRequests;
+  await assert.rejects(
+    runBookingMutationUat(config, fakeFetch),
+    /snapshot unavailable/i,
+  );
+  assert.equal(cleanupRequests, cleanupRequestsBeforeFailure + 1);
+});
