@@ -54,6 +54,7 @@ export interface DeploymentPreflightReport {
 }
 
 export const deploymentCliOnlyVariables = [
+  "ZONE4YOU_LEDGER_INSPECTION_DATABASE_URL",
   "BOOKING_TEST_DATABASE_URL",
   "PAYMENT_TEST_DATABASE_URL",
   "RATE_LIMIT_TEST_DATABASE_URL",

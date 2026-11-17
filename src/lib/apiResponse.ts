@@ -10,7 +10,9 @@ export function ok<T>(data: T, init?: ResponseInit) {
 }
 
 export function fail(error: unknown, status = 400) {
-  const requestId = randomUUID();
+  const suppliedRequestId = error instanceof BookingApiError ? new Headers(error.headers).get("X-Request-ID") : null;
+  const requestId = suppliedRequestId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(suppliedRequestId)
+    ? suppliedRequestId : randomUUID();
   if (error instanceof BookingApiError) {
     const headers = new Headers(error.headers);
     headers.set("X-Request-ID", requestId);

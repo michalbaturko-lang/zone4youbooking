@@ -29,3 +29,18 @@ test("remote GitHub Actions are pinned to immutable full commit SHAs", () => {
     }
   }
 });
+
+test("quality CI executes every real PostgreSQL integration suite with isolated test configuration", () => {
+  const workflow = readFileSync(resolve(".github/workflows/quality.yml"), "utf8");
+  const pkg = JSON.parse(readFileSync(resolve("package.json"), "utf8"));
+  assert.match(workflow, /postgres:\s*\n\s+runs-on:/);
+  assert.match(workflow, /image: postgres:16/);
+  for (const variable of ["BOOKING_TEST_DATABASE_URL", "PAYMENT_TEST_DATABASE_URL", "RATE_LIMIT_TEST_DATABASE_URL"]) {
+    assert.ok(workflow.includes(`${variable}: postgresql://zone4you_test:`));
+  }
+  assert.match(workflow, /run: npm run test:postgres/);
+  assert.match(pkg.scripts["test:postgres"], /tests\/\*\.integration\.ts/);
+  for (const name of ["booking-mutation-ledger-postgres.integration.ts", "payment-ledger-postgres.integration.ts", "rate-limit-postgres.integration.ts"]) {
+    assert.ok(readdirSync(resolve("tests")).includes(name));
+  }
+});

@@ -25,6 +25,7 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
     | "duplicate-lessons"
     | "missing-user-possible"
     | "blocked-user"
+    | "reservations-not-found"
     | "reservations"
     | "watchdog"
     | "credit"
@@ -192,6 +193,11 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
       return;
     }
     if (request.method === "GET" && url.pathname === "/api/Reservations") {
+      if (malformedRead === "reservations-not-found") {
+        response.statusCode = 404;
+        response.end(JSON.stringify({ error: "missing endpoint" }));
+        return;
+      }
       assert.equal(url.searchParams.get("lang"), "en");
       if (malformedRead === "reservations") {
         response.end(JSON.stringify([{ ...reservation, id_rezervace: 0 }]));
@@ -400,6 +406,15 @@ test("runs the documented Luxart login, lessons, credit, reservations, watchdog 
   assert.equal(lessons.length, 1);
   assert.equal(lessons[0].roomName, "Sál 2");
   assert.equal(lessons[0].availableCount, 5);
+
+  malformedRead = "reservations-not-found";
+  const postsBeforeMissingEndpoint = reservationPostCount;
+  await assert.rejects(adapter.getReservations(), (error: unknown) =>
+    error instanceof BookingApiError && error.code === "LUXART_UPSTREAM_ERROR");
+  await assert.rejects(adapter.createReservation({ lessonId: lessons[0].id }), (error: unknown) =>
+    error instanceof BookingApiError && error.code === "LUXART_UPSTREAM_ERROR");
+  assert.equal(reservationPostCount, postsBeforeMissingEndpoint);
+  malformedRead = undefined;
 
   malformedRead = "duplicate-lessons";
   const postsBeforeDuplicateLesson = reservationPostCount;

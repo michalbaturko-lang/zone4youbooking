@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Reservation } from "./domain";
 import type {
   BookingMutationOperation,
@@ -154,6 +154,18 @@ export async function processBookingMutation(input: {
       );
     }
     return { reservation, replayed: false };
+  } catch (error) {
+    if (error instanceof BookingApiError && error.code === "BOOKING_RECONCILIATION_REQUIRED") {
+      const requestId = randomUUID();
+      console.error(JSON.stringify({
+        event: "booking_mutation_reconciliation", requestId, operation: input.operation,
+        userIdSha256: createHash("sha256").update(input.userId).digest("hex"),
+        idempotencyKeySha256: createHash("sha256").update(input.idempotencyKey).digest("hex"),
+        mutationFingerprint: requestFingerprint(input.operation, input.targetId),
+      }));
+      throw new BookingApiError(error.status, error.code, error.message, { "X-Request-ID": requestId });
+    }
+    throw error;
   } finally {
     await lease.release();
   }

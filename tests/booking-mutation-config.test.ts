@@ -27,3 +27,17 @@ test("live booking mutations fail closed until the durable TLS ledger is configu
   assert.equal(bookingMutationRuntimeReady(withoutRuleApproval, confirmedBusinessRulesProfile), false);
   assert.ok(bookingMutationConfigurationProblems(withoutRuleApproval, confirmedBusinessRulesProfile).includes("BOOKING_RULES_UNCONFIRMED"));
 });
+
+test("session advisory locking rejects undeclared, transaction and statement poolers", () => {
+  const environment = confirmedBusinessRulesEnvironment({
+    LUXART_MOCK: "false", BOOKING_MUTATIONS_ENABLED: "true", BOOKING_LEDGER_MODE: "postgres",
+    BOOKING_DATABASE_URL: "postgresql://booking@db.example.com/zone4you?sslmode=verify-full",
+  });
+  for (const mode of [undefined, "transaction", "statement", "unknown"]) {
+    const problems = bookingMutationConfigurationProblems({ ...environment, BOOKING_DATABASE_POOL_MODE: mode }, confirmedBusinessRulesProfile);
+    assert.ok(problems.includes("BOOKING_DATABASE_POOL_MODE"));
+  }
+  for (const mode of ["direct", "session"]) {
+    assert.equal(bookingMutationRuntimeReady({ ...environment, BOOKING_DATABASE_POOL_MODE: mode }, confirmedBusinessRulesProfile), true);
+  }
+});

@@ -85,3 +85,14 @@ test("a custom Reformer cancellation policy must match every implemented value",
     false,
   );
 });
+
+test("confirmation supports a ban on late cancellation and rejects incomplete or invalid agreed values", () => {
+  const profile = {
+    ...confirmedBusinessRulesProfile,
+    groupCancellation: { ...confirmedBusinessRulesProfile.groupCancellation!, lateCancellationAllowed: false },
+  };
+  assert.equal(businessRulesProfileMatchesImplementation(profile, { ...bookingRules, lateCancellationAllowed: false }), true);
+  assert.equal(businessRulesProfileMatchesImplementation(profile, bookingRules), false);
+  const invalid = { ...profile, reservationHoldKc: -1 };
+  assert.equal(businessRulesProfileMatchesImplementation(invalid, { ...bookingRules, reservationHoldKc: -1, lateCancellationAllowed: false }), false);
+});

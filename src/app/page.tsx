@@ -359,9 +359,23 @@ export default function Home() {
   const [paymentReturn, setPaymentReturn] = useState<"success" | "cancelled" | null>(null);
   const [mutationOutcomeUncertain, setMutationOutcomeUncertain] = useState(false);
 
+  const refreshGeneration = useRef(0);
+  const refreshController = useRef<AbortController | null>(null);
+
+  function invalidatePendingRefresh() {
+    refreshGeneration.current += 1;
+    refreshController.current?.abort();
+    refreshController.current = null;
+  }
+
   async function refresh(nextLocale: Locale = locale) {
+    invalidatePendingRefresh();
+    const generation = refreshGeneration.current;
+    const controller = new AbortController();
+    refreshController.current = controller;
     try {
-      const next = await bookingApiClient.snapshot(nextLocale);
+      const next = await bookingApiClient.snapshot(nextLocale, controller.signal);
+      if (generation !== refreshGeneration.current) return;
       setSnapshot(next);
       setRules(next.rules);
       setCapabilities(next.capabilities);
@@ -369,6 +383,7 @@ export default function Home() {
       setLoadFailure(null);
       return next;
     } catch (error) {
+      if (generation !== refreshGeneration.current) return;
       setLoadFailure({
         ...(error instanceof BookingApiClientError && error.requestId
           ? { requestId: error.requestId }
@@ -376,12 +391,16 @@ export default function Home() {
       });
       throw error;
     } finally {
-      setLoading(false);
+      if (generation === refreshGeneration.current) {
+        refreshController.current = null;
+        setLoading(false);
+      }
     }
   }
 
   useEffect(() => {
     refresh().catch(() => undefined);
+    return () => invalidatePendingRefresh();
   }, [locale]);
 
   useEffect(() => {
@@ -484,6 +503,7 @@ export default function Home() {
     } = {},
   ) {
     const refreshAfter = options.refreshAfter ?? true;
+    invalidatePendingRefresh();
     setBusy(key);
     try {
       const result = await action();
@@ -576,7 +596,17 @@ export default function Home() {
   }
 
   async function handleLogout() {
-    await withBusy("logout", () => bookingApiClient.logout(locale), t("toast.logout"));
+    await withBusy("logout", async () => {
+      const result = await bookingApiClient.logout(locale);
+      // Confirmed logout clears personal data before the follow-up read, which
+      // can fail independently during a network outage.
+      setSnapshot((current) => current ? {
+        ...current, user: null, reservations: [], waitlist: [], transactions: [],
+      } : current);
+      setSelectedLesson(null);
+      setModal(null);
+      return result;
+    }, t("toast.logout"), { preserveConfirmedResultOnRefreshFailure: true });
     setSection("schedule");
   }
 

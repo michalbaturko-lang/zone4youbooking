@@ -10,16 +10,17 @@ function requestTooLarge() {
   );
 }
 
-export async function readBoundedJson<T>(
+export async function readBoundedText(
   request: Request,
   maximumBytes = maximumJsonBodyBytes,
-): Promise<T> {
+  tooLarge: () => Error = requestTooLarge,
+): Promise<string> {
   const rawLength = request.headers.get("content-length");
   if (rawLength && /^\d+$/.test(rawLength) && Number(rawLength) > maximumBytes) {
-    throw requestTooLarge();
+    throw tooLarge();
   }
 
-  if (!request.body) return {} as T;
+  if (!request.body) return "";
   const reader = request.body.getReader();
   const decoder = new TextDecoder();
   let bytesRead = 0;
@@ -32,7 +33,7 @@ export async function readBoundedJson<T>(
       bytesRead += value.byteLength;
       if (bytesRead > maximumBytes) {
         await reader.cancel().catch(() => undefined);
-        throw requestTooLarge();
+        throw tooLarge();
       }
       text += decoder.decode(value, { stream: true });
     }
@@ -41,9 +42,16 @@ export async function readBoundedJson<T>(
     reader.releaseLock();
   }
 
+  return text;
+}
+
+export async function readBoundedJson<T>(request: Request, maximumBytes = maximumJsonBodyBytes): Promise<T> {
+  const text = await readBoundedText(request, maximumBytes);
   if (!text.trim()) return {} as T;
   try {
-    return JSON.parse(text) as T;
+    const parsed: unknown = JSON.parse(text);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Expected an object.");
+    return parsed as T;
   } catch {
     throw new BookingApiError(400, "INVALID_JSON", "Požadavek neobsahuje platná data.");
   }

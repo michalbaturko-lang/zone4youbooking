@@ -20,6 +20,11 @@ export function bookingMutationConfigurationProblems(
   if (!bookingMutationsRequested(environment)) problems.push("BOOKING_MUTATIONS_DISABLED");
   if (!businessRulesRuntimeReady(environment, profile)) problems.push("BOOKING_RULES_UNCONFIRMED");
   if (environment.BOOKING_LEDGER_MODE !== "postgres") problems.push("BOOKING_LEDGER_MODE");
+  // Session advisory locks survive individual queries. Transaction/statement
+  // poolers can move these queries to another backend and cannot protect them.
+  if (!["direct", "session"].includes(environment.BOOKING_DATABASE_POOL_MODE ?? "")) {
+    problems.push("BOOKING_DATABASE_POOL_MODE");
+  }
   if (!validTlsPostgresUrl(environment.BOOKING_DATABASE_URL)) problems.push("BOOKING_DATABASE_URL");
   return problems;
 }

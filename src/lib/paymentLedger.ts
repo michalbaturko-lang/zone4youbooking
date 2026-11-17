@@ -1,3 +1,4 @@
+import { createRuntimePostgresPool } from "./postgresPool";
 import { Pool, type PoolClient } from "pg";
 import { BookingApiError } from "./errors";
 import { paymentDatabaseUrl } from "./paymentConfig";
@@ -54,16 +55,29 @@ export class PostgresPaymentLedger implements DurablePaymentLedger {
     ) {
       throw new BookingApiError(503, "PAYMENT_LEDGER_NOT_READY", "Platební ledger není připraven.");
     }
-    const schema = await this.pool.query<{ version: number; uniqueness_constraints: number }>(
+    const schema = await this.pool.query<{
+      version: number;
+      version_rows: number;
+      event_key_valid: boolean;
+      session_key_valid: boolean;
+      intent_key_valid: boolean;
+    }>(
       `SELECT
         COALESCE((SELECT MAX(version) FROM ${paymentSchemaTable}), 0)::int AS version,
-        (SELECT COUNT(*) FROM pg_constraint
-          WHERE conrelid = to_regclass('${paymentTable}') AND contype IN ('p', 'u'))::int AS uniqueness_constraints`,
+        (SELECT COUNT(*) FROM ${paymentSchemaTable})::int AS version_rows,
+        EXISTS (SELECT 1 FROM pg_constraint
+          WHERE conrelid = to_regclass('${paymentTable}') AND contype = 'p'
+            AND pg_get_constraintdef(oid) = 'PRIMARY KEY (stripe_event_id)') AS event_key_valid,
+        EXISTS (SELECT 1 FROM pg_constraint
+          WHERE conrelid = to_regclass('${paymentTable}') AND contype = 'u'
+            AND pg_get_constraintdef(oid) = 'UNIQUE (stripe_checkout_session_id)') AS session_key_valid,
+        EXISTS (SELECT 1 FROM pg_constraint
+          WHERE conrelid = to_regclass('${paymentTable}') AND contype = 'u'
+            AND pg_get_constraintdef(oid) = 'UNIQUE (stripe_payment_intent_id)') AS intent_key_valid`,
     );
-    if (
-      schema.rows[0]?.version !== paymentSchemaVersion ||
-      schema.rows[0]?.uniqueness_constraints < 3
-    ) {
+    const row = schema.rows[0];
+    if (row?.version !== paymentSchemaVersion || row.version_rows !== 1 ||
+      row.event_key_valid !== true || row.session_key_valid !== true || row.intent_key_valid !== true) {
       throw new BookingApiError(503, "PAYMENT_LEDGER_NOT_READY", "Platební ledger má neplatnou verzi.");
     }
   }
@@ -197,13 +211,13 @@ export function getPaymentPool() {
   if (!globalPaymentPool.zone4youPaymentPool) {
     const configuredPoolMax = Number(process.env.PAYMENT_DATABASE_POOL_MAX ?? "2");
     const poolMax = Number.isInteger(configuredPoolMax) ? Math.max(1, Math.min(5, configuredPoolMax)) : 2;
-    globalPaymentPool.zone4youPaymentPool = new Pool({
+    globalPaymentPool.zone4youPaymentPool = createRuntimePostgresPool({
       connectionString: paymentDatabaseUrl(),
       application_name: "zone4you-booking-payments",
       max: poolMax,
       connectionTimeoutMillis: 5_000,
       idleTimeoutMillis: 10_000,
-    });
+    }, "payments");
   }
   return globalPaymentPool.zone4youPaymentPool;
 }

@@ -51,3 +51,29 @@ test("production webhook route stays disabled while the checked-in business rule
   assert.equal(response.status, 503);
   assert.equal((await response.json()).code, "PAYMENTS_DISABLED");
 });
+
+test("chunked oversized webhook is cancelled before signature verification or full buffering", async () => {
+  let produced = 0;
+  let cancelled = false;
+  let signatures = 0;
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      produced += 1;
+      controller.enqueue(new Uint8Array(128 * 1024));
+      if (produced === 24) controller.close();
+    },
+    cancel() { cancelled = true; },
+  });
+  const response = await handleStripeWebhook(new Request("https://booking.zone4you.cz/api/payments/webhook", {
+    method: "POST", headers: { "stripe-signature": "not-used", "content-length": "1" },
+    body, duplex: "half",
+  } as RequestInit), {
+    assertRuntimeReady() {},
+    constructEvent() { signatures += 1; throw new Error("must not verify an oversized payload"); },
+    async processEvent() { throw new Error("must not process an oversized payload"); },
+  });
+  assert.equal(response.status, 413);
+  assert.equal(signatures, 0);
+  assert.equal(cancelled, true);
+  assert.ok(produced < 24, "must stop consuming the body near the 1 MiB limit");
+});

@@ -912,3 +912,48 @@ test("výpadek rozvrhu má trvalý retry stav a vypršená session odstraní sta
     !error.includes("503 (Service Unavailable)") && !error.includes("401 (Unauthorized)"),
   )).toEqual([]);
 });
+
+test("opožděný snapshot nevrátí účet po logoutu ani při chybě následného čtení", { tag: "@preview" }, async ({ page }) => {
+  test.skip(Boolean(process.env.PLAYWRIGHT_EXTERNAL_DEMO_URL), "Local race regression only.");
+  await openCleanDemo(page);
+  await page.getByRole("button", { name: "Přihlásit se", exact: true }).first().click();
+  const login = page.getByRole("dialog", { name: "Přihlášení" });
+  await login.getByLabel("Příjmení, e-mail nebo login").fill("Nováková");
+  await login.getByLabel("Heslo", { exact: true }).fill("2048");
+  await login.getByRole("button", { name: "Přihlásit se", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Odhlásit", exact: true })).toBeVisible();
+
+  let announceHeld!: () => void;
+  let releaseHeld!: () => void;
+  let announceFinished!: () => void;
+  const held = new Promise<void>((resolve) => { announceHeld = resolve; });
+  const release = new Promise<void>((resolve) => { releaseHeld = resolve; });
+  const finished = new Promise<void>((resolve) => { announceFinished = resolve; });
+  let first = true;
+  await page.route("**/api/booking/snapshot", async (route) => {
+    if (first) {
+      first = false;
+      const original = await route.fetch();
+      const oldBody = await original.text();
+      expect(oldBody).toContain("Tereza Nováková");
+      announceHeld();
+      await release;
+      await route.fulfill({ response: original, body: oldBody }).catch(() => undefined);
+      announceFinished();
+    } else {
+      await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ code: "REQUEST_FAILED" }) });
+    }
+  });
+  await page.getByRole("button", { name: "EN", exact: true }).first().click();
+  await held;
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Sign in", exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign out", exact: true })).toHaveCount(0);
+  releaseHeld();
+  await finished;
+  await expect(page.getByRole("button", { name: "Sign out", exact: true })).toHaveCount(0);
+  await expect(page.getByText("Tereza Nováková", { exact: true })).toHaveCount(0);
+  await page.unroute("**/api/booking/snapshot");
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Sign in", exact: true }).first()).toBeVisible();
+});

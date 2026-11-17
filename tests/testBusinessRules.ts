@@ -27,6 +27,7 @@ export function confirmedBusinessRulesEnvironment(
 ): BusinessRulesEnvironment {
   return {
     BOOKING_RULES_CONFIRMED: "true",
+    BOOKING_DATABASE_POOL_MODE: "direct",
     BOOKING_RULES_PROFILE_SHA256: businessRulesProfileSha256(confirmedBusinessRulesProfile),
     ...overrides,
   };

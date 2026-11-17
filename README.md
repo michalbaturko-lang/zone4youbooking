@@ -1,5 +1,7 @@
 # Zone4You Booking
 
+**Aktualizace 17. 11. 2026:** aktuální [audit a implementované nálezy](docs/audit-and-development-spec-2026-11-17.md) a [přesné zadání navazujícího vývoje](docs/next-development-handoff-2026-11-17.md) upřesňují starší plán i předpoklady hostingu.
+
 Řízený booking pilot pro Zone4You. Next.js aplikace obsahuje demo adapter i fail-closed reálnou Luxart vrstvu, PostgreSQL ochranu rezervací/storna, sdílený PostgreSQL rate limit pro multi-instance provoz, serverový Stripe Checkout, podepsaný webhook a samostatný platební ledger. Živé mutace zůstávají vypnuté do dokončení testovací integrace, UAT a výslovného cutover souhlasu.
 
 Aktuální řízený launch plán, rozhodovací body, akceptační brány a E2E scénáře jsou v [`docs/launch-plan.md`](docs/launch-plan.md). Ověřený veřejný Luxart kontrakt je v [`docs/luxart-contract-findings-2026-08-29.md`](docs/luxart-contract-findings-2026-08-29.md) a jeho read-only kontrola z 11. 9. v [`docs/luxart-contract-refresh-2026-09-11.md`](docs/luxart-contract-refresh-2026-09-11.md). Stav hostingu a síťové varianty jsou v [`docs/hosting-readiness.md`](docs/hosting-readiness.md), požadavek pro IT v [`docs/zone4you-it-access-request.md`](docs/zone4you-it-access-request.md) a fail-closed vyhodnocení odpovědi o portu 9191 v [`docs/zone4you-it-response-intake.md`](docs/zone4you-it-response-intake.md).
@@ -24,6 +26,8 @@ Klientsky Vercel preview link je Shareable Link s tokenem v URL. Nepatri do vere
 
 ```bash
 npm run quality
+# V samostatné izolované PostgreSQL DB se třemi *_TEST_DATABASE_URL:
+npm run test:postgres
 # Pouze proti izolovanému Vercel Preview, které samo prokáže demo/mock režim:
 PLAYWRIGHT_EXTERNAL_DEMO_URL=https://zone4youbooking-...vercel.app/ \
 PLAYWRIGHT_EXPECTED_DEMO_COMMIT=<přesný-40znakový-git-commit> npm run test:e2e

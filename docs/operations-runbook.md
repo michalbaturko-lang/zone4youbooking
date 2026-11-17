@@ -204,3 +204,11 @@ npm run verify:readonly-rollback
 ```
 
 Ověřovač nepřijme ručně dopsaný čas: vyžaduje chráněnou startovní účtenku, její celý SHA-256 a shodu cíle, commitu, limitu i drill ID. Ověří `health`, živé read-only `readiness`, fázi `read_only`, commit, region `fra1`, neprázdný rozvrh a bezpečné odmítnutí vytvoření rezervace, storna, watchdogu a Stripe Checkout. Nepoužívá login, cookie ani reálné ID lekce/rezervace; záměrně posílá sentinelové hodnoty, které musí být odmítnuty dříve, než se zavolá Luxart nebo Stripe. Celý privacy-safe JSON výstup s `X-Request-ID`, otiskem startovní účtenky, začátkem rollbacku, časem dosažení read-only a oběma odvozenými délkami uložte jako časovaný rollback důkaz. Skript skončí ještě před sentinelovými požadavky při nesprávném commitu/fázi nebo pokud od nezměnitelného začátku do ověřeného read-only stavu uplynulo více než pět minut.
+
+## Dohledání nejisté rezervace bez osobních dat
+
+Od auditní opravy z 17. 11. procesor při `BOOKING_RECONCILIATION_REQUIRED` vytvoří událost `booking_mutation_reconciliation` se stejným `requestId`, jaké dostane klient. Neobsahuje jméno, heslo, session, číslo karty ani syrové ID klienta/lekce. Obsahuje SHA-256 klientského ID a idempotency klíče a uložený `mutationFingerprint`.
+
+Operátor může s účtem určeným jen ke čtení spustit `npm run inspect:booking-ledger`; připojení vloží do jednorázového prostředí `ZONE4YOU_LEDGER_INSPECTION_DATABASE_URL`, nikoli do runtime hostingu. Nástroj používá READ ONLY transakci a vrací počty a nejvýše 100 nejstarších neuzavřených operací s týmiž otisky. Výpis je omezený a příznak `truncated` upozorní na další řádky. Nečte uložené odpovědi ani osobní data a nikdy neopakuje Luxart zápis ani nemění ledger. Podle klientova request ID nejprve najděte log, potom podle tří otisků příslušný řádek výpisu. Samotné request ID není sloupcem ledgeru.
+
+Tento diagnostický příkaz neopravňuje označit nejistý výsledek za úspěch. Uzavření vyžaduje skutečnou kontrolu Member Pro, důkaz a samostatný schválený provozní postup.

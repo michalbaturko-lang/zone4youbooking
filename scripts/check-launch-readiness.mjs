@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
+import { businessRulesMatch } from "../src/lib/businessRulesValidation.mjs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { createHash } from "node:crypto";
@@ -335,23 +336,7 @@ function verifiedLuxartGatewayConfiguration() {
 }
 
 function businessRulesProfileMatchesImplementation() {
-  const cancellation = businessRulesProfile.groupCancellation;
-  const reservationWindow = businessRulesProfile.reservationWindow;
-  return (
-    businessRulesProfile.status === "confirmed" &&
-    typeof businessRulesProfile.profileId === "string" &&
-    businessRulesProfile.profileId.trim().length > 0 &&
-    businessRulesProfile.minimumCreditForReservationKc === bookingRulesImplementation.minimumCreditForReservationKc &&
-    businessRulesProfile.reservationHoldKc === bookingRulesImplementation.reservationHoldKc &&
-    reservationWindow?.mode === "rolling_hours" &&
-    reservationWindow.hours === bookingRulesImplementation.reservationWindowHours &&
-    cancellation?.freeCancellationCutoff?.mode === bookingRulesImplementation.freeCancellationCutoff.mode &&
-    cancellation.freeCancellationCutoff.timeZone === bookingRulesImplementation.freeCancellationCutoff.timeZone &&
-    cancellation.lateFeeKc === bookingRulesImplementation.lateCancelFeeKc &&
-    cancellation.noShowFeeKc === bookingRulesImplementation.noShowFeeKc &&
-    cancellation.lateCancellationAllowed === true &&
-    businessRulesProfile.reformerCancellation?.mode === "same_as_group"
-  );
+  return businessRulesMatch(businessRulesProfile, bookingRulesImplementation);
 }
 
 function paymentProductProfileMatchesImplementation() {
@@ -452,6 +437,7 @@ check(
 check(
   "Durable booking mutation ledger",
   process.env.BOOKING_LEDGER_MODE === "postgres" &&
+    ["direct", "session"].includes(process.env.BOOKING_DATABASE_POOL_MODE ?? "") &&
     configured("BOOKING_DATABASE_URL") &&
     validTlsPostgresUrl(process.env.BOOKING_DATABASE_URL) &&
     bookingLedger.includes("pg_try_advisory_lock") &&

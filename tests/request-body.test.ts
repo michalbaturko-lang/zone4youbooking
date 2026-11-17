@@ -87,3 +87,10 @@ test("login route returns privacy-safe parser errors with a request ID", async (
     else process.env.LUXART_MOCK = previousLuxartMock;
   }
 });
+
+test("BFF JSON bodies reject null, arrays and scalars before request-specific processing", async () => {
+  for (const body of ["null", "[]", '"private-body-marker"', "1", "true"]) {
+    await assert.rejects(readBoundedJson(post(body)), (error: unknown) =>
+      error instanceof BookingApiError && error.status === 400 && error.code === "INVALID_JSON" && !error.message.includes("private-body-marker"));
+  }
+});

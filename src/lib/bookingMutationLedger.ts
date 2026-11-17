@@ -1,3 +1,4 @@
+import { createRuntimePostgresPool } from "./postgresPool";
 import { Pool, type PoolClient } from "pg";
 import { bookingDatabaseUrl } from "./bookingMutationConfig";
 import { BookingApiError } from "./errors";
@@ -327,13 +328,13 @@ export function getBookingPool() {
   if (!globalBookingPool.zone4youBookingPool) {
     const configuredPoolMax = Number(process.env.BOOKING_DATABASE_POOL_MAX ?? "5");
     const poolMax = Number.isInteger(configuredPoolMax) ? Math.max(2, Math.min(10, configuredPoolMax)) : 5;
-    globalBookingPool.zone4youBookingPool = new Pool({
+    globalBookingPool.zone4youBookingPool = createRuntimePostgresPool({
       connectionString: bookingDatabaseUrl(),
       application_name: "zone4you-booking-mutations",
       max: poolMax,
       connectionTimeoutMillis: 5_000,
       idleTimeoutMillis: 10_000,
-    });
+    }, "booking");
   }
   return globalBookingPool.zone4youBookingPool;
 }

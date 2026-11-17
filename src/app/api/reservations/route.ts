@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     const live = isRealLuxartMode();
     const session = requireLiveBookingMutationSession(request, live);
     const body = await readJsonWithDemoState<{ lessonId?: string }>(request);
-    if (!body.lessonId || body.lessonId.length > 256) {
+    if (typeof body.lessonId !== "string" || !body.lessonId.trim() || body.lessonId.trim() !== body.lessonId || body.lessonId.length > 256 || /[\u0000-\u001f\u007f]/.test(body.lessonId)) {
       throw new BookingApiError(400, "INVALID_LESSON_ID", "Lekci se nepodařilo identifikovat.");
     }
     const idempotencyKey = readIdempotencyKey(request);

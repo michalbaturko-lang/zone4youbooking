@@ -9,6 +9,7 @@ import {
 import { assertPaymentWriteDeploymentReady } from "@/lib/paymentWriteGate";
 import { createStripeClient } from "@/lib/stripeClient";
 import type Stripe from "stripe";
+import { readBoundedText } from "@/lib/requestBody";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -48,14 +49,9 @@ export async function handleStripeWebhook(
     if (!signature) {
       throw new BookingApiError(400, "STRIPE_SIGNATURE_MISSING", "Stripe podpis chybí.");
     }
-    const contentLength = Number(request.headers.get("content-length") ?? "0");
-    if (Number.isFinite(contentLength) && contentLength > maximumWebhookBytes) {
-      throw new BookingApiError(413, "STRIPE_WEBHOOK_TOO_LARGE", "Stripe událost je příliš velká.");
-    }
-    const rawBody = await request.text();
-    if (Buffer.byteLength(rawBody, "utf8") > maximumWebhookBytes) {
-      throw new BookingApiError(413, "STRIPE_WEBHOOK_TOO_LARGE", "Stripe událost je příliš velká.");
-    }
+    const rawBody = await readBoundedText(request, maximumWebhookBytes, () =>
+      new BookingApiError(413, "STRIPE_WEBHOOK_TOO_LARGE", "Stripe událost je příliš velká."),
+    );
 
     let event: Stripe.Event;
     try {

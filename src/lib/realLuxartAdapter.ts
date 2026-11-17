@@ -576,7 +576,8 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
           .map((reservation) => mapValidatedLuxartReservation(reservation, userId, config.resortId));
         return assertUniqueResponseIds(reservations);
       } catch (error) {
-        if (error instanceof LuxartHttpError && error.upstreamStatus === 404) return [];
+        // A missing route is not evidence of an empty collection. Fail closed
+        // until the actual endpoint contract has been verified.
         throw error;
       }
     },
@@ -602,7 +603,8 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
           .filter((entry): entry is WaitlistEntry => entry !== null);
         return assertUniqueResponseIds(waitlist);
       } catch (error) {
-        if (error instanceof LuxartHttpError && error.upstreamStatus === 404) return [];
+        // A missing route is not evidence of an empty collection. Fail closed
+        // until the actual endpoint contract has been verified.
         throw error;
       }
     },
@@ -629,7 +631,8 @@ export function createRealLuxartAdapter(context: RealLuxartContext = {}): Luxart
           config.resortId,
         );
       } catch (error) {
-        if (error instanceof LuxartHttpError && error.upstreamStatus === 404) return [];
+        // A missing route is not evidence of an empty collection. Fail closed
+        // until the actual endpoint contract has been verified.
         throw error;
       }
     },

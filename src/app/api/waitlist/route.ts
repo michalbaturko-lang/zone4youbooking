@@ -4,6 +4,7 @@ import { assertLiveBookingCreationReady } from "@/lib/bookingService";
 import { readJsonWithDemoState, withDemoState } from "@/lib/demoStateTransport";
 import { assertTrustedMutation, assertWaitlistMutationsEnabled } from "@/lib/requestSecurity";
 import { assertRateLimit, rateLimitRules } from "@/lib/rateLimit";
+import { BookingApiError } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,9 @@ export async function POST(request: Request) {
     assertTrustedMutation(request);
     assertWaitlistMutationsEnabled();
     const body = await readJsonWithDemoState<{ lessonId?: string }>(request);
-    if (!body.lessonId) throw new Error("Missing lessonId.");
+    if (typeof body.lessonId !== "string" || !body.lessonId.trim() || body.lessonId.trim() !== body.lessonId || body.lessonId.length > 256 || /[\u0000-\u001f\u007f]/.test(body.lessonId)) {
+      throw new BookingApiError(400, "INVALID_LESSON_ID", "Lekci se nepodařilo identifikovat.");
+    }
     await assertRateLimit(request, rateLimitRules.waitlistJoin, body.lessonId);
     const adapter = getRequestLuxartAdapter(request);
     if (isRealLuxartMode()) await assertLiveBookingCreationReady(adapter);

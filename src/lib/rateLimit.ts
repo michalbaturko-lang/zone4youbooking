@@ -1,3 +1,4 @@
+import { createRuntimePostgresPool } from "./postgresPool";
 import { createHash } from "node:crypto";
 import { isIP } from "node:net";
 import { Pool } from "pg";
@@ -264,13 +265,13 @@ export function getPostgresRateLimiter() {
   if (!globalPostgresRateLimitState.zone4youRateLimitPool) {
     const configuredPoolMax = Number(process.env.RATE_LIMIT_DATABASE_POOL_MAX ?? "2");
     const poolMax = Number.isInteger(configuredPoolMax) ? Math.max(1, Math.min(5, configuredPoolMax)) : 2;
-    globalPostgresRateLimitState.zone4youRateLimitPool = new Pool({
+    globalPostgresRateLimitState.zone4youRateLimitPool = createRuntimePostgresPool({
       connectionString: process.env.RATE_LIMIT_DATABASE_URL,
       application_name: "zone4you-rate-limit",
       max: poolMax,
       connectionTimeoutMillis: 3_000,
       idleTimeoutMillis: 10_000,
-    });
+    }, "rate-limit");
   }
   if (!globalPostgresRateLimitState.zone4youPostgresRateLimiter) {
     globalPostgresRateLimitState.zone4youPostgresRateLimiter = new PostgresFixedWindowRateLimiter(

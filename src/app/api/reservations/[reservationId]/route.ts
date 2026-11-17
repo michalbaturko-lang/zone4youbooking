@@ -18,7 +18,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ rese
     const session = requireLiveBookingMutationSession(request, live);
     await readJsonWithDemoState(request);
     const { reservationId } = await context.params;
-    if (!reservationId || reservationId.length > 128) {
+    if (typeof reservationId !== "string" || !reservationId.trim() || reservationId.trim() !== reservationId || reservationId.length > 320 || /[\u0000-\u001f\u007f]/.test(reservationId)) {
       throw new BookingApiError(400, "INVALID_RESERVATION_ID", "Rezervaci se nepodařilo identifikovat.");
     }
     const idempotencyKey = readIdempotencyKey(request);

@@ -189,3 +189,27 @@ test("a determinate business rejection is replayable while a safe preflight outa
   );
   assert.deepEqual(outage.calls, ["discarded", "released"]);
 });
+
+test("uncertain mutation support IDs correlate client errors with private-data-free ledger fingerprints", async (context) => {
+  const { fail } = await import("../src/lib/apiResponse");
+  const events: Array<Record<string, unknown>> = [];
+  context.mock.method(console, "error", (entry: string) => { events.push(JSON.parse(entry)); });
+  const { lease } = fakeLease("claimed");
+  await assert.rejects(processBookingMutation({
+    ...baseInput, ledger: ledgerWith(lease),
+    async mutate() { throw new BookingMutationOutcomeUnknownError(); },
+  }), (error: unknown) => {
+    assert.ok(error instanceof BookingApiError);
+    const response = fail(error);
+    assert.equal(response.status, 409);
+    assert.equal(response.headers.get("x-request-id"), events[0]?.requestId);
+    assert.match(String(events[0]?.mutationFingerprint), /^[a-f0-9]{64}$/);
+    assert.match(String(events[0]?.idempotencyKeySha256), /^[a-f0-9]{64}$/);
+    assert.equal(events[0]?.event, "booking_mutation_reconciliation");
+    assert.equal("userId" in events[0]!, false);
+    assert.equal("targetId" in events[0]!, false);
+    assert.equal("idempotencyKey" in events[0]!, false);
+    assert.equal(JSON.stringify(events).includes(baseInput.idempotencyKey), false);
+    return true;
+  });
+});

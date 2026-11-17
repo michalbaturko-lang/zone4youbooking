@@ -2,6 +2,7 @@ import type { BookingCapabilities, BookingRules, BookingSnapshot, LoginInput, Pa
 import type { MockLuxartState } from "./mockLuxart";
 import type { Locale } from "./i18n";
 import { isSafeMockLuxartState, safeSerializedDemoState } from "./demoState";
+import { isBookingSnapshotResponse } from "./bookingSnapshotValidation";
 
 export interface BookingSnapshotResponse extends BookingSnapshot {
   rules: BookingRules;
@@ -16,6 +17,7 @@ let inMemoryDemoState: MockLuxartState | undefined;
 export interface BookingApiRequestOptions {
   timeoutMs?: number;
   outcome?: "read" | "booking_mutation";
+  validateResponse?: (value: unknown) => boolean;
 }
 
 interface StatefulResponse {
@@ -130,6 +132,56 @@ function boundedTimeout(value: number | undefined, fallback: number) {
     : fallback;
 }
 
+const maximumApiResponseBytes = 16 * 1024 * 1024;
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+async function readBoundedApiResponse(response: Response): Promise<unknown> {
+  const length = response.headers.get("content-length");
+  if (length && /^\d+$/.test(length) && Number(length) > maximumApiResponseBytes) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new Error("API response exceeds the byte limit.");
+  }
+  if (!response.body) throw new Error("Missing API response body.");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  let bytes = 0;
+  let text = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > maximumApiResponseBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new Error("API response exceeds the byte limit.");
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    return JSON.parse(text + decoder.decode()) as unknown;
+  } finally { reader.releaseLock(); }
+}
+
+function reservationReceiptMatches(value: unknown, operation: "create" | "cancel", target: string) {
+  if (!isJsonObject(value) || !isJsonObject(value.reservation)) return false;
+  const r = value.reservation;
+  if (
+    typeof r.id !== "string" || !r.id || r.id.length > 320 ||
+    typeof r.userId !== "string" || !r.userId ||
+    typeof r.lessonId !== "string" || !r.lessonId ||
+    typeof r.priceKc !== "number" || !Number.isFinite(r.priceKc) || r.priceKc < 0 ||
+    typeof r.reservedAt !== "string" || !Number.isFinite(Date.parse(r.reservedAt))
+  ) return false;
+  return operation === "create"
+    ? r.status === "active" && r.lessonId === target
+    : r.status === "cancelled" &&
+      (r.id === target || (target.startsWith("uuid:") && r.luxartUuid === target.slice(5))) &&
+      typeof r.cancelledAt === "string" && Number.isFinite(Date.parse(r.cancelledAt)) &&
+      typeof r.cancellationFeeKc === "number" && Number.isFinite(r.cancellationFeeKc) && r.cancellationFeeKc >= 0;
+}
+
 export async function apiRequest<T>(
   path: string,
   init?: RequestInit,
@@ -148,7 +200,8 @@ export async function apiRequest<T>(
   else upstreamSignal?.addEventListener("abort", abortFromUpstream, { once: true });
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-  let response: Response;
+  let response: Response | undefined;
+  let json: unknown;
   try {
     response = await fetch(path, {
       ...init,
@@ -159,28 +212,47 @@ export async function apiRequest<T>(
       },
       signal: controller.signal,
     });
-  } catch {
-    const code = outcome === "booking_mutation"
+    try {
+      json = await readBoundedApiResponse(response);
+    } catch (error) {
+      // A known HTTP rejection remains a rejection even if its error body is
+      // unavailable. A missing success receipt must never confirm a mutation.
+      if (controller.signal.aborted || response.ok) throw error;
+      json = {};
+    }
+    if (!response.ok) {
+      const payload = isJsonObject(json) ? json : {};
+      const code = typeof payload.code === "string" ? payload.code : undefined;
+      const serverMessage = typeof payload.error === "string" ? payload.error : undefined;
+      throw new BookingApiClientError(
+        localizedApiErrorMessage(locale, code, serverMessage), response.status, code,
+        typeof payload.requestId === "string" ? payload.requestId : response.headers.get("x-request-id") ?? undefined,
+      );
+    }
+    if (controller.signal.aborted) throw new Error("Request was superseded.");
+    if (!isJsonObject(json) || (options.validateResponse && !options.validateResponse(json))) {
+      throw new Error("Invalid successful API receipt.");
+    }
+  } catch (error) {
+    if (error instanceof BookingApiClientError) throw error;
+    const code = outcome === "booking_mutation" && (!response || response.ok)
       ? "BOOKING_RECONCILIATION_REQUIRED"
-      : controller.signal.aborted
-        ? "REQUEST_TIMEOUT"
-        : "REQUEST_FAILED";
-    throw new BookingApiClientError(clientTransportMessage(locale, code), 0, code);
+      : controller.signal.aborted ? "REQUEST_TIMEOUT" : response ? "INVALID_RESPONSE" : "REQUEST_FAILED";
+    if (response && !response.ok) {
+      throw new BookingApiClientError(
+        localizedApiErrorMessage(locale), response.status, undefined,
+        response.headers.get("x-request-id") ?? undefined,
+      );
+    }
+    throw new BookingApiClientError(
+      code === "INVALID_RESPONSE"
+        ? (locale === "cs" ? "Služba vrátila neplatnou odpověď. Zkuste načtení zopakovat." : "The service returned an invalid response. Please reload and try again.")
+        : clientTransportMessage(locale, code),
+      0, code, response?.headers.get("x-request-id") ?? undefined,
+    );
   } finally {
     clearTimeout(timeout);
     upstreamSignal?.removeEventListener("abort", abortFromUpstream);
-  }
-  const json = (await response.json().catch(() => ({}))) as unknown;
-
-  if (!response.ok) {
-    const payload = typeof json === "object" && json !== null ? json as Record<string, unknown> : {};
-    const code = typeof payload.code === "string" ? payload.code : undefined;
-    const serverMessage = typeof payload.error === "string" ? payload.error : undefined;
-    const message = localizedApiErrorMessage(locale, code, serverMessage);
-    const requestId = typeof payload.requestId === "string"
-      ? payload.requestId
-      : response.headers.get("x-request-id") ?? undefined;
-    throw new BookingApiClientError(message, response.status, code, requestId);
   }
 
   writeStoredDemoState(json);
@@ -188,11 +260,12 @@ export async function apiRequest<T>(
 }
 
 export const bookingApiClient = {
-  snapshot(locale: Locale = "cs") {
+  snapshot(locale: Locale = "cs", signal?: AbortSignal) {
     return apiRequest<BookingSnapshotResponse>("/api/booking/snapshot", {
       method: "POST",
+      signal,
       body: bodyWithDemoState(),
-    }, locale);
+    }, locale, { validateResponse: isBookingSnapshotResponse });
   },
 
   login(input: LoginInput, locale: Locale = "cs") {
@@ -214,7 +287,7 @@ export const bookingApiClient = {
       method: "POST",
       headers: { "Idempotency-Key": bookingMutationKey("reserve") },
       body: bodyWithDemoState({ lessonId }),
-    }, locale, { outcome: "booking_mutation" });
+    }, locale, { outcome: "booking_mutation", validateResponse: (value) => reservationReceiptMatches(value, "create", lessonId) });
   },
 
   cancelReservation(reservationId: string, locale: Locale = "cs") {
@@ -222,7 +295,7 @@ export const bookingApiClient = {
       method: "DELETE",
       headers: { "Idempotency-Key": bookingMutationKey("cancel") },
       body: bodyWithDemoState(),
-    }, locale, { outcome: "booking_mutation" });
+    }, locale, { outcome: "booking_mutation", validateResponse: (value) => reservationReceiptMatches(value, "cancel", reservationId) });
   },
 
   joinWaitlist(lessonId: string, locale: Locale = "cs") {

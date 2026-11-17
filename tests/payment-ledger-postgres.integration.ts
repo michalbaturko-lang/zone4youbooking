@@ -54,3 +54,37 @@ test("PostgreSQL ledger atomically deduplicates event and Checkout Session", asy
     await admin.end();
   }
 });
+
+test("payment readiness rejects decoy uniqueness constraints and extra schema versions", async () => {
+  const schema = `z4y_payment_schema_${process.pid}_${Date.now()}`;
+  const admin = new Pool({ connectionString, max: 1 });
+  const pool = new Pool({ connectionString, max: 1, options: `-c search_path=${schema}` });
+  const migration = await readFile(join(process.cwd(), "migrations/001_payment_ledger.sql"), "utf8");
+  try {
+    await admin.query(`CREATE SCHEMA ${schema}`);
+    await pool.query(migration);
+    const ledger = new PostgresPaymentLedger(pool);
+    await ledger.assertReady();
+    for (const column of ["stripe_event_id", "stripe_checkout_session_id", "stripe_payment_intent_id"]) {
+      const constraints = await pool.query<{ conname: string }>(
+        `SELECT conname FROM pg_constraint WHERE conrelid = to_regclass('zone4you_payment_events')
+          AND contype IN ('p', 'u') AND pg_get_constraintdef(oid) IN ($1, $2)`,
+        [`PRIMARY KEY (${column})`, `UNIQUE (${column})`],
+      );
+      assert.equal(constraints.rowCount, 1);
+      const name = constraints.rows[0]!.conname.replaceAll('"', '""');
+      await pool.query(`ALTER TABLE zone4you_payment_events DROP CONSTRAINT "${name}"`);
+      await pool.query("ALTER TABLE zone4you_payment_events ADD CONSTRAINT decoy_unique UNIQUE (user_id)");
+      await assert.rejects(ledger.assertReady(), /neplatnou verzi/);
+      await pool.query("ALTER TABLE zone4you_payment_events DROP CONSTRAINT decoy_unique");
+      await pool.query(`ALTER TABLE zone4you_payment_events ADD CONSTRAINT "${name}" ${column === "stripe_event_id" ? "PRIMARY KEY" : "UNIQUE"} (${column})`);
+      await ledger.assertReady();
+    }
+    await pool.query("INSERT INTO zone4you_payment_schema (version) VALUES (0)");
+    await assert.rejects(ledger.assertReady(), /neplatnou verzi/);
+  } finally {
+    await pool.end();
+    await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+    await admin.end();
+  }
+});
