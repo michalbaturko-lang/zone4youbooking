@@ -1,4 +1,4 @@
-import { getLuxartAdapter, isRealLuxartMode } from "@/lib/adapterProvider";
+import { getLuxartAdapter, isRealLuxartMode, mockLuxartConfigurationReady } from "@/lib/adapterProvider";
 import { ok } from "@/lib/apiResponse";
 import { bookingMutationsRequested } from "@/lib/bookingMutationConfig";
 import { getPostgresBookingMutationLedger } from "@/lib/bookingMutationLedger";
@@ -27,6 +27,18 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   if (!isRealLuxartMode()) {
     const commit = runtimeDeploymentCommit();
+    if (!mockLuxartConfigurationReady()) {
+      return ok({
+        status: "not_ready",
+        mode: "demo",
+        phase: "demo",
+        commit: commit ?? "unverified",
+        region: runtimeDeploymentRegion(),
+        deployment: "invalid_demo_configuration",
+        luxart: "not_checked",
+        schedule: "not_checked",
+      }, { status: 503 });
+    }
     return ok({
       status: "ready",
       mode: "demo",

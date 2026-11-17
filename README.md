@@ -22,6 +22,10 @@ http://localhost:3007
 
 Klientsky Vercel preview link je Shareable Link s tokenem v URL. Nepatri do verejneho repozitare; aktualni odkaz je soucasti handoff zpravy.
 
+## Demo na hlavní Vercel adrese
+
+Produkční hosting může sloužit jako výslovně označené demo: nastavit současně `LUXART_MOCK=true` a `NEXT_PUBLIC_APP_ENV=demo` pro dané nasazení. Chybějící či jiné nastavení na produkčním hostingu se odmítne a readiness vrátí 503. `NEXT_PUBLIC_APP_ENV=production` nadále vyžaduje skutečné API; demo není schválení živého pilotu. Podrobný postup: [`docs/demo-deployment-2026-11-17.md`](docs/demo-deployment-2026-11-17.md).
+
 ## Overeni
 
 ```bash

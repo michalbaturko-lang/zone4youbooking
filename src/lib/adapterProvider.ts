@@ -14,17 +14,24 @@ export function isRealLuxartMode() {
   return process.env.LUXART_MOCK === "false";
 }
 
+// Hosting production and launching the live club system are distinct choices.
+// An explicit demo on production hosting must still use only mock data.
+export function mockLuxartConfigurationReady(environment = process.env) {
+  if (environment.NEXT_PUBLIC_APP_ENV === "production") return false;
+  return environment.VERCEL_ENV !== "production" || (
+    environment.LUXART_MOCK === "true" && environment.NEXT_PUBLIC_APP_ENV === "demo"
+  );
+}
+
 export function getLuxartAdapter(context: LuxartAdapterContext = {}): LuxartAdapter {
   const mockSetting = process.env.LUXART_MOCK;
-  const appEnvironment = process.env.NEXT_PUBLIC_APP_ENV;
-  const isProduction = appEnvironment === "production" || process.env.VERCEL_ENV === "production";
 
   if (mockSetting === "false") {
     return createRealLuxartAdapter(context);
   }
 
-  if (isProduction) {
-    throw new Error("Production launch requires LUXART_MOCK=false.");
+  if (!mockLuxartConfigurationReady()) {
+    throw new Error("Live production requires LUXART_MOCK=false; a hosted demo requires explicit LUXART_MOCK=true and NEXT_PUBLIC_APP_ENV=demo.");
   }
 
   return mockLuxartAdapter;
