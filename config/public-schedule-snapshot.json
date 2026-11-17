@@ -1,6 +1,6 @@
 {
   "sourceUrl": "https://memberzone.cz/zone4you/scheduler.aspx",
-  "capturedAt": "2026-11-17T17:10:00Z",
+  "capturedAt": "2026-11-17T18:15:43Z",
   "timeZone": "Europe/Prague",
   "validFrom": "2026-11-17",
   "validTo": "2026-11-29",
@@ -8,60 +8,18 @@
   "sources": [
     {
       "sourceFile": "week.html",
-      "sha256": "d1e03313bc83945c7ab90d4801ebb13cf927b5162ddc10adec7e9aafcfd45ad4",
-      "lessonCount": 59,
-      "capturedAt": "2026-11-17T17:09:58Z"
+      "sha256": "4122d84a661b32aa26d0de945b6a080fede4deb87e68599cbddc9df737756359",
+      "lessonCount": 56,
+      "capturedAt": "2026-11-17T18:15:42Z"
     },
     {
       "sourceFile": "callback-2.txt",
-      "sha256": "c5a9c976344d36b27272cb6060ee73feec5c7a33ec3169649352538f1709babd",
+      "sha256": "0ef83b8fa624a7a66a00d6e7debc5d937fd8a45de6a7b6b673c8a712b6f3e12e",
       "lessonCount": 89,
-      "capturedAt": "2026-11-17T17:10:00Z"
+      "capturedAt": "2026-11-17T18:15:43Z"
     }
   ],
   "lessons": [
-    {
-      "id": "public_93380",
-      "luxartLessonId": "93380",
-      "name": "WORLD JUMPING",
-      "startsAt": "2026-11-17T17:30:00Z",
-      "endsAt": "2026-11-17T18:25:00Z",
-      "durationMinutes": 55,
-      "instructorName": "Krhutová Dagmar",
-      "roomName": "Sál 1",
-      "capacity": 8,
-      "occupiedCount": 6,
-      "availableCount": 2,
-      "resourceId": "2001000002"
-    },
-    {
-      "id": "public_92068",
-      "luxartLessonId": "92068",
-      "name": "H.E.A.T.",
-      "startsAt": "2026-11-17T17:30:00Z",
-      "endsAt": "2026-11-17T18:20:00Z",
-      "durationMinutes": 50,
-      "instructorName": "Hrnčiariková Hana",
-      "roomName": "Sál 2",
-      "capacity": 12,
-      "occupiedCount": 1,
-      "availableCount": 11,
-      "resourceId": "2001000003"
-    },
-    {
-      "id": "public_93262",
-      "luxartLessonId": "93262",
-      "name": "REFORMER",
-      "startsAt": "2026-11-17T18:15:00Z",
-      "endsAt": "2026-11-17T19:10:00Z",
-      "durationMinutes": 55,
-      "instructorName": "Vodička Alex",
-      "roomName": "Reformer",
-      "capacity": 5,
-      "occupiedCount": 3,
-      "availableCount": 2,
-      "resourceId": "2001000007"
-    },
     {
       "id": "public_92081",
       "luxartLessonId": "92081",
@@ -142,8 +100,8 @@
       "instructorName": "Sedlák Lucie",
       "roomName": "Sál 3",
       "capacity": 9,
-      "occupiedCount": 7,
-      "availableCount": 2,
+      "occupiedCount": 8,
+      "availableCount": 1,
       "resourceId": "2001000010"
     },
     {

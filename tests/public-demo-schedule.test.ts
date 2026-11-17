@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { lessonContentSetSha256 } from "../scripts/lesson-content-evidence.mjs";
 import source from "../config/public-schedule-snapshot.json";
 import { publicDemoLessons, publicDemoScheduleSource, publicDemoScheduleReady, usesPublicDemoSchedule } from "../src/lib/publicDemoSchedule";
 import { getMockLuxartState, mockLuxartAdapter, resetMockLuxartState, setMockLuxartState } from "../src/lib/mockLuxart";
@@ -22,6 +23,7 @@ test("public demo preserves every source occurrence and does not invent prices o
   configure(context);
   const lessons = publicDemoLessons();
   assert.equal(lessons.length, source.lessons.length);
+  assert.doesNotThrow(() => lessonContentSetSha256(lessons, "public demo runtime contract"));
   assert.equal(new Set(lessons.map(l => l.id)).size, lessons.length);
   for (const expected of source.lessons) {
     const actual = lessons.find(l => l.id === expected.id)!;

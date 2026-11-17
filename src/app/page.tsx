@@ -282,6 +282,7 @@ function displayLessonDescription(lesson: Lesson, locale: Locale) {
 }
 
 function displaySpecialization(lesson: Lesson, locale: Locale) {
+  if (lesson.pricePublished === false) return "";
   return locale === "en"
     ? englishSpecializations[lesson.instructorSpecialization] ?? lesson.instructorSpecialization
     : lesson.instructorSpecialization;

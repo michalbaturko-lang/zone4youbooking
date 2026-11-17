@@ -34,7 +34,7 @@ export function publicDemoLessons(): Lesson[] {
   return snapshot.lessons.map(({ resourceId: _resourceId, ...lesson }) => ({
     ...lesson,
     description: "Lekce převzatá z veřejného rozvrhu Zone4you.",
-    instructorSpecialization: "",
+    instructorSpecialization: "Specializace ve veřejném rozvrhu neuvedena.",
     category: lesson.roomName === "Reformer" ? "Reformer" : "Lekce",
     // No prices are exposed in the public scheduler. Zero is an internal
     // placeholder only; pricePublished=false prevents displaying it as free.
