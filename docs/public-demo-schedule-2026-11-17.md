@@ -2,7 +2,7 @@
 
 Uživatel požádal o převzetí aktuálních lekcí 1:1. Zdroj je veřejný přehled lekcí `https://memberzone.cz/zone4you/scheduler.aspx`, na který odkazuje web Zone4you. Bez přihlášení byly přečtené pouze rozvrhy pro Sál 1, Sál 2, Sál 3 a Reformer. Žádná akce Rezervovat se v originálu neprovedla.
 
-`config/public-schedule-snapshot.json` obsahuje 149 zveřejněných termínů 17.-29. listopadu 2026, zdrojovou adresu, časy načtení obou týdnů a SHA-256 zdrojových odpovědí. Z nich aplikace zobrazuje standardních sedm pražských kalendářních dnů; při převzetí 17.-23. 11. jde o 76 lekcí. Zkopírované jsou skutečné názvy, termíny, přesná délka, uvedené jméno instruktora, umístění, kapacita a zveřejněný počet rezervací. Datum se neposouvá na dnešek podle offsetu jako u syntetického datasetu.
+`config/public-schedule-snapshot.json` obsahuje 148 zveřejněných termínů 17.-29. listopadu 2026, zdrojovou adresu, časy načtení obou týdnů a SHA-256 zdrojových odpovědí. Z nich aplikace zobrazuje standardních sedm pražských kalendářních dnů; při převzetí 17.-23. 11. jde o 75 lekcí. Zkopírované jsou skutečné názvy, termíny, přesná délka, uvedené jméno instruktora, umístění, kapacita a zveřejněný počet rezervací. Datum se neposouvá na dnešek podle offsetu jako u syntetického datasetu.
 
 DevExpress zdroj uvádí dvě délky: skutečnou AddAppointment duration a zaokrouhlenou AddVerticalAppointment výšku v tabulce. Import používá skutečnou duration, nikoli výšku položky. Anonymní callback druhého týdne obsahuje více vrstev escapování; parsovala se data, žádný stažený JavaScript se nespouštěl importérem. Mapa veřejných resource IDs slouží jen k pojmenování sálů a není potvrzením živé REST resource mapy pro zápis.
 
@@ -19,4 +19,8 @@ DevExpress zdroj uvádí dvě délky: skutečnou AddAppointment duration a zaokr
 
 `npm run verify:public-demo-schedule` porovná každou nasazenou lekci s JSON zdrojem pro aktuálních sedm pražských dnů. Vyžaduje `APP_BASE_URL` a na veřejném cíli také přesný `ZONE4YOU_EXPECTED_DEMO_COMMIT`. Nejdříve prokáže demo/mock a public_snapshot; teprve potom čte snapshot s prázdným browser state. Na živém cíli se zastaví. Původní externí Playwright guard pro syntetických 24 lekcí zůstává beze změny a nemá se obcházet.
 
-Vedle standardních regresí provést porovnání všech polí a skutečné browser ověření desktop/mobil/menší mobil/WebKit: dnešní čtyři skutečné lekce, týdenní výpis, zdrojová poznámka, skryté neověřené ceny, detail bez cizí fotografie a jeden řízený booking/storno výhradně nad mock stavem. Stejný produkční build po ověření propagovat na hlavní Vercel adresu. Postup `demo-deployment-2026-11-17.md` nadále platí.
+Vedle standardních regresí provést porovnání všech polí a skutečné browser ověření desktop/mobil/menší mobil/WebKit: dnešní skutečné lekce, týdenní výpis, zdrojová poznámka, skryté neověřené ceny, detail bez cizí fotografie a jeden řízený booking/storno výhradně nad mock stavem. Stejný produkční build po ověření propagovat na hlavní Vercel adresu. Postup `demo-deployment-2026-11-17.md` nadále platí.
+
+Při kontrole skutečného týdenního pohledu se prokázal nedostatečný kontrast bílého textu na světlých barvách Sálu 1 a Sálu 3. Týdenní dlaždice těchto sálů nyní používají tmavý text. Existující WCAG browser regrese nově zahrnuje také týdenní pohled, nejen den a dialogy.
+
+Rozvrh byl těsně před finálním nasazením znovu načten. Originál mezitím odstranil již zahájenou lekci Reformeru z veřejného výpisu, proto finální snapshot obsahuje 148 termínů a aktuální sedmidenní okno 75 (původní pracovní převzetí mělo 149/76). Nasazuje se výhradně novější snapshot.

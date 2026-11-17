@@ -712,6 +712,11 @@ button:disabled {
   transition: transform 0.1s;
 }
 
+.week-lesson.room-sal-1,
+.week-lesson.room-sal-3 {
+  color: #20150c;
+}
+
 .week-lesson:hover {
   transform: scale(1.02);
 }

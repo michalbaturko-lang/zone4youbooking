@@ -1,6 +1,6 @@
 {
   "sourceUrl": "https://memberzone.cz/zone4you/scheduler.aspx",
-  "capturedAt": "2026-11-17T16:50:37Z",
+  "capturedAt": "2026-11-17T17:10:00Z",
   "timeZone": "Europe/Prague",
   "validFrom": "2026-11-17",
   "validTo": "2026-11-29",
@@ -8,32 +8,18 @@
   "sources": [
     {
       "sourceFile": "week.html",
-      "sha256": "9c44f7f4a4ce57055b23520796fd13ab372747d5de54fbbca3fbc332aa57cb0d",
-      "lessonCount": 60,
-      "capturedAt": "2026-11-17T16:47:26Z"
+      "sha256": "d1e03313bc83945c7ab90d4801ebb13cf927b5162ddc10adec7e9aafcfd45ad4",
+      "lessonCount": 59,
+      "capturedAt": "2026-11-17T17:09:58Z"
     },
     {
       "sourceFile": "callback-2.txt",
-      "sha256": "6ba2127294e3cf271e7dd8e9164c40fee34491c6f68b3532dc76e61b5e313220",
+      "sha256": "c5a9c976344d36b27272cb6060ee73feec5c7a33ec3169649352538f1709babd",
       "lessonCount": 89,
-      "capturedAt": "2026-11-17T16:50:37Z"
+      "capturedAt": "2026-11-17T17:10:00Z"
     }
   ],
   "lessons": [
-    {
-      "id": "public_93112",
-      "luxartLessonId": "93112",
-      "name": "REFORMER",
-      "startsAt": "2026-11-17T17:00:00Z",
-      "endsAt": "2026-11-17T17:55:00Z",
-      "durationMinutes": 55,
-      "instructorName": "Malá Jana",
-      "roomName": "Reformer",
-      "capacity": 5,
-      "occupiedCount": 5,
-      "availableCount": 0,
-      "resourceId": "2001000007"
-    },
     {
       "id": "public_93380",
       "luxartLessonId": "93380",
@@ -184,8 +170,8 @@
       "instructorName": "Malá Jana",
       "roomName": "Reformer",
       "capacity": 5,
-      "occupiedCount": 4,
-      "availableCount": 1,
+      "occupiedCount": 5,
+      "availableCount": 0,
       "resourceId": "2001000007"
     },
     {
@@ -198,8 +184,8 @@
       "instructorName": "Mužík Ondřej",
       "roomName": "Sál 1",
       "capacity": 13,
-      "occupiedCount": 1,
-      "availableCount": 12,
+      "occupiedCount": 0,
+      "availableCount": 13,
       "resourceId": "2001000002"
     },
     {
@@ -324,8 +310,8 @@
       "instructorName": "Chlupová Zuzana",
       "roomName": "Sál 1",
       "capacity": 15,
-      "occupiedCount": 3,
-      "availableCount": 12,
+      "occupiedCount": 4,
+      "availableCount": 11,
       "resourceId": "2001000002"
     },
     {
@@ -338,8 +324,8 @@
       "instructorName": "Nečasová  Michaela",
       "roomName": "Reformer",
       "capacity": 5,
-      "occupiedCount": 4,
-      "availableCount": 1,
+      "occupiedCount": 3,
+      "availableCount": 2,
       "resourceId": "2001000007"
     },
     {
@@ -464,8 +450,8 @@
       "instructorName": "Jestříbková Lada",
       "roomName": "Reformer",
       "capacity": 6,
-      "occupiedCount": 0,
-      "availableCount": 6,
+      "occupiedCount": 3,
+      "availableCount": 3,
       "resourceId": "2001000007"
     },
     {

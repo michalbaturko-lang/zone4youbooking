@@ -558,6 +558,24 @@ test("rozvrh a dialogy projdou WCAG scanem i klávesnicovým focus flow", { tag:
   });
   expect(scheduleScan.violations).toEqual([]);
 
+  await page.getByRole("button", { name: "Týden", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Týden", exact: true })).toHaveClass(/active/);
+  await page.locator(".view-toggle").evaluate(async (element) => {
+    await Promise.allSettled(element.getAnimations({ subtree: true }).map((animation) => animation.finished));
+  });
+  const weekScan = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  await testInfo.attach("accessibility-week", {
+    body: JSON.stringify(weekScan, null, 2),
+    contentType: "application/json",
+  });
+  expect(weekScan.violations).toEqual([]);
+  await page.getByRole("button", { name: "Den", exact: true }).click();
+  await page.locator(".view-toggle").evaluate(async (element) => {
+    await Promise.allSettled(element.getAnimations({ subtree: true }).map((animation) => animation.finished));
+  });
+
   await page.getByLabel("Filtr místnosti").getByRole("button", { name: "Reformer", exact: true }).click();
   const reformerTrigger = page.locator(".lesson-row").filter({ hasText: "REFORMER" }).first();
   await reformerTrigger.focus();

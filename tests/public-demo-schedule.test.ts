@@ -41,6 +41,7 @@ test("an old browser schedule cannot restore fabricated bookings or old occupanc
   delete process.env.ZONE4YOU_DEMO_SCHEDULE;
   resetMockLuxartState();
   const old = getMockLuxartState();
+  delete old.scheduleVersion; // Browser state from the previously deployed demo.
   configure(context);
   setMockLuxartState({ ...old, loggedIn: true });
   const recovered = getMockLuxartState();
