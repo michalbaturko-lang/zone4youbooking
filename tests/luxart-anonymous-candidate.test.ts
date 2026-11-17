@@ -186,6 +186,32 @@ test("semantic drift remains ineligible for D1", async () => {
   assert.equal(report.contract.checked, true);
 });
 
+test("TLS failures retain the diagnostic code and stop before contract requests", async () => {
+  let contractCalls = 0;
+  const report = await runAnonymousLuxartCandidateVerification({
+    environment,
+    now,
+    helpProbe: async () => ({
+      ...readyHelp(),
+      ok: false,
+      reached: false,
+      classification: "network_unavailable",
+      httpStatus: undefined,
+      bodySha256: undefined,
+      networkCode: "ERR_TLS_CERT_ALTNAME_INVALID",
+    }),
+    contractVerifier: async () => {
+      contractCalls += 1;
+      return readyContract();
+    },
+  });
+  assert.equal(report.help.networkCode, "ERR_TLS_CERT_ALTNAME_INVALID");
+  assert.equal(contractCalls, 0);
+  assert.equal(report.d1Eligible, false);
+  assert.equal(report.credentialsAuthorized, false);
+  assert.equal(report.launchAuthority, false);
+});
+
 test("candidate evidence is rejected when a dependency switches the target", async () => {
   await assert.rejects(
     runAnonymousLuxartCandidateVerification({

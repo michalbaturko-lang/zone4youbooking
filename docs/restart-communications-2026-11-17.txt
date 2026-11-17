@@ -1,0 +1,79 @@
+ZONE4YOU — ZPRÁVY PŘIPRAVENÉ K ODESLÁNÍ
+Datum přípravy: 17. 11. 2026. Zprávy zatím nebyly odeslány.
+
+1. IT: PAVEL ŠVÁB
+Komu: pavel@alipa.cz
+Kopie: info@luxart.cz, zdenek.treblik@zone4you.cz
+Předmět: Zone4You booking — dokončení přístupu k API a společný test
+
+Dobrý den pane Švábe,
+
+navazuji na naši komunikaci z 22. září. Rád bych teď dotáhl napojení nového bookingu na testovací Member Pro.
+
+Navrhujeme uzavřít variantu HTTPS reverse proxy na portu 443, omezenou na statické odchozí IP našeho backendu ve Frankfurtu a chráněnou Basic Auth. Interní REST API na portu 9759 zůstane neveřejné. Prosím potvrďte, že je pro Vás tato varianta přijatelná; pokud je podmínkou VPN, napište prosím typ a potřebné parametry připojení.
+
+Na naší straně připravíme statické odchozí IP a dodáme je po schválení a aktivaci služby. Zatím je nemáme přidělené. Prosím neposouvejte firewall do neomezeného režimu.
+
+Při dnešní kontrole se booking-api.zone4you.cz překládá v DNS, ale HTTPS certifikát nepokrývá tento hostname. Potřebujeme od Vás:
+
+• přesnou potvrzenou HTTPS adresu API a /Help, s platným certifikátem a úplným řetězcem;
+• potvrzení směrování na REST API 9759 nad testovací databází Zone4You;
+• vypnutý výpis adresáře a vynechání/redakci login, password i member_card_number v logách proxy, webserveru a monitoringu;
+• termín, kdy bude připravená síťová část, a dva návrhy času pro společný integrační test.
+
+Nejprve ověříme dokumentaci bez přihlašovacích údajů. Následný testovací login a čtení dat proběhnou po potvrzení bezpečného logování od IT i Luxartu. Hesla prosím neposílejte v odpovědi; způsob bezpečného předání domluvíme samostatně.
+
+Produkční DNS bookingu nyní nepřepínáme. Prosím o potvrzení varianty a termínu do dvou pracovních dnů od této zprávy.
+
+Děkuji
+Michal Baturko
+
+────────────────────────────────────────────────────
+
+2. LUXART: JOSEF KOCIAN
+Komu: info@luxart.cz
+Kopie: pavel@alipa.cz, zdenek.treblik@zone4you.cz
+Předmět: Zone4You booking — logování loginu a podklady pro testovací integraci
+
+Dobrý den pane Kociane,
+
+navazuji na Vaše potvrzení ze 14. září: REST API na interním portu 9759 používá stejný kontrakt a testovací databázi Zone4You. Se správcem IT dokončujeme bezpečný přístup.
+
+Před testovacím přihlášením potřebujeme dořešit logování. Uvedl jste, že se hash hesla ukládá do logu na pět dní. Protože jej API používá k přihlášení, potřebujeme, aby se login, password/hash ani member_card_number neukládaly v aplikačních, přístupových a souvisejících diagnostických logách. Prosím potvrďte, kdo změnu provede či ověří a kdy bude hotová. Pokud už je vyřešená, stačí popsat aktuální nastavení a datum ověření.
+
+Pro další integrační krok také prosíme:
+
+• určit vlastníka a dodat úplné mapování cislo_salu → id_resource pro všechny sály včetně Reformeru;
+• potvrdit aktivní Zone4You šablony pro potvrzení rezervace a její storno — emaily bude posílat Luxart, naše aplikace je nebude duplikovat;
+• potvrdit, jak API vynucuje rezervační okno, minimum kreditu, stržení/blokaci kreditu a pozdní storno, aby se pravidla neprováděla dvakrát;
+• určit kontakt pro společné ověření nad testovací databází.
+
+Dedikované Basic Auth a testovací klientské údaje předáme až po ověření HTTPS odděleným bezpečným kanálem, nikoliv emailem. Prosím o potvrzení vlastníka a termínu do dvou pracovních dnů od této zprávy.
+
+Děkuji
+Michal Baturko
+
+────────────────────────────────────────────────────
+
+3. ZONE4YOU: ZDENĚK TREBLÍK
+Komu: zdenek.treblik@zone4you.cz
+Předmět: Zone4You booking — potvrzení pravidel a postupu pilotu
+
+Ahoj Zdeňku,
+
+prošel jsem stav nového bookingu. Demo funguje, ale reálné napojení zatím stojí na přístupu k Member Pro a vyřešení logování u Luxartu. Na naší straně zbývá také zajistit statické IP pro přístup. Tyto technické body řešíme samostatně s Pavlem Švábem a panem Kocianem.
+
+Pro první pilot počítáme s rezervací a stornem všech lekcí z rozvrhu Member Pro včetně Reformeru, v češtině i angličtině. Online dobití kreditu bychom zapnuli až v další fázi; pilot tedy využije stávající kredit a recepci. Prosím potvrď, že tento postup platí.
+
+Potřebujeme uzavřít tři pravidla:
+
+1. Kdy přesně se rezervace otevírá a zavírá? Prosím počet dnů/hodin a čas.
+2. U potvrzeného minima 200 Kč: pouze kontrolujeme zůstatek, nebo se částka při rezervaci blokuje/strhává? Pokud ano, kolik a kdy se vrací?
+3. Bezplatné storno běžné lekce máme zaznamenané do 00:00 na začátku dne lekce. Potvrď prosím tento výklad, poplatek za pozdní storno a no-show, zda lze pozdě stornovat online, a případné odlišnosti Reformeru.
+
+Prosím ještě o člověka z recepce pro akceptační test, malou pilotní skupinu a povolení testovacího přihlášení a čtení dat nad testovací databází. Rezervaci a následné storno předem popíšeme v konkrétním testovacím scénáři a domluvíme zvlášť.
+
+Termín spuštění stanovíme po funkčním napojení a otestování; starý zářijový termín už neplatí. Můžeš mi prosím odpovědět do dvou pracovních dnů?
+
+Díky
+Michal

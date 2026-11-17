@@ -66,6 +66,7 @@ function summarizeHelp(help: HelpEvidence) {
     reached: help.reached,
     classification: help.classification,
     httpStatus: help.httpStatus,
+    networkCode: help.networkCode,
     bodySha256: help.bodySha256,
     directoryBrowsingChecked: help.directoryBrowsingChecked,
     directoryBrowsingDetected: help.directoryBrowsingDetected,

@@ -1,6 +1,20 @@
 # Zone4You IT — příjem a vyhodnocení odpovědi
 
-Aktualizace: 2026-09-13
+Aktualizace: 2026-11-17
+
+## Aktuální vyhodnocení — nahrazuje historické závěry níže
+
+- Luxart 14. 9. potvrdil REST kontrakt na interním portu `9759`, testovací databázi, HTTPS/IP allowlist a Basic Auth. Tyto body nejsou znovu „nepotvrzené“ jen kvůli starší tabulce níže.
+- IT 22. 9. požádalo o statické IP a vyjasnění reverse proxy oproti VPN. Naše odpověď doporučila HTTPS 443 → interní 9759, Basic Auth a allowlist dvou statických odchozích IP po aktivaci Vercel Static IPs. Dohoda o variantě a skutečné IP nejsou v dohledané odpovědi dokončené.
+- `booking-api.zone4you.cz` je pouze navržený kandidát, nikoli schválený API origin. Kontrola 17. 11. potvrdila DNS A/AAAA, ale TLS certifikát nesedí na tento hostname. Stejná chyba je na `booking.zone4you.cz`. Neobcházet validaci certifikátu.
+- Luxart uvedl pětidenní logování klientského password hashe. Do písemného potvrzení redakce všech vrstev se klientský login nespouští; podmínky jsou v [potvrzení ze 14. 9.](luxart-access-confirmation-2026-09-14.md).
+- **Další krok:** uzavřít síťovou variantu, schválit náklad/přidělit IP, IT dodá přesný HTTPS origin a dokončí proxy/TLS/allowlist, Luxart i IT potvrdí redakci logů. Potom anonymní probe, následně povolený D1. Port `9191` se již nepoužívá jako výchozí požadavek.
+- Stav nyní: **NO-GO pro klientský login, rezervace/storno a spuštění pilotu**. Detailní vlastníci a pořadí jsou v [plánu pokračování](restart-plan-2026-11-17.md).
+- Tvrzení o aktivním dvouhodinovém monitoru v historické části není k 17. 11. znovu ověřené a nelze se na něj spoléhat.
+
+## Historický záznam do 13. 9. 2026
+
+Následující tabulka a výsledky zachycují tehdejší hledání portu 9191. Nejsou aktuální konfigurací ani zadáním pro IT.
 
 Tento checklist slouží pouze k vyhodnocení technické odpovědi. Není souhlasem s deployem, DNS změnou ani živou Luxart mutací. Hesla, tokeny, privátní klíče a klientské přihlašovací údaje se do tohoto souboru ani do repozitáře nevkládají.
 
