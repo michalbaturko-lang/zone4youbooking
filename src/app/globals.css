@@ -1890,3 +1890,7 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
+
+.schedule-source { padding: 5px 14px; text-align: center; font-size: 11px; line-height: 1.4; color: var(--gray-700); background: var(--gray-50); overflow-wrap: anywhere; }
+.schedule-source a { color: inherit; text-decoration: underline; }
+.instructor-placeholder { display: grid; place-items: center; background: var(--gray-100); color: var(--gray-500); }

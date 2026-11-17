@@ -120,5 +120,8 @@
   "error.staleTitle": "Aktuálnost dat nelze potvrdit",
   "error.staleBody": "Zobrazená data mohou být zastaralá. Před rezervací obnovte spojení.",
   "error.retry": "Zkusit znovu",
-  "error.supportReference": "Kód pro podporu: {requestId}."
+  "error.supportReference": "Kód pro podporu: {requestId}.",
+  "demo.scheduleSnapshot": "Rozvrh a obsazenost převzaty {date}. Bez živé synchronizace.",
+  "lesson.priceUnpublished": "Ve veřejném rozvrhu neuvedena",
+  "demo.scheduleExpired": "Pro celý týden je potřeba rozvrh aktualizovat."
 }

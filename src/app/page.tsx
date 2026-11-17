@@ -275,6 +275,9 @@ function displayLessonName(lesson: Lesson, locale: Locale) {
 }
 
 function displayLessonDescription(lesson: Lesson, locale: Locale) {
+  if (lesson.pricePublished === false) return locale === "en"
+    ? "Class copied from Zone4you’s public timetable."
+    : lesson.description;
   return locale === "en" ? englishLessonDescriptions[lesson.name] ?? lesson.description : lesson.description;
 }
 
@@ -294,6 +297,7 @@ function displayRoomName(roomName: string, locale: Locale) {
 }
 
 function displayCategory(category: string, locale: Locale) {
+  if (category === "Lekce" && locale === "en") return "Classes";
   if (locale !== "en") return category;
   return ({ Síla: "Strength", Zdraví: "Health", Ostatní: "Other" } as Record<string, string>)[category] ?? category;
 }
@@ -855,6 +859,16 @@ export default function Home() {
         </div>
       )}
 
+      {capabilities.businessRulesStatus === "demo" && snapshot?.demoSchedule && (
+        <div className="schedule-source" role="note">
+          <a href={snapshot.demoSchedule.url} target="_blank" rel="noopener noreferrer">Memberzone</a>
+          {" • "}{t("demo.scheduleSnapshot", { date: formatDateTime(snapshot.demoSchedule.capturedAt, locale) })}
+          {addZone4YouCalendarDays(zone4YouDateKey(new Date()), rules.scheduleDays - 1) > snapshot.demoSchedule.validTo && (
+            <strong> {t("demo.scheduleExpired")}</strong>
+          )}
+        </div>
+      )}
+
       {toast && (
         <div className="toast-container">
           <div className={`toast toast-${toast.tone}`} role={toast.tone === "error" ? "alert" : "status"}>
@@ -1097,7 +1111,9 @@ export default function Home() {
                             <h4>{activeReservationLabel(reservation, lesson, locale, t)}</h4>
                             <p>
                               {lesson
-                                ? policyVisible
+                                ? lesson.pricePublished === false
+                                  ? `${displayRoomName(lesson.roomName, locale)} • ${t("reservations.hold", { hold: money(reservationHold(reservation, rules), locale) })}`
+                                  : policyVisible
                                   ? t("reservations.holdAndPrice", { room: displayRoomName(lesson.roomName, locale), hold: money(reservationHold(reservation, rules), locale), price: money(reservation.priceKc, locale) })
                                   : t("reservations.roomAndPrice", { room: displayRoomName(lesson.roomName, locale), price: money(reservation.priceKc, locale) })
                                 : policyVisible
@@ -1339,7 +1355,8 @@ function LessonRow({
       <div className={`lesson-info ${roomClass(lesson.roomName)}`}>
         <div className="lesson-name">{displayLessonName(lesson, locale)}</div>
         <div className="lesson-meta">
-          {displayInstructorName(lesson.instructorName, locale)} • {displayRoomName(lesson.roomName, locale)} • {money(lesson.priceKc, locale)}
+          {displayInstructorName(lesson.instructorName, locale)} • {displayRoomName(lesson.roomName, locale)}
+          {lesson.pricePublished !== false && <> • {money(lesson.priceKc, locale)}</>}
         </div>
       </div>
       <div className="lesson-badges">
@@ -1533,7 +1550,11 @@ function LessonModal({
         <div className="modal-body">
           <div className="modal-instructor-section">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="modal-instructor-photo" src={lesson.instructorPhoto} alt="" />
+            {lesson.instructorPhoto ? (
+              <img className="modal-instructor-photo" src={lesson.instructorPhoto} alt="" />
+            ) : (
+              <div className="modal-instructor-photo instructor-placeholder" aria-hidden="true"><UserRound size={40} /></div>
+            )}
             <div className="modal-instructor-info">
               <h4>{displayInstructorName(lesson.instructorName, locale)}</h4>
               <p>{displaySpecialization(lesson, locale)}</p>
@@ -1568,7 +1589,7 @@ function LessonModal({
             </div>
             <div className="modal-info-row">
               <span className="modal-info-label">{t("lesson.price")}</span>
-              <span className="modal-info-value">{money(lesson.priceKc, locale)}</span>
+              <span className="modal-info-value">{lesson.pricePublished === false ? t("lesson.priceUnpublished") : money(lesson.priceKc, locale)}</span>
             </div>
             {policyVisible && (
               <div className="modal-info-row">

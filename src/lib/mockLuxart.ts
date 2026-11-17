@@ -19,6 +19,7 @@ import {
   freeCancellationDeadlineForLesson,
 } from "./bookingRules";
 import { BookingApiError } from "./errors";
+import { demoScheduleVersion, publicDemoLessons, usesPublicDemoSchedule } from "./publicDemoSchedule";
 
 const RESORT_ID = bookingRules.resortId;
 const MINIMUM_CREDIT_FOR_RESERVATION_KC = bookingRules.minimumCreditForReservationKc;
@@ -196,6 +197,7 @@ let currentUser: User | null = null;
 let userState: User = { ...demoUser };
 
 function createSeedLessons(): Lesson[] {
+  if (usesPublicDemoSchedule()) return publicDemoLessons();
   return [
     lessonSeed("les_001", 0, "16:30", 50, "HEAT easy", "Sál 2", "Cardio", "Lenka Olivová", 14, 9, 180, true),
     lessonSeed("les_002", 0, "17:30", 50, "SPINNING", "Sál 2", "Cardio", "Petra Uhrová", 16, 15, 180, true),
@@ -225,6 +227,7 @@ function createSeedLessons(): Lesson[] {
 }
 
 function createSeedReservations(): Reservation[] {
+  if (usesPublicDemoSchedule()) return [];
   return [
     {
       id: "res_seed_001",
@@ -240,6 +243,7 @@ function createSeedReservations(): Reservation[] {
 }
 
 function createSeedWaitlist(): WaitlistEntry[] {
+  if (usesPublicDemoSchedule()) return [];
   return [
     {
       id: "wl_seed_001",
@@ -253,6 +257,7 @@ function createSeedWaitlist(): WaitlistEntry[] {
 }
 
 function createSeedTransactions(): CreditTransaction[] {
+  if (usesPublicDemoSchedule()) return [];
   return [
     {
       id: "trx_seed_001",
@@ -282,6 +287,7 @@ let waitlist: WaitlistEntry[] = createSeedWaitlist();
 let transactions: CreditTransaction[] = createSeedTransactions();
 
 export interface MockLuxartState {
+  scheduleVersion?: string;
   loggedIn: boolean;
   userState: User;
   reservations: Reservation[];
@@ -307,6 +313,7 @@ function applyOccupiedCounts(counts: Record<string, number> = {}) {
 
 export function getMockLuxartState(): MockLuxartState {
   return {
+    scheduleVersion: demoScheduleVersion(),
     loggedIn: Boolean(currentUser),
     userState: { ...userState },
     reservations: reservations.map((reservation) => ({ ...reservation })),
@@ -317,6 +324,10 @@ export function getMockLuxartState(): MockLuxartState {
 }
 
 export function setMockLuxartState(state: MockLuxartState) {
+  if ((state.scheduleVersion ?? "synthetic-v1") !== demoScheduleVersion()) {
+    resetMockLuxartState();
+    return;
+  }
   userState = { ...state.userState };
   lessons = createSeedLessons();
   reservations = state.reservations.map((reservation) => ({ ...reservation }));

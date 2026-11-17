@@ -47,6 +47,7 @@ export interface Lesson {
   availableCount?: number;
   canCurrentUserReserve?: boolean;
   priceKc: number;
+  pricePublished?: boolean;
   reservationOpensAt?: ISODateTime;
   reservationClosesAt?: ISODateTime;
   waitlistEnabled: boolean;
@@ -146,7 +147,16 @@ export interface LuxartAdapter {
   createTopup(input: CreateTopupInput): Promise<PaymentTopup>;
 }
 
+export interface DemoScheduleSource {
+  url: string;
+  capturedAt: string;
+  validFrom: string;
+  validTo: string;
+  version: string;
+}
+
 export interface BookingSnapshot {
+  demoSchedule?: DemoScheduleSource;
   user: User | null;
   lessons: Lesson[];
   reservations: Reservation[];

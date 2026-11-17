@@ -92,7 +92,8 @@ function validOccupiedCounts(value: unknown) {
 }
 
 export function isSafeMockLuxartState(value: unknown): value is MockLuxartState {
-  if (!record(value) || typeof value.loggedIn !== "boolean" || !validUser(value.userState)) return false;
+  if (!record(value) || typeof value.loggedIn !== "boolean" || !validUser(value.userState) ||
+    !optionalBoundedText(value.scheduleVersion, 128)) return false;
   const reservations = value.reservations;
   const waitlist = value.waitlist;
   const transactions = value.transactions;

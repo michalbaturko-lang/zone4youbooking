@@ -28,6 +28,15 @@ function policy(value: Record<string, unknown>) {
 
 export function isBookingSnapshotResponse(value: unknown): boolean {
   if (!object(value) || !object(value.rules) || !object(value.capabilities)) return false;
+  if (value.demoSchedule !== undefined) {
+    const source = value.demoSchedule;
+    if (!object(source) || source.url !== "https://memberzone.cz/zone4you/scheduler.aspx" ||
+      !parseExplicitLuxartDateTime(source.capturedAt) ||
+      !texts(source, ["validFrom", "validTo", "version"]) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(String(source.validFrom)) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(String(source.validTo)) ||
+      String(source.version).length > 128) return false;
+  }
   const r = value.rules;
   const c = value.capabilities;
   if (!numbers(r, ["minimumCreditForReservationKc", "reservationHoldKc", "reservationWindowHours", "resortId"]) ||
@@ -46,6 +55,7 @@ export function isBookingSnapshotResponse(value: unknown): boolean {
     numbers(l, ["durationMinutes", "capacity", "occupiedCount", "priceKc"]) &&
     Boolean(parseExplicitLuxartDateTime(l.startsAt)) && Boolean(parseExplicitLuxartDateTime(l.endsAt)) &&
     typeof l.waitlistEnabled === "boolean" &&
+    (l.pricePublished === undefined || typeof l.pricePublished === "boolean") &&
     (l.canCurrentUserReserve === undefined || typeof l.canCurrentUserReserve === "boolean")) &&
     list(value.reservations, (r) => texts(r, ["id", "userId", "lessonId"]) &&
       ["active", "cancelled", "attended", "no_show"].includes(String(r.status)) && numbers(r, ["priceKc"]) && Boolean(parseExplicitLuxartDateTime(r.reservedAt))) &&

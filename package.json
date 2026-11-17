@@ -44,7 +44,8 @@
     "quality": "npm test && npm run typecheck && npm run build && npm run test:e2e && npm audit --omit=dev && npm run scan:release-secrets",
     "check:launch": "node scripts/check-launch-readiness.mjs",
     "test:postgres": "tsx --test tests/*.integration.ts",
-    "inspect:booking-ledger": "tsx scripts/inspect-booking-ledger.ts"
+    "inspect:booking-ledger": "tsx scripts/inspect-booking-ledger.ts",
+    "verify:public-demo-schedule": "tsx scripts/verify-public-demo-schedule.ts"
   },
   "dependencies": {
     "lucide-react": "^1.21.0",

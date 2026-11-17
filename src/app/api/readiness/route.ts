@@ -22,6 +22,8 @@ import {
 import { BookingApiError } from "@/lib/errors";
 import { luxartResourceMappingSha256 } from "@/lib/luxartResourceMappingFingerprint";
 
+import { publicDemoScheduleSource, publicDemoScheduleReady, usesPublicDemoSchedule } from "@/lib/publicDemoSchedule";
+
 export const dynamic = "force-dynamic";
 
 export async function GET() {
@@ -39,6 +41,12 @@ export async function GET() {
         schedule: "not_checked",
       }, { status: 503 });
     }
+    if (usesPublicDemoSchedule() && !publicDemoScheduleReady()) {
+      return ok({ status: "not_ready", mode: "demo", phase: "demo",
+        commit: commit ?? "unverified", region: runtimeDeploymentRegion(),
+        schedule: "public_snapshot_expired", demoSchedule: publicDemoScheduleSource(),
+        luxart: "mock" }, { status: 503 });
+    }
     return ok({
       status: "ready",
       mode: "demo",
@@ -46,7 +54,8 @@ export async function GET() {
       commit: commit ?? "unverified",
       region: runtimeDeploymentRegion(),
       luxart: "mock",
-      schedule: "mock",
+      schedule: usesPublicDemoSchedule() ? "public_snapshot" : "mock",
+      demoSchedule: publicDemoScheduleSource(),
       rateLimit: "memory",
       bookingNotifications: "mock",
       capabilities: getPilotCapabilities(),

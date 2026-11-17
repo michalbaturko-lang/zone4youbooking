@@ -120,5 +120,8 @@
   "error.staleTitle": "Data freshness cannot be confirmed",
   "error.staleBody": "The displayed data may be outdated. Restore the connection before booking.",
   "error.retry": "Try again",
-  "error.supportReference": "Support reference: {requestId}."
+  "error.supportReference": "Support reference: {requestId}.",
+  "demo.scheduleSnapshot": "Timetable and occupancy copied {date}. No live synchronization.",
+  "lesson.priceUnpublished": "Not published in the public timetable",
+  "demo.scheduleExpired": "Refresh the timetable to cover the whole week."
 }

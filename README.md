@@ -26,6 +26,12 @@ Klientsky Vercel preview link je Shareable Link s tokenem v URL. Nepatri do vere
 
 Produkční hosting může sloužit jako výslovně označené demo: nastavit současně `LUXART_MOCK=true` a `NEXT_PUBLIC_APP_ENV=demo` pro dané nasazení. Chybějící či jiné nastavení na produkčním hostingu se odmítne a readiness vrátí 503. `NEXT_PUBLIC_APP_ENV=production` nadále vyžaduje skutečné API; demo není schválení živého pilotu. Podrobný postup: [`docs/demo-deployment-2026-11-17.md`](docs/demo-deployment-2026-11-17.md).
 
+## Aktuální veřejný rozvrh v demu
+
+Jednorázový snapshot skutečných lekcí je v `config/public-schedule-snapshot.json`. Pro jeho zobrazení použít `ZONE4YOU_DEMO_SCHEDULE=public_snapshot` v explicitním demo prostředí. Data zachovávají pevná skutečná data/časy a obsazenost k okamžiku načtení. UI uvádí zdroj a čas; nedoložené ceny a fotky se nezobrazují. Nejde o živé Member Pro. Postup a omezení: [`docs/public-demo-schedule-2026-11-17.md`](docs/public-demo-schedule-2026-11-17.md).
+
+`APP_BASE_URL=<demo-origin> ZONE4YOU_EXPECTED_DEMO_COMMIT=<celý SHA> npm run verify:public-demo-schedule` ověří všechny převzaté lekce proti nasazenému API.
+
 ## Overeni
 
 ```bash
